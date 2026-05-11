@@ -16,6 +16,9 @@ from kigo_xcvario_simulator.session import SimulatorRuntimeSession
 
 
 class _FakePublisher:
+    def __init__(self) -> None:
+        self.oat_c = 18.0
+
     def start(self) -> None:
         return None
 
@@ -24,6 +27,9 @@ class _FakePublisher:
 
     def publish_snapshot(self, _snapshot) -> None:
         return None
+
+    def set_oat_c(self, oat_c: float) -> None:
+        self.oat_c = float(oat_c)
 
 
 def _config() -> SimulatorRuntimeConfig:
@@ -121,6 +127,24 @@ class ControlApiTests(unittest.TestCase):
         self.assertEqual(payload["snapshot"]["wind"]["speed_kmh"], 25.5)
         self.assertEqual(payload["runtime"]["wind"]["direction_deg"], 90.0)
         self.assertEqual(payload["runtime"]["wind"]["speed_kmh"], 25.5)
+
+    def test_oat_endpoint_updates_runtime_metadata_and_xcvario_adapter(self):
+        self.connection.request(
+            "POST",
+            "/api/v1/simulation/oat",
+            body=json.dumps({"oat_c": 7.5}),
+            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+        )
+        response = self.connection.getresponse()
+        response.read()
+        self.assertEqual(response.status, 204)
+
+        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
+        response = self.connection.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(payload["runtime"]["environment"]["oat_c"], 7.5)
+        self.assertEqual(self.session.xcvario_adapter.oat_c, 7.5)
 
     def test_preset_endpoint_accepts_on_ground(self):
         self.connection.request(

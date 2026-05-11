@@ -29,6 +29,8 @@ const applyManualButton = document.getElementById("apply-manual-button");
 const windDirectionInput = document.getElementById("wind-direction-input");
 const windSpeedInput = document.getElementById("wind-speed-input");
 const applyWindButton = document.getElementById("apply-wind-button");
+const oatInput = document.getElementById("oat-input");
+const applyOatButton = document.getElementById("apply-oat-button");
 
 const trafficEnabledInput = document.getElementById("traffic-enabled-input");
 const trafficCountInput = document.getElementById("traffic-count-input");
@@ -288,6 +290,10 @@ function syncControlValues() {
     setNumericValueIfIdle(windDirectionInput, wind.direction_deg, 1);
     setNumericValueIfIdle(windSpeedInput, wind.speed_kmh, 1);
   }
+  const environment = state.runtime ? state.runtime.environment : null;
+  if (environment) {
+    setNumericValueIfIdle(oatInput, environment.oat_c, 1);
+  }
 }
 
 function setSelectValueIfIdle(node, value) {
@@ -368,6 +374,10 @@ function renderHealth(snapshot, runtime) {
       snapshot && snapshot.wind
         ? `${formatNumber(snapshot.wind.direction_deg, 1)} deg / ${formatNumber(snapshot.wind.speed_kmh, 1)} km/h`
         : "-",
+    ],
+    [
+      "OAT",
+      runtime && runtime.environment ? `${formatNumber(runtime.environment.oat_c, 1)} deg C` : "-",
     ],
     [
       "Traffic Mode",
@@ -468,6 +478,12 @@ applyWindButton.addEventListener("click", () => {
     direction_deg: numericValue(windDirectionInput) ?? 0,
     speed_kmh: numericValue(windSpeedInput) ?? 0,
   });
+});
+
+applyOatButton.addEventListener("click", () => {
+  void postCommand("/api/v1/simulation/oat", {
+    oat_c: numericValue(oatInput) ?? 18.0,
+  }, { syncControls: true });
 });
 
 applyTrafficButton.addEventListener("click", () => {

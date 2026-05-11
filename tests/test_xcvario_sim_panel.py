@@ -18,10 +18,13 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             'id="manual-heading-input" type="number" step="0.1" value="135"',
             'id="manual-speed-input" type="number" step="0.1" value="95"',
             "Wysokosc [m]",
-            "<h2>Wind</h2>",
+            "<h2>Atmosphere</h2>",
             'id="wind-direction-input"',
             'id="wind-speed-input"',
             'id="apply-wind-button"',
+            'id="oat-input"',
+            'id="apply-oat-button"',
+            "OAT [deg C]",
             'id="circling-speed-min-input"',
             'id="circling-speed-max-input"',
             'id="apply-manual-button"',
@@ -55,6 +58,7 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             "/api/v1/events",
             '"/api/v1/simulation/manual-mode"',
             '"/api/v1/simulation/wind"',
+            '"/api/v1/simulation/oat"',
             '"/api/v1/simulation/traffic"',
             '"/api/v1/simulation/start"',
             '"/api/v1/simulation/pause"',
@@ -73,6 +77,8 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             '["speed_max_kmh", numericValue(circlingSpeedMaxInput)]',
             "direction_deg: numericValue(windDirectionInput) ?? 0",
             "speed_kmh: numericValue(windSpeedInput) ?? 0",
+            "oat_c: numericValue(oatInput) ?? 18.0",
+            "runtime.environment.oat_c",
         ):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, script)

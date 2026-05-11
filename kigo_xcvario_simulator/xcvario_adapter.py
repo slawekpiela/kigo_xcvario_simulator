@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import replace
+import math
 import socket
 from threading import Event, Lock, Thread
 
-from .contracts import SimulationSnapshot
+from .contracts import OwnshipState, SimulationSnapshot, WindState
 from .baro import qnh_hpa_for_static_pressure, static_pressure_hpa_for_altitude
 from .nmea import build_gpgga, build_gprmc, build_pov, build_pxcv, build_wimwv, dynamic_pressure_pa_for_speed
 from .state import FlightPhase
@@ -57,6 +58,16 @@ class XcvarioTcpAdapter:
     def client_connected(self) -> bool:
         with self._lock:
             return self._client_socket is not None
+
+    @property
+    def oat_c(self) -> float:
+        with self._lock:
+            return self._oat_c
+
+    def set_oat_c(self, oat_c: float) -> None:
+        resolved_oat_c = validate_oat_c(oat_c)
+        with self._lock:
+            self._oat_c = resolved_oat_c
 
     def start(self) -> None:
         with self._lock:
@@ -113,7 +124,8 @@ class XcvarioTcpAdapter:
         payload_parts = []
         if include_position:
             position_ownship = self._ownship_for_position_output(snapshot)
-            payload_parts.append(build_gprmc(position_ownship))
+            gps_ownship = _ownship_with_wind_adjusted_ground_speed(position_ownship, snapshot.wind)
+            payload_parts.append(build_gprmc(gps_ownship))
             payload_parts.append(build_gpgga(position_ownship))
         payload_parts.append(
             build_pxcv(
@@ -329,3 +341,37 @@ def _find_separator(buffer: bytearray) -> int:
 
 def _command_value_text(raw_value_text: str) -> str:
     return raw_value_text.split("*", 1)[0].strip()
+
+
+def _ownship_with_wind_adjusted_ground_speed(ownship: OwnshipState, wind: WindState) -> OwnshipState:
+    return replace(
+        ownship,
+        speed_kmh=_ground_speed_kmh_from_true_wind(
+            airspeed_kmh=ownship.speed_kmh,
+            track_deg=ownship.track_deg,
+            wind_from_direction_deg=wind.direction_deg,
+            wind_speed_kmh=wind.speed_kmh,
+        ),
+    )
+
+
+def _ground_speed_kmh_from_true_wind(
+    *,
+    airspeed_kmh: float,
+    track_deg: float,
+    wind_from_direction_deg: float,
+    wind_speed_kmh: float,
+) -> float:
+    headwind_component_kmh = max(0.0, float(wind_speed_kmh)) * math.cos(
+        math.radians(float(track_deg) - float(wind_from_direction_deg))
+    )
+    return max(0.0, max(0.0, float(airspeed_kmh)) - headwind_component_kmh)
+
+
+def validate_oat_c(oat_c: float) -> float:
+    resolved_oat_c = float(oat_c)
+    if not math.isfinite(resolved_oat_c):
+        raise ValueError("oat_c must be finite.")
+    if resolved_oat_c <= -273.15:
+        raise ValueError("oat_c must be above absolute zero.")
+    return resolved_oat_c

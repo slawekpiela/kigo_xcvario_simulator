@@ -8,7 +8,7 @@ from .flarm_adapter import FlarmTcpAdapter
 from .orchestrator import ScenarioOrchestrator
 from .scheduler import TelemetryScheduler
 from .state import FlightPhase
-from .xcvario_adapter import XcvarioTcpAdapter
+from .xcvario_adapter import DEFAULT_OAT_C, XcvarioTcpAdapter, validate_oat_c
 from .xcvario_polar import get_xcvario_polar
 
 
@@ -40,6 +40,7 @@ class SimulatorRuntimeSession:
             bind_host=runtime_config.flarm.bind_host,
             port=runtime_config.flarm.port,
         )
+        self._oat_c = float(getattr(self.xcvario_adapter, "oat_c", DEFAULT_OAT_C))
         self.scheduler = scheduler or TelemetryScheduler(
             orchestrator=self.orchestrator,
             ownship_publishers=(self.xcvario_adapter,),
@@ -107,6 +108,9 @@ class SimulatorRuntimeSession:
                 "direction_deg": wind.direction_deg,
                 "speed_kmh": wind.speed_kmh,
             },
+            "environment": {
+                "oat_c": self._oat_c,
+            },
             "adapters": {
                 "xcvario": {
                     "bound_port": getattr(self.xcvario_adapter, "bound_port", self.runtime_config.xcvario.port),
@@ -156,6 +160,14 @@ class SimulatorRuntimeSession:
 
     def set_wind(self, direction_deg: float, speed_kmh: float) -> SimulationSnapshot:
         return self.orchestrator.set_wind(direction_deg, speed_kmh)
+
+    def set_oat_c(self, oat_c: float) -> SimulationSnapshot:
+        resolved_oat_c = validate_oat_c(oat_c)
+        setter = getattr(self.xcvario_adapter, "set_oat_c", None)
+        if callable(setter):
+            setter(resolved_oat_c)
+        self._oat_c = resolved_oat_c
+        return self.orchestrator.get_snapshot()
 
     def set_device_qnh_hpa(self, qnh_hpa: float) -> SimulationSnapshot:
         return self.orchestrator.set_device_qnh_hpa(qnh_hpa)

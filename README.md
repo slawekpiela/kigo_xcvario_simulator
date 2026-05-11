@@ -54,6 +54,8 @@ baro/vario sentences are emitted at `2 Hz`, while simulator GPS sentences are
 kept at `1 Hz`.
 Wind is emitted on the same `XCvario` stream as `$WIMWV,<direction>,T,<speed>,K,A`,
 matching the real device output for true wind in `km/h`.
+OAT defaults to `18.0 deg C` and is emitted in the `PXCV` and `POV` pressure
+sentences used by `kigo_nav`.
 
 When `kigo_nav` or another `XCvario` client connects or reconnects, the runtime
 automatically activates manual `on_ground` at the configured home position:
@@ -137,9 +139,10 @@ simulator still runs over TCP underneath.
 3. Set `Wysokosc [m]` when using `straight`; it changes both GPS altitude and barometric pressure output.
 4. Set circling speed min/max in `Manual Mode` when using `circling_left` or `circling_right`.
 5. Set wind direction and speed; the runtime sends them to `kigo_nav` as `WIMWV`.
-6. Adjust traffic count if needed, and enable `collision course` when you want the first traffic contact to converge on the ownship.
-7. Use `Start / Resume`, `Pause`, `Reset` or `Apply Manual Mode`.
-8. Watch `Ownship`, `Traffic` and `Health` update from `GET /state` and `SSE`, including the emitted visible aircraft ID for each contact.
+6. Set OAT when you need a non-default outside air temperature in the `PXCV`/`POV` stream.
+7. Adjust traffic count if needed, and enable `collision course` when you want the first traffic contact to converge on the ownship.
+8. Use `Start / Resume`, `Pause`, `Reset` or `Apply Manual Mode`.
+9. Watch `Ownship`, `Traffic` and `Health` update from `GET /state` and `SSE`, including the emitted visible aircraft ID for each contact.
 
 ## Test Commands
 

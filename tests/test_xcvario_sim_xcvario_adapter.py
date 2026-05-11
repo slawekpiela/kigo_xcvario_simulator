@@ -83,6 +83,60 @@ class XcvarioAdapterTests(unittest.TestCase):
 
         self.assertIn("$PXCV,2.4,1.50,5,1.121,0,18.0,1019.8,965.4,361.0", payload)
 
+    def test_oat_setting_updates_following_xcvario_frames(self):
+        adapter = XcvarioTcpAdapter(bind_host="127.0.0.1", port=0, polar=get_xcvario_polar("DG 800B/15"))
+        adapter.start()
+        self.addCleanup(adapter.stop)
+
+        client = socket.create_connection(("127.0.0.1", adapter.bound_port), timeout=1.0)
+        self.addCleanup(client.close)
+        time.sleep(0.05)
+
+        adapter.set_oat_c(7.5)
+        adapter.publish_snapshot(_snapshot())
+        payload = client.recv(4096).decode("ascii")
+
+        self.assertEqual(adapter.oat_c, 7.5)
+        self.assertIn("$PXCV,2.4,0.00,0,1.000,0,7.5,1019.8,965.4,", payload)
+        self.assertIn("$POV,P,965.4,Q,", payload)
+        self.assertIn(",E,2.4,T,7.5*", payload)
+
+    def test_gprmc_speed_is_adjusted_by_true_wind(self):
+        adapter = XcvarioTcpAdapter(
+            bind_host="127.0.0.1",
+            port=0,
+            polar=get_xcvario_polar("DG 800B/15"),
+            gps_every_baro_frames=1,
+        )
+        adapter.start()
+        self.addCleanup(adapter.stop)
+
+        client = socket.create_connection(("127.0.0.1", adapter.bound_port), timeout=1.0)
+        self.addCleanup(client.close)
+        time.sleep(0.05)
+
+        base_ownship = replace(_snapshot().ownship, speed_kmh=100.0, track_deg=90.0)
+        adapter.publish_snapshot(
+            replace(
+                _snapshot(),
+                ownship=base_ownship,
+                wind=WindState(direction_deg=90.0, speed_kmh=20.0),
+            )
+        )
+        headwind_payload = _recv_until(client, "$GPRMC,", expected_count=1)
+
+        adapter.publish_snapshot(
+            replace(
+                _snapshot(),
+                ownship=base_ownship,
+                wind=WindState(direction_deg=270.0, speed_kmh=20.0),
+            )
+        )
+        tailwind_payload = _recv_until(client, "$GPRMC,", expected_count=1)
+
+        self.assertEqual(_gprmc_speed_knots(headwind_payload), 43.2)
+        self.assertEqual(_gprmc_speed_knots(tailwind_payload), 64.8)
+
     def test_new_client_replaces_old_client(self):
         adapter = XcvarioTcpAdapter(
             bind_host="127.0.0.1",
@@ -210,6 +264,13 @@ def _recv_until(client: socket.socket, needle: str, *, expected_count: int) -> s
         chunks.append(chunk)
         payload = "".join(chunks)
     return payload
+
+
+def _gprmc_speed_knots(payload: str) -> float:
+    for line in payload.splitlines():
+        if line.startswith("$GPRMC,"):
+            return float(line.split(",")[7])
+    raise AssertionError("GPRMC sentence not found.")
 
 
 if __name__ == "__main__":

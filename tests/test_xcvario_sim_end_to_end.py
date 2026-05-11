@@ -57,6 +57,7 @@ class SimulatorEndToEndSmokeTests(unittest.TestCase):
 
         self._post_json("/api/v1/simulation/traffic", {"enabled": True, "contact_count": 2})
         self._post_json("/api/v1/simulation/wind", {"direction_deg": 270.0, "speed_kmh": 25.5})
+        self._post_json("/api/v1/simulation/oat", {"oat_c": 7.5})
         self._post_json("/api/v1/simulation/preset", {"preset_id": "full_flight", "seed": 42, "autostart": True})
 
         snapshot = None
@@ -73,6 +74,8 @@ class SimulatorEndToEndSmokeTests(unittest.TestCase):
         self.assertEqual(snapshot.ownship.phase, FlightPhase.GLIDER_LANDING)
         self.assertTrue(snapshot.ownship.on_ground)
         self.assertIn("$PXCV,", xc_payload)
+        self.assertIn(",7.5,", xc_payload)
+        self.assertIn(",T,7.5*", xc_payload)
         self.assertIn("$WIMWV,270.0,T,25.5,K,A*", xc_payload)
         self.assertIn("$PFLAU,", flarm_payload)
 

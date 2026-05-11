@@ -208,6 +208,13 @@ class ControlApiServer:
                     self._write_cors_headers()
                     self.end_headers()
                     return True
+                if path == "/api/v1/simulation/oat":
+                    payload = self._read_json_body()
+                    controller.session.set_oat_c(_required_float_any(payload, "oat_c", "temperature_c", "oat"))
+                    self.send_response(204)
+                    self._write_cors_headers()
+                    self.end_headers()
+                    return True
                 return False
 
             def _stream_events(self) -> None:

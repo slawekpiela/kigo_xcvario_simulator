@@ -15,7 +15,7 @@ Then open [http://127.0.0.1:8180/](http://127.0.0.1:8180/).
 - stores the runtime URL and simulator token in local browser storage,
 - loads the latest state from `GET /api/v1/simulation/state`,
 - subscribes to `GET /api/v1/events` with the same token,
-- sends operator commands for lifecycle, manual mode and traffic,
+- sends operator commands for lifecycle, manual mode, wind, OAT and traffic,
 - renders read-only ownship, traffic and health status,
 - exposes traffic count, visible aircraft IDs and an optional collision-course mode for contact `1`.
 

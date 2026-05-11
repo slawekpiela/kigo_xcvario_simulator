@@ -114,8 +114,8 @@
 
         <section class="panel-card">
           <div class="panel-heading">
-            <h2>Wind</h2>
-            <p>True wind sent on the XCvario stream as WIMWV.</p>
+            <h2>Atmosphere</h2>
+            <p>True wind and OAT sent on the XCvario stream.</p>
           </div>
           <div class="field-grid">
             <label class="field">
@@ -126,9 +126,14 @@
               <span>Wind Speed [km/h]</span>
               <input id="wind-speed-input" type="number" min="0" step="0.1" value="0">
             </label>
+            <label class="field">
+              <span>OAT [deg C]</span>
+              <input id="oat-input" type="number" step="0.1" value="18.0">
+            </label>
           </div>
           <div class="button-row">
             <button id="apply-wind-button" class="primary-button" type="button">Apply Wind</button>
+            <button id="apply-oat-button" class="secondary-button" type="button">Apply OAT</button>
           </div>
         </section>
 
