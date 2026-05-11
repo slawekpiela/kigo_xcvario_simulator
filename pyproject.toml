@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kigo-xcvario-simulator"
+version = "0.1.0"
+description = "Standalone XCvario and FLARM simulator used by Kigo/kigo_nav tests."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+kigo-xcvario-runtime = "kigo_xcvario_simulator.start_remote_runtime:main"
+kigo-xcvario-panel = "kigo_xcvario_simulator.panel.start_frontend:main"
+kigo-xcvario-pty-bridge = "kigo_xcvario_simulator.pty_bridge:main"
+
+[tool.setuptools.packages.find]
+include = ["kigo_xcvario_simulator*"]
+
+[tool.setuptools.package-data]
+kigo_xcvario_simulator = [
+  "examples/*.json",
+  "examples/*.txt",
+  "panel/frontend/*",
+]

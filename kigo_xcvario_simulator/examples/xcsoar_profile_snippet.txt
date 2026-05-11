@@ -1,0 +1,9 @@
+DeviceA="XCVario"
+PortType="tcp_client"
+PortIPAddress="<runtime-host>"
+PortTCPPort="4353"
+
+DeviceB="FLARM"
+Port2Type="tcp_client"
+Port2IPAddress="<runtime-host>"
+Port2TCPPort="4354"

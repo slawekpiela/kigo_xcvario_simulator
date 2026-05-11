@@ -1,0 +1,237 @@
+import http.client
+import json
+import unittest
+
+from kigo_xcvario_simulator.baro import static_pressure_hpa_for_altitude
+from kigo_xcvario_simulator.config import (
+    ControlApiConfig,
+    EndpointConfig,
+    HomePosition,
+    SchedulerConfig,
+    SimulatorRuntimeConfig,
+    XcvarioConfig,
+)
+from kigo_xcvario_simulator.control_api import ControlApiServer
+from kigo_xcvario_simulator.session import SimulatorRuntimeSession
+
+
+class _FakePublisher:
+    def start(self) -> None:
+        return None
+
+    def stop(self) -> None:
+        return None
+
+    def publish_snapshot(self, _snapshot) -> None:
+        return None
+
+
+def _config() -> SimulatorRuntimeConfig:
+    return SimulatorRuntimeConfig(
+        session_id="xcvario-sim",
+        seed=15,
+        device_qnh_hpa=1013.25,
+        home_position=HomePosition(latitude_deg=49.83833, longitude_deg=19.00202, gps_altitude_m=401.0),
+        control_api=ControlApiConfig(bind_host="127.0.0.1", port=0, token="token"),
+        xcvario=XcvarioConfig(port=4353, polar_name="DG 800B/15"),
+        flarm=EndpointConfig(port=4354),
+        scheduler=SchedulerConfig(tick_hz=10, ownship_hz=2, traffic_hz=1),
+    )
+
+
+class ControlApiTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.session = SimulatorRuntimeSession(_config(), xcvario_adapter=_FakePublisher(), flarm_adapter=_FakePublisher())
+        self.session.start()
+        self.api = ControlApiServer(
+            bind_host="127.0.0.1",
+            port=0,
+            token="token",
+            session=self.session,
+        )
+        self.api.start()
+        self.connection = http.client.HTTPConnection("127.0.0.1", self.api.bound_port, timeout=2.0)
+
+    def tearDown(self) -> None:
+        self.connection.close()
+        self.api.stop()
+        self.session.stop()
+
+    def test_state_endpoint_requires_token(self):
+        self.connection.request("GET", "/api/v1/simulation/state")
+        response = self.connection.getresponse()
+        body = response.read().decode("utf-8")
+
+        self.assertEqual(response.status, 401)
+        self.assertIn("unauthorized", body)
+
+        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
+        response = self.connection.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(response.status, 200)
+        self.assertIn("snapshot", payload)
+        self.assertIn("runtime", payload)
+
+    def test_post_endpoints_drive_runtime_state(self):
+        self.connection.request(
+            "POST",
+            "/api/v1/simulation/preset",
+            body=json.dumps({"preset_id": "straight", "seed": 7, "autostart": True}),
+            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+        )
+        response = self.connection.getresponse()
+        response.read()
+        self.assertEqual(response.status, 204)
+
+        self.connection.request(
+            "POST",
+            "/api/v1/simulation/traffic",
+            body=json.dumps({"enabled": True, "contact_count": 2, "collision_course": True}),
+            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+        )
+        response = self.connection.getresponse()
+        response.read()
+        self.assertEqual(response.status, 204)
+
+        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
+        response = self.connection.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(payload["snapshot"]["preset_id"], "straight")
+        self.assertEqual(payload["runtime"]["traffic_config"]["contact_count"], 2)
+        self.assertEqual(payload["runtime"]["traffic_config"]["collision_course"], True)
+
+    def test_wind_endpoint_updates_snapshot_and_runtime_metadata(self):
+        self.connection.request(
+            "POST",
+            "/api/v1/simulation/wind",
+            body=json.dumps({"direction_deg": 450.0, "speed_kmh": 25.5}),
+            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+        )
+        response = self.connection.getresponse()
+        response.read()
+        self.assertEqual(response.status, 204)
+
+        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
+        response = self.connection.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(payload["snapshot"]["wind"]["direction_deg"], 90.0)
+        self.assertEqual(payload["snapshot"]["wind"]["speed_kmh"], 25.5)
+        self.assertEqual(payload["runtime"]["wind"]["direction_deg"], 90.0)
+        self.assertEqual(payload["runtime"]["wind"]["speed_kmh"], 25.5)
+
+    def test_preset_endpoint_accepts_on_ground(self):
+        self.connection.request(
+            "POST",
+            "/api/v1/simulation/preset",
+            body=json.dumps({"preset_id": "on_ground", "seed": 7, "autostart": True}),
+            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+        )
+        response = self.connection.getresponse()
+        response.read()
+
+        self.assertEqual(response.status, 204)
+
+        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
+        response = self.connection.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(payload["snapshot"]["preset_id"], "on_ground")
+        self.assertTrue(payload["snapshot"]["ownship"]["on_ground"])
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["speed_kmh"], 0.0, places=6)
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["vertical_speed_ms"], 0.0, places=6)
+
+    def test_manual_mode_accepts_on_ground_and_circling_speed_range(self):
+        self.connection.request(
+            "POST",
+            "/api/v1/simulation/manual-mode",
+            body=json.dumps({"phase": "on_ground"}),
+            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+        )
+        response = self.connection.getresponse()
+        response.read()
+
+        self.assertEqual(response.status, 204)
+
+        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
+        response = self.connection.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(payload["snapshot"]["preset_id"], None)
+        self.assertTrue(payload["snapshot"]["ownship"]["on_ground"])
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["speed_kmh"], 0.0, places=6)
+
+        self.connection.request(
+            "POST",
+            "/api/v1/simulation/manual-mode",
+            body=json.dumps(
+                {
+                    "phase": "circling_left",
+                    "speed_min_kmh": 90.0,
+                    "speed_max_kmh": 110.0,
+                    "climb_min_ms": 2.0,
+                    "climb_max_ms": 2.0,
+                }
+            ),
+            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+        )
+        response = self.connection.getresponse()
+        response.read()
+
+        self.assertEqual(response.status, 204)
+
+        self.connection.request(
+            "POST",
+            "/api/v1/simulation/manual-mode",
+            body=json.dumps({"phase": "straight", "speed_kmh": 100.0, "wysokosc": 875.0}),
+            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+        )
+        response = self.connection.getresponse()
+        response.read()
+
+        self.assertEqual(response.status, 204)
+
+        self.session.orchestrator.start()
+        self.session.orchestrator.tick(1.0)
+        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
+        response = self.connection.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(payload["snapshot"]["ownship"]["phase"], "straight")
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["gps_altitude_m"], 875.0, places=6)
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["vertical_speed_ms"], 0.0, places=6)
+        self.assertAlmostEqual(
+            payload["snapshot"]["ownship"]["static_pressure_hpa"],
+            static_pressure_hpa_for_altitude(875.0, qnh_hpa=1013.25),
+            places=6,
+        )
+
+    def test_bad_preset_returns_json_error(self):
+        self.connection.request(
+            "POST",
+            "/api/v1/simulation/preset",
+            body=json.dumps({"preset_id": "missing", "seed": 7, "autostart": True}),
+            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+        )
+        response = self.connection.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(response.status, 400)
+        self.assertEqual(payload["error"], "bad_request")
+        self.assertIn("Unknown preset_id", payload["message"])
+
+    def test_sse_endpoint_emits_initial_state_event(self):
+        self.connection.request("GET", "/api/v1/events", headers={"X-Simulator-Token": "token"})
+        response = self.connection.getresponse()
+        lines = [response.fp.readline().decode("utf-8") for _ in range(6)]
+        payload = "".join(lines)
+
+        self.assertEqual(response.status, 200)
+        self.assertIn("event: state", payload)
+        self.assertIn("event: ownship", payload)
+
+
+if __name__ == "__main__":
+    unittest.main()
