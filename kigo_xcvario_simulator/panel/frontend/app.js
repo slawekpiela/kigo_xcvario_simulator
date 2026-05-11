@@ -263,6 +263,10 @@ async function postCommand(path, payload = null, { syncControls = false } = {}) 
 }
 
 function formatCommandError(path, error) {
+  const message = String(error.message || error);
+  if (path === "/api/v1/simulation/oat" && message === "not_found") {
+    return "Runtime does not support OAT yet. Pull latest simulator code and restart the remote runtime.";
+  }
   return String(error.message || error);
 }
 

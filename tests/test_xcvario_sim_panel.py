@@ -79,6 +79,7 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             "speed_kmh: numericValue(windSpeedInput) ?? 0",
             "oat_c: numericValue(oatInput) ?? 18.0",
             "runtime.environment.oat_c",
+            "Runtime does not support OAT yet.",
         ):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, script)
