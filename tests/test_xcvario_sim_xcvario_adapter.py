@@ -137,6 +137,32 @@ class XcvarioAdapterTests(unittest.TestCase):
         self.assertEqual(_gprmc_speed_knots(headwind_payload), 43.2)
         self.assertEqual(_gprmc_speed_knots(tailwind_payload), 64.8)
 
+    def test_gprmc_speed_and_track_include_crosswind(self):
+        adapter = XcvarioTcpAdapter(
+            bind_host="127.0.0.1",
+            port=0,
+            polar=get_xcvario_polar("DG 800B/15"),
+            gps_every_baro_frames=1,
+        )
+        adapter.start()
+        self.addCleanup(adapter.stop)
+
+        client = socket.create_connection(("127.0.0.1", adapter.bound_port), timeout=1.0)
+        self.addCleanup(client.close)
+        time.sleep(0.05)
+
+        adapter.publish_snapshot(
+            replace(
+                _snapshot(),
+                ownship=replace(_snapshot().ownship, speed_kmh=100.0, track_deg=90.0),
+                wind=WindState(direction_deg=0.0, speed_kmh=20.0),
+            )
+        )
+        payload = _recv_until(client, "$GPRMC,", expected_count=1)
+
+        self.assertEqual(_gprmc_speed_knots(payload), 55.1)
+        self.assertEqual(_gprmc_track_deg(payload), 101.3)
+
     def test_new_client_replaces_old_client(self):
         adapter = XcvarioTcpAdapter(
             bind_host="127.0.0.1",
@@ -267,9 +293,17 @@ def _recv_until(client: socket.socket, needle: str, *, expected_count: int) -> s
 
 
 def _gprmc_speed_knots(payload: str) -> float:
+    return float(_gprmc_fields(payload)[7])
+
+
+def _gprmc_track_deg(payload: str) -> float:
+    return float(_gprmc_fields(payload)[8])
+
+
+def _gprmc_fields(payload: str) -> list[str]:
     for line in payload.splitlines():
         if line.startswith("$GPRMC,"):
-            return float(line.split(",")[7])
+            return line.split(",")
     raise AssertionError("GPRMC sentence not found.")
 
 

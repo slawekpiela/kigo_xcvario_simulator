@@ -124,7 +124,7 @@ class XcvarioTcpAdapter:
         payload_parts = []
         if include_position:
             position_ownship = self._ownship_for_position_output(snapshot)
-            gps_ownship = _ownship_with_wind_adjusted_ground_speed(position_ownship, snapshot.wind)
+            gps_ownship = _ownship_with_wind_adjusted_ground_velocity(position_ownship, snapshot.wind)
             payload_parts.append(build_gprmc(gps_ownship))
             payload_parts.append(build_gpgga(position_ownship))
         payload_parts.append(
@@ -343,29 +343,44 @@ def _command_value_text(raw_value_text: str) -> str:
     return raw_value_text.split("*", 1)[0].strip()
 
 
-def _ownship_with_wind_adjusted_ground_speed(ownship: OwnshipState, wind: WindState) -> OwnshipState:
+def _ownship_with_wind_adjusted_ground_velocity(ownship: OwnshipState, wind: WindState) -> OwnshipState:
+    ground_speed_kmh, ground_track_deg = _ground_velocity_from_true_wind(
+        airspeed_kmh=ownship.speed_kmh,
+        track_deg=ownship.track_deg,
+        wind_from_direction_deg=wind.direction_deg,
+        wind_speed_kmh=wind.speed_kmh,
+    )
     return replace(
         ownship,
-        speed_kmh=_ground_speed_kmh_from_true_wind(
-            airspeed_kmh=ownship.speed_kmh,
-            track_deg=ownship.track_deg,
-            wind_from_direction_deg=wind.direction_deg,
-            wind_speed_kmh=wind.speed_kmh,
-        ),
+        speed_kmh=ground_speed_kmh,
+        track_deg=ground_track_deg,
     )
 
 
-def _ground_speed_kmh_from_true_wind(
+def _ground_velocity_from_true_wind(
     *,
     airspeed_kmh: float,
     track_deg: float,
     wind_from_direction_deg: float,
     wind_speed_kmh: float,
-) -> float:
-    headwind_component_kmh = max(0.0, float(wind_speed_kmh)) * math.cos(
-        math.radians(float(track_deg) - float(wind_from_direction_deg))
-    )
-    return max(0.0, max(0.0, float(airspeed_kmh)) - headwind_component_kmh)
+) -> tuple[float, float]:
+    airspeed_kmh = max(0.0, float(airspeed_kmh))
+    wind_speed_kmh = max(0.0, float(wind_speed_kmh))
+    track_rad = math.radians(float(track_deg))
+    wind_from_rad = math.radians(float(wind_from_direction_deg))
+
+    air_north_kmh = airspeed_kmh * math.cos(track_rad)
+    air_east_kmh = airspeed_kmh * math.sin(track_rad)
+    wind_north_kmh = -wind_speed_kmh * math.cos(wind_from_rad)
+    wind_east_kmh = -wind_speed_kmh * math.sin(wind_from_rad)
+    ground_north_kmh = air_north_kmh + wind_north_kmh
+    ground_east_kmh = air_east_kmh + wind_east_kmh
+
+    ground_speed_kmh = math.hypot(ground_north_kmh, ground_east_kmh)
+    if ground_speed_kmh == 0.0:
+        return 0.0, float(track_deg) % 360.0
+    ground_track_deg = math.degrees(math.atan2(ground_east_kmh, ground_north_kmh)) % 360.0
+    return ground_speed_kmh, ground_track_deg
 
 
 def validate_oat_c(oat_c: float) -> float:
