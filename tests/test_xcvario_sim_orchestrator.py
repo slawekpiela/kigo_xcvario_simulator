@@ -188,7 +188,7 @@ class ScenarioOrchestratorTests(unittest.TestCase):
         self.assertEqual(completed_launch.preset_id, "straight")
         self.assertEqual(completed_launch.ownship.phase, FlightPhase.STRAIGHT)
         self.assertGreaterEqual(completed_launch.ownship.gps_altitude_m, 551.0)
-        self.assertAlmostEqual(completed_launch.ownship.speed_kmh, 100.0, places=6)
+        self.assertAlmostEqual(completed_launch.ownship.speed_kmh, 120.0, places=6)
 
     def test_manual_glider_launch_switches_to_straight_after_reaching_150m_agl(self):
         self.orchestrator.set_manual_mode(

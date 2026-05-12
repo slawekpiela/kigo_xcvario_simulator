@@ -72,6 +72,8 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             "async function postCommand(path, payload = null, { syncControls = false } = {})",
             "await fetchState({ syncControls });",
             'postCommand("/api/v1/simulation/reset", null, { syncControls: true })',
+            'if (phase !== "glider_launch")',
+            '["speed_kmh", numericValue(manualSpeedInput)]',
             'if (phase === "straight")',
             '["wysokosc", numericValue(manualBaroAltitudeInput)]',
             'if (phase === "circling_left" || phase === "circling_right")',

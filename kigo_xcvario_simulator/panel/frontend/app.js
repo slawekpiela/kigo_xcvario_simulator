@@ -461,8 +461,10 @@ applyManualButton.addEventListener("click", () => {
   };
   const numericFields = [
     ["heading_deg", numericValue(manualHeadingInput)],
-    ["speed_kmh", numericValue(manualSpeedInput)],
   ];
+  if (phase !== "glider_launch") {
+    numericFields.push(["speed_kmh", numericValue(manualSpeedInput)]);
+  }
   if (phase === "straight") {
     numericFields.push(["wysokosc", numericValue(manualBaroAltitudeInput)]);
   }
