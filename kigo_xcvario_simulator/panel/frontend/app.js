@@ -455,20 +455,29 @@ resetButton.addEventListener("click", () => {
 });
 
 applyManualButton.addEventListener("click", () => {
+  const phase = manualPhaseSelect.value;
   const payload = {
-    phase: manualPhaseSelect.value,
+    phase,
   };
   const numericFields = [
     ["heading_deg", numericValue(manualHeadingInput)],
     ["speed_kmh", numericValue(manualSpeedInput)],
-    ["wysokosc", numericValue(manualBaroAltitudeInput)],
-    ["speed_min_kmh", numericValue(circlingSpeedMinInput)],
-    ["speed_max_kmh", numericValue(circlingSpeedMaxInput)],
-    ["turn_radius_m", numericValue(manualTurnRadiusInput)],
-    ["climb_min_ms", numericValue(manualClimbMinInput)],
-    ["climb_max_ms", numericValue(manualClimbMaxInput)],
-    ["sink_ms", numericValue(manualSinkInput)],
   ];
+  if (phase === "straight") {
+    numericFields.push(["wysokosc", numericValue(manualBaroAltitudeInput)]);
+  }
+  if (phase === "circling_left" || phase === "circling_right") {
+    numericFields.push(
+      ["speed_min_kmh", numericValue(circlingSpeedMinInput)],
+      ["speed_max_kmh", numericValue(circlingSpeedMaxInput)],
+      ["turn_radius_m", numericValue(manualTurnRadiusInput)],
+      ["climb_min_ms", numericValue(manualClimbMinInput)],
+      ["climb_max_ms", numericValue(manualClimbMaxInput)],
+    );
+  }
+  if (phase === "sink" || phase === "glider_landing") {
+    numericFields.push(["sink_ms", numericValue(manualSinkInput)]);
+  }
   for (const [key, value] of numericFields) {
     if (value !== null) {
       payload[key] = value;
