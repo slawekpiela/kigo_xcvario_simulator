@@ -223,7 +223,7 @@ class ScenarioOrchestrator:
                     remaining_segment_s = max(0.0, directive.duration_s - self._active_plan_elapsed_s())
                     step_dt_s = min(remaining_dt_s, remaining_segment_s)
 
-                self._ownship = self._flight_model.step(self._ownship, directive, step_dt_s)
+                self._ownship = self._flight_model.step(self._ownship, directive, step_dt_s, wind=self._wind)
                 self._sim_time_s += step_dt_s
                 remaining_dt_s -= step_dt_s
 

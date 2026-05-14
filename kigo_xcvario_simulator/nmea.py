@@ -7,11 +7,13 @@ import json
 import math
 from typing import Sequence
 
+from .baro import STANDARD_QNH_HPA, static_pressure_to_qnh_altitude_m
 from .contracts import OwnshipState, TrafficContact, WindState
 from .state import FlightPhase
 
 DRY_AIR_GAS_CONSTANT_J_PER_KG_K = 287.05
 ABSOLUTE_ZERO_C = 273.15
+FEET_PER_METER = 3.280839895013123
 
 
 def nmea_checksum(sentence_body: str) -> int:
@@ -170,6 +172,89 @@ def build_wimwv(wind: WindState) -> str:
     return build_nmea_sentence(body)
 
 
+def build_lxwp0(ownship: OwnshipState, wind: WindState) -> str:
+    airspeed_kmh = max(0.0, min(250.0, float(ownship.speed_kmh)))
+    baro_altitude_m = float(ownship.gps_altitude_m)
+    vario_ms = float(ownship.vertical_speed_ms)
+    heading_deg = math.fmod(float(ownship.track_deg), 360.0)
+    if heading_deg < 0.0:
+        heading_deg += 360.0
+    wind_direction_deg = math.fmod(float(wind.direction_deg), 360.0)
+    if wind_direction_deg < 0.0:
+        wind_direction_deg += 360.0
+    wind_speed_kmh = max(0.0, float(wind.speed_kmh))
+    body = ",".join(
+        [
+            "LXWP0",
+            "Y",
+            f"{airspeed_kmh:.1f}",
+            f"{baro_altitude_m:.1f}",
+            f"{vario_ms:.2f}",
+            f"{vario_ms:.2f}",
+            f"{vario_ms:.2f}",
+            f"{vario_ms:.2f}",
+            f"{vario_ms:.2f}",
+            f"{vario_ms:.2f}",
+            f"{heading_deg:.1f}",
+            f"{wind_direction_deg:.1f}",
+            f"{wind_speed_kmh:.1f}",
+        ]
+    )
+    return build_nmea_sentence(body)
+
+
+def build_lxwp1(
+    *,
+    product: str = "SxHAWK",
+    serial_number: str = "SXSIM0001",
+    software_version: str = "I9.56/S9.54",
+    hardware_version: str = "SIM",
+    license_string: str = "",
+) -> str:
+    body = ",".join(
+        [
+            "LXWP1",
+            _nmea_text(product),
+            _nmea_text(serial_number),
+            _nmea_text(software_version),
+            _nmea_text(hardware_version),
+            _nmea_text(license_string),
+        ]
+    )
+    return build_nmea_sentence(body)
+
+
+def build_lxwp2(
+    *,
+    mac_cready_ms: float = 0.0,
+    ballast_overload_factor: float = 1.0,
+    bugs_degradation_percent: int = 0,
+    volume_percent: int = 80,
+) -> str:
+    body = ",".join(
+        [
+            "LXWP2",
+            f"{max(0.0, float(mac_cready_ms)):.1f}",
+            f"{max(1.0, float(ballast_overload_factor)):.2f}",
+            str(max(0, min(30, int(bugs_degradation_percent)))),
+            "",
+            "",
+            "",
+            str(max(0, min(100, int(volume_percent)))),
+        ]
+    )
+    return build_nmea_sentence(body)
+
+
+def build_lxwp3(*, qnh_hpa: float) -> str:
+    pressure_altitude_m = static_pressure_to_qnh_altitude_m(STANDARD_QNH_HPA, float(qnh_hpa))
+    altitude_offset_ft = -pressure_altitude_m * FEET_PER_METER
+    if abs(altitude_offset_ft) < 0.005:
+        altitude_offset_ft = 0.0
+    body = ",".join(["LXWP3", f"{altitude_offset_ft:.2f}"] + [""] * 12)
+    return build_nmea_sentence(body)
+
+
 def build_pflau(traffic: Sequence[TrafficContact]) -> str:
     if traffic:
         primary = min(
@@ -237,6 +322,10 @@ def format_longitude(longitude_deg: float) -> tuple[str, str]:
 
 def snapshot_to_json_bytes(payload: object) -> bytes:
     return json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+
+
+def _nmea_text(value: object) -> str:
+    return str(value or "").replace(",", " ").replace("*", "").strip()
 
 
 def dynamic_pressure_pa_for_speed(*, static_pressure_hpa: float, speed_kmh: float, oat_c: float) -> float:

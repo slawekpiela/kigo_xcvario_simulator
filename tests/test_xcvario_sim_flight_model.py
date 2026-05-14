@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import unittest
 
 from kigo_xcvario_simulator.baro import static_pressure_hpa_for_altitude
-from kigo_xcvario_simulator.contracts import FlightDirective
+from kigo_xcvario_simulator.contracts import FlightDirective, WindState
 from kigo_xcvario_simulator.flight_model import FlightModel
 from kigo_xcvario_simulator.state import FlightPhase
 
@@ -182,6 +182,47 @@ class FlightModelTests(unittest.TestCase):
         self.assertLess(max(deltas), 0.15)
         self.assertGreaterEqual(min(samples), 76.0)
         self.assertLessEqual(max(samples), 80.0)
+
+    def test_circling_position_drifts_with_wind_without_changing_air_vector(self):
+        directive = FlightDirective(
+            segment_id="circling_core",
+            phase=FlightPhase.CIRCLING_LEFT,
+            duration_s=60.0,
+            target_heading_deg=180.0,
+            target_speed_kmh=78.0,
+            turn_radius_m=110.0,
+            climb_min_ms=0.0,
+            climb_max_ms=0.0,
+        )
+        calm_model = FlightModel(
+            seed=17,
+            home_latitude_deg=49.83833,
+            home_longitude_deg=19.00202,
+            home_altitude_m=401.0,
+            pressure_reference_qnh_hpa=1013.25,
+            device_qnh_hpa=1013.25,
+            start_utc=datetime(2026, 5, 8, 12, 0, 0, tzinfo=timezone.utc),
+        )
+        windy_model = FlightModel(
+            seed=17,
+            home_latitude_deg=49.83833,
+            home_longitude_deg=19.00202,
+            home_altitude_m=401.0,
+            pressure_reference_qnh_hpa=1013.25,
+            device_qnh_hpa=1013.25,
+            start_utc=datetime(2026, 5, 8, 12, 0, 0, tzinfo=timezone.utc),
+        )
+        calm_state = calm_model.reset()
+        windy_state = windy_model.reset()
+        wind = WindState(direction_deg=270.0, speed_kmh=20.0)
+
+        for _ in range(80):
+            calm_state = calm_model.step(calm_state, directive, 0.5)
+            windy_state = windy_model.step(windy_state, directive, 0.5, wind=wind)
+
+        self.assertGreater(windy_state.longitude_deg - calm_state.longitude_deg, 0.002)
+        self.assertAlmostEqual(windy_state.speed_kmh, calm_state.speed_kmh, places=6)
+        self.assertAlmostEqual(windy_state.track_deg, calm_state.track_deg, places=6)
 
     def test_landing_rollout_clamps_to_home_altitude_and_stays_on_ground(self):
         rollout = FlightDirective(

@@ -84,6 +84,32 @@ def advance_position(
     return math.degrees(new_latitude_rad), normalize_longitude_deg(math.degrees(new_longitude_rad))
 
 
+def ground_velocity_from_true_wind(
+    *,
+    airspeed_kmh: float,
+    track_deg: float,
+    wind_from_direction_deg: float,
+    wind_speed_kmh: float,
+) -> tuple[float, float]:
+    airspeed_kmh = max(0.0, float(airspeed_kmh))
+    wind_speed_kmh = max(0.0, float(wind_speed_kmh))
+    track_rad = math.radians(float(track_deg))
+    wind_from_rad = math.radians(float(wind_from_direction_deg))
+
+    air_north_kmh = airspeed_kmh * math.cos(track_rad)
+    air_east_kmh = airspeed_kmh * math.sin(track_rad)
+    wind_north_kmh = -wind_speed_kmh * math.cos(wind_from_rad)
+    wind_east_kmh = -wind_speed_kmh * math.sin(wind_from_rad)
+    ground_north_kmh = air_north_kmh + wind_north_kmh
+    ground_east_kmh = air_east_kmh + wind_east_kmh
+
+    ground_speed_kmh = math.hypot(ground_north_kmh, ground_east_kmh)
+    if ground_speed_kmh == 0.0:
+        return 0.0, normalize_heading_deg(track_deg)
+    ground_track_deg = math.degrees(math.atan2(ground_east_kmh, ground_north_kmh))
+    return ground_speed_kmh, normalize_heading_deg(ground_track_deg)
+
+
 def bearing_between_points_deg(
     latitude_a_deg: float,
     longitude_a_deg: float,

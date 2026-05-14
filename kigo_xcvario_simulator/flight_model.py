@@ -6,8 +6,8 @@ from dataclasses import replace
 from datetime import datetime, timezone
 
 from .baro import simulation_timestamp_utc, static_pressure_hpa_for_altitude
-from .contracts import FlightDirective, OwnshipState
-from .flight_math import advance_heading_deg, advance_position, normalize_heading_deg
+from .contracts import FlightDirective, OwnshipState, WindState
+from .flight_math import advance_heading_deg, advance_position, ground_velocity_from_true_wind, normalize_heading_deg
 from .state import FlightPhase
 from .variation import SeededRangeGenerator
 
@@ -87,7 +87,14 @@ class FlightModel:
             phase=FlightPhase.GLIDER_LAUNCH,
         )
 
-    def step(self, state: OwnshipState, directive: FlightDirective, dt_s: float) -> OwnshipState:
+    def step(
+        self,
+        state: OwnshipState,
+        directive: FlightDirective,
+        dt_s: float,
+        *,
+        wind: WindState | None = None,
+    ) -> OwnshipState:
         if dt_s < 0.0:
             raise ValueError("dt_s must be >= 0.")
 
@@ -114,11 +121,18 @@ class FlightModel:
             vertical_speed_ms = 0.0
             on_ground = False
 
+        movement_speed_kmh, movement_track_deg = self._movement_velocity(
+            speed_kmh=speed_kmh,
+            track_deg=track_deg,
+            on_ground=on_ground,
+            wind=wind,
+        )
+
         latitude_deg, longitude_deg = advance_position(
             state.latitude_deg,
             state.longitude_deg,
-            track_deg=track_deg,
-            speed_kmh=speed_kmh,
+            track_deg=movement_track_deg,
+            speed_kmh=movement_speed_kmh,
             dt_s=dt_s,
         )
 
@@ -132,6 +146,23 @@ class FlightModel:
             track_deg=track_deg,
             on_ground=on_ground,
             phase=directive.phase,
+        )
+
+    @staticmethod
+    def _movement_velocity(
+        *,
+        speed_kmh: float,
+        track_deg: float,
+        on_ground: bool,
+        wind: WindState | None,
+    ) -> tuple[float, float]:
+        if wind is None or on_ground:
+            return speed_kmh, track_deg
+        return ground_velocity_from_true_wind(
+            airspeed_kmh=speed_kmh,
+            track_deg=track_deg,
+            wind_from_direction_deg=wind.direction_deg,
+            wind_speed_kmh=wind.speed_kmh,
         )
 
     def apply_device_qnh_to_state(self, state: OwnshipState) -> OwnshipState:

@@ -100,6 +100,8 @@ class PtyTcpBridge:
             return False
         try:
             os.write(self._master_fd, payload)
+        except BlockingIOError:
+            return True
         except OSError as exc:
             if exc.errno in {errno.EIO, errno.EBADF}:
                 return True

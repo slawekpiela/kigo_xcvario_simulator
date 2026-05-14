@@ -1,9 +1,9 @@
-# XCvario Simulator
+# KIGO Vario Simulator
 
 This directory contains the complete test simulator for KIGO:
 
 - remote runtime for `Pi` or `VM`,
-- `XCvario` and `FLARM` TCP adapters,
+- selectable `XCvario` / `SxHAWK` primary TCP adapter and `FLARM` TCP adapter,
 - control API with JSON and SSE,
 - local panel for `Mac`,
 - examples, smoke tests and runbook material.
@@ -12,7 +12,7 @@ This directory contains the complete test simulator for KIGO:
 
 - `config.py`, `contracts.py`, `state.py`: shared runtime contracts
 - `flight_model.py`, `traffic_model.py`, `presets.py`, `variation.py`: simulation core
-- `nmea.py`, `xcvario_adapter.py`, `flarm_adapter.py`: wire-format and TCP adapters
+- `nmea.py`, `xcvario_adapter.py`, `sxhawk_adapter.py`, `flarm_adapter.py`: wire-format and TCP adapters
 - `scheduler.py`, `session.py`, `control_api.py`: runtime loop and control plane
 - `start_remote_runtime.py`: CLI entrypoint for the remote runtime
 - `panel/`: static operator UI served locally on `Mac`
@@ -32,7 +32,8 @@ cp kigo_xcvario_simulator/examples/runtime.example.json /tmp/runtime.local.json
 Recommended edits:
 
 - set `control_api.token` to a lab token,
-- keep `xcvario.port=4353` and `flarm.port=4354`,
+- set `primary_device` to `xcvario` or `sxhawk`,
+- keep `xcvario.port=4353` and `flarm.port=4354`; the `xcvario` block is the primary device endpoint for both protocols,
 - set `cors_allowed_origins` to the panel URL you will use on the `Mac`,
 - verify `home_position`.
 
@@ -44,7 +45,7 @@ python3 -m kigo_xcvario_simulator.start_remote_runtime --config /tmp/runtime.loc
 
 This starts:
 
-- `XCvario` TCP listener,
+- active primary-device TCP listener: `XCvario` or `SxHAWK`,
 - `FLARM` TCP listener,
 - control API,
 - telemetry scheduler.
@@ -57,7 +58,12 @@ matching the real device output for true wind in `km/h`.
 OAT defaults to `18.0 deg C` and is emitted in the `PXCV` and `POV` pressure
 sentences used by `kigo_nav`.
 
-When `kigo_nav` or another `XCvario` client connects or reconnects, the runtime
+The `SxHAWK` telemetry stream follows the LXNAV/LX protocol parsed by the
+`LX`/LXNAV driver in `kigo_nav`: `GPRMC`, `GPGGA`, `LXWP0`, `LXWP1`, `LXWP2`
+and `LXWP3`. It accepts `PFLX2`/`PFLX3` and `PLXV0` write-side settings for
+MC, ballast, bugs and QNH.
+
+When `kigo_nav` or another primary-device client connects or reconnects, the runtime
 automatically activates manual `on_ground` at the configured home position:
 speed `0 km/h`, vertical speed `0 m/s`, glider on the runway.
 
@@ -71,6 +77,7 @@ Open [http://127.0.0.1:8180/](http://127.0.0.1:8180/), enter:
 
 - runtime URL, for example `http://192.168.0.50:8181`,
 - the same simulator token as in the runtime config.
+- choose `XCvario` or `SxHAWK` as the active primary device when needed.
 
 ### 4. Configure XCSoar/KIGO Test Profile
 
@@ -89,6 +96,16 @@ Port2TCPPort="4354"
 ```
 
 Replace `<runtime-host>` with the `Pi` or `VM` host that runs the simulator.
+For SxHAWK, set `primary_device="sxhawk"` in the runtime config or panel and
+use [examples/sxhawk_profile_snippet.txt](kigo_xcvario_simulator/examples/sxhawk_profile_snippet.txt).
+Kigo/Nav stores the LXNAV/SxHAWK protocol driver under the internal name `LX`:
+
+```text
+DeviceA="LX"
+PortType="tcp_client"
+PortIPAddress="<runtime-host>"
+PortTCPPort="4353"
+```
 
 ### 5. Reuse An Existing Serial Profile Such As `SLAWEK2`
 
@@ -131,6 +148,9 @@ Port3Enabled="1"
 
 This lets `kigo_nav` keep using the existing serial-profile layout while the
 simulator still runs over TCP underneath.
+For SxHAWK, switch the runtime to `primary_device="sxhawk"`, expose a matching
+PTY such as `/tmp/kigo-sim/sxhawk`, and set `DeviceA="LX"` with
+`PortPath="/tmp/kigo-sim/sxhawk"`.
 
 ## Manual Flow
 

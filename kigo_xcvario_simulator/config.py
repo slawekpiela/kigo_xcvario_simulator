@@ -19,6 +19,8 @@ DEFAULT_TRAFFIC_HZ = 1
 DEFAULT_CONTROL_TOKEN = "change-me-before-lab-use"
 DEFAULT_QNH_HPA = 1013.25
 DEFAULT_SESSION_ID = "xcvario-sim"
+DEFAULT_PRIMARY_DEVICE = "xcvario"
+SUPPORTED_PRIMARY_DEVICES = ("xcvario", "sxhawk")
 CONTROL_TOKEN_HEADER = "X-Simulator-Token"
 
 
@@ -73,6 +75,7 @@ class SimulatorRuntimeConfig:
     xcvario: XcvarioConfig
     flarm: EndpointConfig
     scheduler: SchedulerConfig
+    primary_device: str = DEFAULT_PRIMARY_DEVICE
 
 
 def load_runtime_config(path: Path | str) -> SimulatorRuntimeConfig:
@@ -135,6 +138,7 @@ def parse_runtime_config(raw: Mapping[str, Any]) -> SimulatorRuntimeConfig:
         session_id=_text(raw.get("session_id"), default=DEFAULT_SESSION_ID),
         seed=_int_value(raw.get("seed"), key_name="seed"),
         device_qnh_hpa=_float_value(raw.get("device_qnh_hpa"), key_name="device_qnh_hpa"),
+        primary_device=normalize_primary_device(raw.get("primary_device", raw.get("device_type", DEFAULT_PRIMARY_DEVICE))),
         home_position=home_position,
         control_api=control_api,
         xcvario=xcvario,
@@ -143,16 +147,26 @@ def parse_runtime_config(raw: Mapping[str, Any]) -> SimulatorRuntimeConfig:
     )
 
 
+def normalize_primary_device(value: Any) -> str:
+    normalized = _text(value, default=DEFAULT_PRIMARY_DEVICE).casefold()
+    if normalized not in SUPPORTED_PRIMARY_DEVICES:
+        choices = ", ".join(SUPPORTED_PRIMARY_DEVICES)
+        raise ValueError(f"primary_device must be one of: {choices}.")
+    return normalized
+
+
 def build_xcsoar_profile_snippet(
     runtime_host: str,
     *,
+    primary_device: str = DEFAULT_PRIMARY_DEVICE,
     xcvario_port: int = DEFAULT_XCVARIO_PORT,
     flarm_port: int = DEFAULT_FLARM_PORT,
 ) -> str:
     host = runtime_host.strip() or "<runtime-host>"
+    primary_driver = "LX" if normalize_primary_device(primary_device) == "sxhawk" else "XCVario"
     return "\n".join(
         [
-            'DeviceA="XCVario"',
+            f'DeviceA="{primary_driver}"',
             'PortType="tcp_client"',
             f'PortIPAddress="{host}"',
             f'PortTCPPort="{_port(xcvario_port, default=DEFAULT_XCVARIO_PORT)}"',

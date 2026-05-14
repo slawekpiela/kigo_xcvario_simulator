@@ -163,6 +163,32 @@ class XcvarioAdapterTests(unittest.TestCase):
         self.assertEqual(_gprmc_speed_knots(payload), 55.1)
         self.assertEqual(_gprmc_track_deg(payload), 101.3)
 
+    def test_gprmc_ignores_wind_for_ground_roll(self):
+        adapter = XcvarioTcpAdapter(
+            bind_host="127.0.0.1",
+            port=0,
+            polar=get_xcvario_polar("DG 800B/15"),
+            gps_every_baro_frames=1,
+        )
+        adapter.start()
+        self.addCleanup(adapter.stop)
+
+        client = socket.create_connection(("127.0.0.1", adapter.bound_port), timeout=1.0)
+        self.addCleanup(client.close)
+        time.sleep(0.05)
+
+        adapter.publish_snapshot(
+            replace(
+                _snapshot(),
+                ownship=replace(_snapshot().ownship, speed_kmh=24.0, track_deg=90.0, on_ground=True),
+                wind=WindState(direction_deg=0.0, speed_kmh=40.0),
+            )
+        )
+        payload = _recv_until(client, "$GPRMC,", expected_count=1)
+
+        self.assertEqual(_gprmc_speed_knots(payload), 13.0)
+        self.assertEqual(_gprmc_track_deg(payload), 90.0)
+
     def test_new_client_replaces_old_client(self):
         adapter = XcvarioTcpAdapter(
             bind_host="127.0.0.1",

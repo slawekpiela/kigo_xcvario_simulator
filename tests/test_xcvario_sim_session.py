@@ -90,6 +90,32 @@ class SessionAndSchedulerTests(unittest.TestCase):
         self.assertAlmostEqual(snapshot.ownship.latitude_deg, _config().home_position.latitude_deg, places=6)
         self.assertAlmostEqual(snapshot.ownship.longitude_deg, _config().home_position.longitude_deg, places=6)
 
+    def test_primary_device_switch_changes_publisher_without_rebuilding_session(self):
+        xcvario = _FakePublisher()
+        sxhawk = _FakePublisher()
+        traffic = _FakePublisher()
+        session = SimulatorRuntimeSession(
+            _config(),
+            xcvario_adapter=xcvario,
+            sxhawk_adapter=sxhawk,
+            flarm_adapter=traffic,
+        )
+        session.start(start_scheduler=False)
+        self.addCleanup(session.stop)
+
+        self.assertTrue(xcvario.started)
+        self.assertFalse(sxhawk.started)
+
+        session.set_primary_device("sxhawk")
+        session.publish_snapshot(session.get_snapshot())
+
+        self.assertTrue(xcvario.stopped)
+        self.assertTrue(sxhawk.started)
+        self.assertEqual(session.primary_device, "sxhawk")
+        self.assertEqual(len(xcvario.published), 0)
+        self.assertEqual(len(sxhawk.published), 1)
+        self.assertTrue(session.get_runtime_metadata()["adapters"]["sxhawk"]["active"])
+
 
 if __name__ == "__main__":
     unittest.main()

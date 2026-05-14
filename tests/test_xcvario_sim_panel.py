@@ -12,6 +12,9 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
         for snippet in (
             'id="runtime-url-input"',
             'id="runtime-token-input"',
+            'id="device-select"',
+            '<option value="sxhawk">SxHAWK</option>',
+            'id="apply-device-button"',
             "<h2>Manual Mode</h2>",
             '<option value="on_ground" selected>on_ground</option>',
             'id="manual-baro-altitude-input"',
@@ -60,6 +63,7 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             '"/api/v1/simulation/wind"',
             '"/api/v1/simulation/oat"',
             '"/api/v1/simulation/traffic"',
+            '"/api/v1/simulation/device"',
             '"/api/v1/simulation/start"',
             '"/api/v1/simulation/pause"',
             '"/api/v1/simulation/reset"',
@@ -87,6 +91,8 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             "speed_kmh: numericValue(windSpeedInput) ?? 0",
             "oat_c: numericValue(oatInput) ?? 18.0",
             "runtime.environment.oat_c",
+            "runtime.primary_device",
+            "adapters.sxhawk",
             "Runtime does not support OAT yet.",
         ):
             with self.subTest(snippet=snippet):
@@ -141,7 +147,7 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             connection.close()
 
             self.assertEqual(response.status, 200)
-            self.assertIn("XCvario Simulator Control Panel", payload)
+            self.assertIn("KIGO Vario Simulator Control Panel", payload)
         finally:
             server.shutdown()
             server.server_close()

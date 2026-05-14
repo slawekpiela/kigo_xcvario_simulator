@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "kigo-xcvario-simulator"
 version = "0.1.0"
-description = "Standalone XCvario and FLARM simulator used by Kigo/kigo_nav tests."
+description = "Standalone XCvario, SxHAWK and FLARM simulator used by Kigo/kigo_nav tests."
 requires-python = ">=3.10"
 dependencies = []
 

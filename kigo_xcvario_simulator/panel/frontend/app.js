@@ -6,6 +6,8 @@ const runtimeTokenInput = document.getElementById("runtime-token-input");
 const connectButton = document.getElementById("connect-button");
 const disconnectButton = document.getElementById("disconnect-button");
 const refreshButton = document.getElementById("refresh-button");
+const deviceSelect = document.getElementById("device-select");
+const applyDeviceButton = document.getElementById("apply-device-button");
 const connectionStatus = document.getElementById("connection-status");
 const statusMessage = document.getElementById("status-message");
 const apiErrorNode = document.getElementById("api-error");
@@ -298,6 +300,9 @@ function syncControlValues() {
   if (environment) {
     setNumericValueIfIdle(oatInput, environment.oat_c, 1);
   }
+  if (state.runtime && state.runtime.primary_device) {
+    setSelectValueIfIdle(deviceSelect, state.runtime.primary_device);
+  }
 }
 
 function setSelectValueIfIdle(node, value) {
@@ -368,6 +373,10 @@ function renderTraffic(traffic) {
 
 function renderHealth(snapshot, runtime) {
   healthGrid.innerHTML = "";
+  const adapters = runtime && runtime.adapters ? runtime.adapters : {};
+  const xcvarioAdapter = adapters.xcvario || null;
+  const sxhawkAdapter = adapters.sxhawk || null;
+  const flarmAdapter = adapters.flarm || null;
   const rows = [
     ["Runtime State", snapshot ? snapshot.runtime_state : "-"],
     ["Health", snapshot ? snapshot.health : "-"],
@@ -393,18 +402,30 @@ function renderHealth(snapshot, runtime) {
     ["Tick Count", runtime ? runtime.scheduler.tick_count : "-"],
     ["Last Jitter", runtime ? `${formatNumber(runtime.scheduler.last_jitter_s, 4)} s` : "-"],
     [
-      "XCVario Rates",
+      "Primary Device",
+      runtime ? runtime.primary_device : "-",
+    ],
+    [
+      "Primary Rates",
       runtime && runtime.scheduler
         ? `GPS ${runtime.scheduler.gps_hz || "-"} Hz / baro ${runtime.scheduler.baro_hz || "-"} Hz`
         : "-",
     ],
     [
       "XCvario Adapter",
-      runtime ? `${runtime.adapters.xcvario.bound_port} / connected=${runtime.adapters.xcvario.client_connected}` : "-",
+      xcvarioAdapter
+        ? `${xcvarioAdapter.bound_port} / active=${Boolean(xcvarioAdapter.active)} / connected=${xcvarioAdapter.client_connected}`
+        : "-",
+    ],
+    [
+      "SxHAWK Adapter",
+      sxhawkAdapter
+        ? `${sxhawkAdapter.bound_port} / active=${Boolean(sxhawkAdapter.active)} / connected=${sxhawkAdapter.client_connected}`
+        : "-",
     ],
     [
       "FLARM Adapter",
-      runtime ? `${runtime.adapters.flarm.bound_port} / connected=${runtime.adapters.flarm.client_connected}` : "-",
+      flarmAdapter ? `${flarmAdapter.bound_port} / connected=${flarmAdapter.client_connected}` : "-",
     ],
   ];
   for (const [label, value] of rows) {
@@ -440,6 +461,12 @@ disconnectButton.addEventListener("click", () => {
 
 refreshButton.addEventListener("click", () => {
   void fetchState({ syncControls: true }).catch((error) => showApiError(String(error.message || error)));
+});
+
+applyDeviceButton.addEventListener("click", () => {
+  void postCommand("/api/v1/simulation/device", {
+    primary_device: deviceSelect.value,
+  }, { syncControls: true });
 });
 
 startButton.addEventListener("click", () => {

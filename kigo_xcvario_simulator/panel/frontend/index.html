@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#080c0a">
-    <title>KIGO XCvario Simulator Panel</title>
+    <title>KIGO Vario Simulator Panel</title>
     <link rel="stylesheet" href="/style.css">
   </head>
   <body data-page="simulator-panel">
@@ -12,7 +12,7 @@
       <header class="hero">
         <div class="hero-copy">
           <p class="eyebrow">KIGO Test Runtime</p>
-          <h1>XCvario Simulator Control Panel</h1>
+          <h1>KIGO Vario Simulator Control Panel</h1>
           <p class="hero-text">
             Local operator UI for driving the remote simulator on Pi or VM, with live ownship, traffic and health feedback.
           </p>
@@ -40,10 +40,18 @@
               <span>Simulator Token</span>
               <input id="runtime-token-input" type="password" placeholder="change-me-before-lab-use">
             </label>
+            <label class="field">
+              <span>Primary Device</span>
+              <select id="device-select">
+                <option value="xcvario" selected>XCvario</option>
+                <option value="sxhawk">SxHAWK</option>
+              </select>
+            </label>
           </div>
           <div class="button-row">
             <button id="connect-button" class="primary-button" type="button">Connect</button>
             <button id="disconnect-button" class="secondary-button" type="button">Disconnect</button>
+            <button id="apply-device-button" class="secondary-button" type="button">Apply Device</button>
             <button id="refresh-button" class="ghost-button" type="button">Refresh State</button>
           </div>
           <p id="api-error" class="panel-error" hidden></p>

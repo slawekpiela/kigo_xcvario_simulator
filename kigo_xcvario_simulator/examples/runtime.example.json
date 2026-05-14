@@ -2,6 +2,7 @@
   "session_id": "xcvario-sim",
   "seed": 424242,
   "device_qnh_hpa": 1013.25,
+  "primary_device": "xcvario",
   "home_position": {
     "latitude_deg": 49.83833,
     "longitude_deg": 19.00202,

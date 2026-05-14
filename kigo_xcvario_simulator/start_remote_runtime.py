@@ -25,7 +25,7 @@ DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent / "examples" / "runtime.ex
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Start the XCvario simulator runtime.")
+    parser = argparse.ArgumentParser(description="Start the KIGO vario simulator runtime.")
     parser.add_argument(
         "--config",
         default=str(DEFAULT_CONFIG_PATH),

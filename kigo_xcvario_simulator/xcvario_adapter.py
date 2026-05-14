@@ -10,6 +10,7 @@ from threading import Event, Lock, Thread
 
 from .contracts import OwnshipState, SimulationSnapshot, WindState
 from .baro import qnh_hpa_for_static_pressure, static_pressure_hpa_for_altitude
+from .flight_math import ground_velocity_from_true_wind
 from .nmea import build_gpgga, build_gprmc, build_pov, build_pxcv, build_wimwv, dynamic_pressure_pa_for_speed
 from .state import FlightPhase
 from .xcvario_polar import XcvarioPolar
@@ -33,6 +34,7 @@ class XcvarioTcpAdapter:
         on_qnh_command: Callable[[float], object] | None = None,
         on_client_connect: Callable[[], object] | None = None,
         gps_every_baro_frames: int = DEFAULT_GPS_EVERY_BARO_FRAMES,
+        thread_name: str = "xcvario-adapter",
     ) -> None:
         self._bind_host = bind_host
         self._requested_port = int(port)
@@ -40,6 +42,7 @@ class XcvarioTcpAdapter:
         self._on_qnh_command = on_qnh_command
         self._on_client_connect = on_client_connect
         self._gps_every_baro_frames = max(1, int(gps_every_baro_frames))
+        self._thread_name = str(thread_name or "xcvario-adapter")
         self._server_socket: socket.socket | None = None
         self._server_thread: Thread | None = None
         self._reader_thread: Thread | None = None
@@ -81,7 +84,7 @@ class XcvarioTcpAdapter:
             self._server_socket = server_socket
             self.bound_port = int(server_socket.getsockname()[1])
             self._stop_event.clear()
-            self._server_thread = Thread(target=self._accept_loop, name="xcvario-adapter", daemon=True)
+            self._server_thread = Thread(target=self._accept_loop, name=self._thread_name, daemon=True)
             self._server_thread.start()
 
     def stop(self) -> None:
@@ -205,7 +208,12 @@ class XcvarioTcpAdapter:
             self._baro_frame_index = 0
         if previous_socket is not None:
             self._close_socket(previous_socket)
-        reader = Thread(target=self._reader_loop, args=(client_socket,), name="xcvario-adapter-reader", daemon=True)
+        reader = Thread(
+            target=self._reader_loop,
+            args=(client_socket,),
+            name=f"{self._thread_name}-reader",
+            daemon=True,
+        )
         self._reader_thread = reader
         reader.start()
         self._notify_client_connect()
@@ -344,7 +352,9 @@ def _command_value_text(raw_value_text: str) -> str:
 
 
 def _ownship_with_wind_adjusted_ground_velocity(ownship: OwnshipState, wind: WindState) -> OwnshipState:
-    ground_speed_kmh, ground_track_deg = _ground_velocity_from_true_wind(
+    if ownship.on_ground:
+        return ownship
+    ground_speed_kmh, ground_track_deg = ground_velocity_from_true_wind(
         airspeed_kmh=ownship.speed_kmh,
         track_deg=ownship.track_deg,
         wind_from_direction_deg=wind.direction_deg,
@@ -355,32 +365,6 @@ def _ownship_with_wind_adjusted_ground_velocity(ownship: OwnshipState, wind: Win
         speed_kmh=ground_speed_kmh,
         track_deg=ground_track_deg,
     )
-
-
-def _ground_velocity_from_true_wind(
-    *,
-    airspeed_kmh: float,
-    track_deg: float,
-    wind_from_direction_deg: float,
-    wind_speed_kmh: float,
-) -> tuple[float, float]:
-    airspeed_kmh = max(0.0, float(airspeed_kmh))
-    wind_speed_kmh = max(0.0, float(wind_speed_kmh))
-    track_rad = math.radians(float(track_deg))
-    wind_from_rad = math.radians(float(wind_from_direction_deg))
-
-    air_north_kmh = airspeed_kmh * math.cos(track_rad)
-    air_east_kmh = airspeed_kmh * math.sin(track_rad)
-    wind_north_kmh = -wind_speed_kmh * math.cos(wind_from_rad)
-    wind_east_kmh = -wind_speed_kmh * math.sin(wind_from_rad)
-    ground_north_kmh = air_north_kmh + wind_north_kmh
-    ground_east_kmh = air_east_kmh + wind_east_kmh
-
-    ground_speed_kmh = math.hypot(ground_north_kmh, ground_east_kmh)
-    if ground_speed_kmh == 0.0:
-        return 0.0, float(track_deg) % 360.0
-    ground_track_deg = math.degrees(math.atan2(ground_east_kmh, ground_north_kmh)) % 360.0
-    return ground_speed_kmh, ground_track_deg
 
 
 def validate_oat_c(oat_c: float) -> float:

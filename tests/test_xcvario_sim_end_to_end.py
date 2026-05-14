@@ -164,6 +164,25 @@ class SimulatorEndToEndSmokeTests(unittest.TestCase):
         self.assertIn("$PXCV,", xc_payload)
         self.assertIn("$PFLAU,", flarm_payload)
 
+    def test_sxhawk_primary_device_streams_lx_protocol(self):
+        self._post_json("/api/v1/simulation/device", {"primary_device": "sxhawk"})
+        sxhawk_client = socket.create_connection(("127.0.0.1", self.session.sxhawk_adapter.bound_port), timeout=2.0)
+        self.addCleanup(sxhawk_client.close)
+        time.sleep(0.05)
+
+        self._post_json("/api/v1/simulation/wind", {"direction_deg": 270.0, "speed_kmh": 25.5})
+        self._post_json("/api/v1/simulation/preset", {"preset_id": "straight", "seed": 9, "autostart": True})
+
+        snapshot = self.session.orchestrator.tick(5.0)
+        self.session.publish_snapshot(snapshot)
+        payload = sxhawk_client.recv(4096).decode("ascii")
+
+        self.assertEqual(self.session.get_runtime_metadata()["primary_device"], "sxhawk")
+        self.assertIn("$LXWP0,", payload)
+        self.assertIn("$LXWP1,SxHAWK,", payload)
+        self.assertIn("$LXWP2,", payload)
+        self.assertIn("$GPRMC,", payload)
+
     def _post_json(self, path: str, payload: dict[str, object]) -> None:
         self.api_connection.request(
             "POST",

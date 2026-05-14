@@ -18,11 +18,15 @@ from kigo_xcvario_simulator.session import SimulatorRuntimeSession
 class _FakePublisher:
     def __init__(self) -> None:
         self.oat_c = 18.0
+        self.started = False
+        self.stopped = False
 
     def start(self) -> None:
+        self.started = True
         return None
 
     def stop(self) -> None:
+        self.stopped = True
         return None
 
     def publish_snapshot(self, _snapshot) -> None:
@@ -47,7 +51,12 @@ def _config() -> SimulatorRuntimeConfig:
 
 class ControlApiTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.session = SimulatorRuntimeSession(_config(), xcvario_adapter=_FakePublisher(), flarm_adapter=_FakePublisher())
+        self.session = SimulatorRuntimeSession(
+            _config(),
+            xcvario_adapter=_FakePublisher(),
+            sxhawk_adapter=_FakePublisher(),
+            flarm_adapter=_FakePublisher(),
+        )
         self.session.start()
         self.api = ControlApiServer(
             bind_host="127.0.0.1",
@@ -145,6 +154,27 @@ class ControlApiTests(unittest.TestCase):
 
         self.assertEqual(payload["runtime"]["environment"]["oat_c"], 7.5)
         self.assertEqual(self.session.xcvario_adapter.oat_c, 7.5)
+
+    def test_device_endpoint_switches_primary_adapter(self):
+        self.connection.request(
+            "POST",
+            "/api/v1/simulation/device",
+            body=json.dumps({"primary_device": "sxhawk"}),
+            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+        )
+        response = self.connection.getresponse()
+        response.read()
+        self.assertEqual(response.status, 204)
+
+        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
+        response = self.connection.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(payload["runtime"]["primary_device"], "sxhawk")
+        self.assertTrue(payload["runtime"]["adapters"]["sxhawk"]["active"])
+        self.assertFalse(payload["runtime"]["adapters"]["xcvario"]["active"])
+        self.assertTrue(self.session.xcvario_adapter.stopped)
+        self.assertTrue(self.session.sxhawk_adapter.started)
 
     def test_preset_endpoint_accepts_on_ground(self):
         self.connection.request(

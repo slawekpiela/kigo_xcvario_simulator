@@ -6,6 +6,7 @@ from kigo_xcvario_simulator.flight_math import (
     bearing_between_points_deg,
     calculate_turn_radius_m,
     calculate_turn_rate_deg_s,
+    ground_velocity_from_true_wind,
     normalize_heading_deg,
     travel_distance_m,
 )
@@ -18,6 +19,17 @@ class SimulatorFlightMathTests(unittest.TestCase):
 
     def test_travel_distance_uses_kmh_and_seconds(self):
         self.assertAlmostEqual(travel_distance_m(72.0, 10.0), 200.0, places=3)
+
+    def test_ground_velocity_combines_air_vector_and_true_wind(self):
+        speed_kmh, track_deg = ground_velocity_from_true_wind(
+            airspeed_kmh=100.0,
+            track_deg=90.0,
+            wind_from_direction_deg=0.0,
+            wind_speed_kmh=20.0,
+        )
+
+        self.assertAlmostEqual(speed_kmh, 101.980390, places=6)
+        self.assertAlmostEqual(track_deg, 101.309932, places=6)
 
     def test_turn_rate_and_radius_are_inverse_operations(self):
         turn_rate = calculate_turn_rate_deg_s(90.0, 120.0)

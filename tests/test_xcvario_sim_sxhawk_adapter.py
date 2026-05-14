@@ -1,0 +1,117 @@
+from dataclasses import replace
+import socket
+import time
+import unittest
+
+from kigo_xcvario_simulator.contracts import OwnshipState, SimulationSnapshot, WindState
+from kigo_xcvario_simulator.nmea import build_lxwp3, build_nmea_sentence
+from kigo_xcvario_simulator.state import FlightPhase, HealthState, RuntimeState
+from kigo_xcvario_simulator.sxhawk_adapter import SxHawkTcpAdapter
+from kigo_xcvario_simulator.xcvario_polar import get_xcvario_polar
+
+
+def _snapshot() -> SimulationSnapshot:
+    return SimulationSnapshot(
+        runtime_state=RuntimeState.RUNNING,
+        ownship=OwnshipState(
+            timestamp_utc="2026-05-08T12:00:00.000Z",
+            latitude_deg=49.83833,
+            longitude_deg=19.00202,
+            gps_altitude_m=401.0,
+            static_pressure_hpa=965.43,
+            device_qnh_hpa=1019.8,
+            vertical_speed_ms=2.35,
+            speed_kmh=90.0,
+            track_deg=84.4,
+            on_ground=False,
+            phase=FlightPhase.STRAIGHT,
+        ),
+        traffic=(),
+        wind=WindState(direction_deg=270.0, speed_kmh=25.5),
+        preset_id="straight",
+        seed=7,
+        sim_time_s=1.0,
+        health=HealthState.READY,
+    )
+
+
+class SxHawkAdapterTests(unittest.TestCase):
+    def test_client_receives_sxhawk_lx_sentences(self):
+        adapter = SxHawkTcpAdapter(
+            bind_host="127.0.0.1",
+            port=0,
+            polar=get_xcvario_polar("DG 800B/15"),
+        )
+        adapter.start()
+        self.addCleanup(adapter.stop)
+
+        client = socket.create_connection(("127.0.0.1", adapter.bound_port), timeout=1.0)
+        self.addCleanup(client.close)
+        time.sleep(0.05)
+
+        adapter.publish_snapshot(_snapshot())
+        payload = client.recv(4096).decode("ascii")
+
+        self.assertIn("$GPRMC,", payload)
+        self.assertIn("$GPGGA,", payload)
+        self.assertIn("$LXWP0,Y,90.0,401.0,2.35,2.35,2.35,2.35,2.35,2.35,84.4,270.0,25.5*", payload)
+        self.assertIn("$LXWP1,SxHAWK,SXSIM0001,I9.56/S9.54,SIM,*", payload)
+        self.assertIn("$LXWP2,0.0,1.00,0,,,,80*", payload)
+        self.assertIn("$LXWP3,", payload)
+
+    def test_lx_style_settings_commands_update_following_sxhawk_frames(self):
+        received_qnh: list[float] = []
+        adapter = SxHawkTcpAdapter(
+            bind_host="127.0.0.1",
+            port=0,
+            polar=get_xcvario_polar("DG 800B/15"),
+            on_qnh_command=received_qnh.append,
+        )
+        adapter.start()
+        self.addCleanup(adapter.stop)
+
+        client = socket.create_connection(("127.0.0.1", adapter.bound_port), timeout=1.0)
+        self.addCleanup(client.close)
+        time.sleep(0.05)
+
+        client.sendall(build_nmea_sentence("PFLX2,1.5,1.20,7,,,,65").encode("ascii"))
+        client.sendall(build_lxwp3(qnh_hpa=999.0).replace("$LXWP3", "$PFLX3", 1).encode("ascii"))
+        time.sleep(0.05)
+
+        adapter.publish_snapshot(_snapshot())
+        payload = client.recv(4096).decode("ascii")
+
+        self.assertIn("$LXWP2,1.5,1.20,7,,,,65*", payload)
+        self.assertEqual(len(received_qnh), 1)
+        self.assertAlmostEqual(received_qnh[0], 999.0, places=1)
+
+    def test_plxv0_settings_commands_are_accepted_for_compatibility(self):
+        received_qnh: list[float] = []
+        adapter = SxHawkTcpAdapter(
+            bind_host="127.0.0.1",
+            port=0,
+            polar=get_xcvario_polar("DG 800B/15"),
+            on_qnh_command=received_qnh.append,
+        )
+        adapter.start()
+        self.addCleanup(adapter.stop)
+
+        client = socket.create_connection(("127.0.0.1", adapter.bound_port), timeout=1.0)
+        self.addCleanup(client.close)
+        time.sleep(0.05)
+
+        client.sendall(build_nmea_sentence("PLXV0,MC,W,2.0").encode("ascii"))
+        client.sendall(build_nmea_sentence("PLXV0,BAL,W,1.30").encode("ascii"))
+        client.sendall(build_nmea_sentence("PLXV0,BUGS,W,9").encode("ascii"))
+        client.sendall(build_nmea_sentence("PLXV0,QNH,W,100500").encode("ascii"))
+        time.sleep(0.05)
+
+        adapter.publish_snapshot(replace(_snapshot(), wind=WindState(direction_deg=90.0, speed_kmh=15.0)))
+        payload = client.recv(4096).decode("ascii")
+
+        self.assertIn("$LXWP2,2.0,1.30,9,,,,80*", payload)
+        self.assertEqual(received_qnh, [1005.0])
+
+
+if __name__ == "__main__":
+    unittest.main()

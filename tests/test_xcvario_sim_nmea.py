@@ -4,6 +4,10 @@ from kigo_xcvario_simulator.contracts import OwnshipState, TrafficContact, WindS
 from kigo_xcvario_simulator.nmea import (
     build_gpgga,
     build_gprmc,
+    build_lxwp0,
+    build_lxwp1,
+    build_lxwp2,
+    build_lxwp3,
     build_pflaa,
     build_pflau,
     build_pov,
@@ -107,6 +111,29 @@ class NmeaBuilderTests(unittest.TestCase):
         body = "WIMWV,270.0,T,25.5,K,A"
 
         self.assertEqual(sentence, f"${body}*{nmea_checksum(body):02X}\r\n")
+
+    def test_lxwp0_builder_matches_sxhawk_lx_parser_layout(self):
+        sentence = build_lxwp0(_ownship(), WindState(direction_deg=270.0, speed_kmh=25.5))
+        body = "LXWP0,Y,90.0,401.0,2.35,2.35,2.35,2.35,2.35,2.35,84.4,270.0,25.5"
+
+        self.assertEqual(sentence, f"${body}*{nmea_checksum(body):02X}\r\n")
+
+    def test_lxwp1_lxwp2_and_lxwp3_builders_cover_sxhawk_metadata_settings_and_qnh(self):
+        lxwp1_body = "LXWP1,SxHAWK,SXSIM0001,I9.56/S9.54,SIM,"
+        lxwp2_body = "LXWP2,1.5,1.20,7,,,,65"
+        lxwp3_body = "LXWP3,0.00,,,,,,,,,,,,"
+
+        self.assertEqual(build_lxwp1(), f"${lxwp1_body}*{nmea_checksum(lxwp1_body):02X}\r\n")
+        self.assertEqual(
+            build_lxwp2(
+                mac_cready_ms=1.5,
+                ballast_overload_factor=1.2,
+                bugs_degradation_percent=7,
+                volume_percent=65,
+            ),
+            f"${lxwp2_body}*{nmea_checksum(lxwp2_body):02X}\r\n",
+        )
+        self.assertEqual(build_lxwp3(qnh_hpa=1013.25), f"${lxwp3_body}*{nmea_checksum(lxwp3_body):02X}\r\n")
 
     def test_gps_builders_work_with_existing_stream_reader(self):
         stream = (
