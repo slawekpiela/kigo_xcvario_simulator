@@ -57,11 +57,15 @@ Wind is emitted on the same `XCvario` stream as `$WIMWV,<direction>,T,<speed>,K,
 matching the real device output for true wind in `km/h`.
 OAT defaults to `18.0 deg C` and is emitted in the `PXCV` and `POV` pressure
 sentences used by `kigo_nav`.
+Device QNH and device barometric altitude can be adjusted from the panel.  A
+QNH change is emitted in the primary-device protocol, while an altitude change
+is converted to the matching QNH for the current static pressure and then
+emitted the same way.
 
 The `SxHAWK` telemetry stream follows the LXNAV/LX protocol parsed by the
 `LX`/LXNAV driver in `kigo_nav`: `GPRMC`, `GPGGA`, `LXWP0`, `LXWP1`, `LXWP2`
 and `LXWP3`. It accepts `PFLX2`/`PFLX3` and `PLXV0` write-side settings for
-MC, ballast, bugs and QNH.
+MC, ballast, bugs, QNH and device altitude.
 
 When `kigo_nav` or another primary-device client connects or reconnects, the runtime
 automatically activates manual `on_ground` at the configured home position:
@@ -160,9 +164,10 @@ PTY such as `/tmp/kigo-sim/sxhawk`, and set `DeviceA="LX"` with
 4. Set circling speed min/max in `Manual Mode` when using `circling_left` or `circling_right`.
 5. Set wind direction and speed; the runtime sends them to `kigo_nav` as `WIMWV`.
 6. Set OAT when you need a non-default outside air temperature in the `PXCV`/`POV` stream.
-7. Adjust traffic count if needed, and enable `collision course` when you want the first traffic contact to converge on the ownship.
-8. Use `Start / Resume`, `Pause`, `Reset` or `Apply Manual Mode`.
-9. Watch `Ownship`, `Traffic` and `Health` update from `GET /state` and `SSE`, including the emitted visible aircraft ID for each contact.
+7. Set `QNH [hPa]` or `Wysokosc [m]` in `Atmosphere` to adjust the simulated device altimeter; changing one recalculates the other from the current static pressure.
+8. Adjust traffic count if needed, and enable `collision course` when you want the first traffic contact to converge on the ownship.
+9. Use `Start / Resume`, `Pause`, `Reset` or `Apply Manual Mode`.
+10. Watch `Ownship`, `Traffic` and `Health` update from `GET /state` and `SSE`, including the emitted visible aircraft ID for each contact.
 
 ## Test Commands
 

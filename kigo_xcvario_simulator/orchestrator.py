@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import datetime, timezone
+import math
 from threading import RLock
 
+from .baro import qnh_hpa_for_static_pressure
 from .config import SimulatorRuntimeConfig
 from .contracts import (
     FlightDirective,
@@ -158,7 +160,18 @@ class ScenarioOrchestrator:
             return self._snapshot()
 
     def set_device_qnh_hpa(self, qnh_hpa: float) -> SimulationSnapshot:
+        qnh_hpa = _finite_float(qnh_hpa, "qnh_hpa")
+        if qnh_hpa <= 0.0:
+            raise ValueError("qnh_hpa must be > 0.")
         with self._lock:
+            self._flight_model.set_device_qnh_hpa(qnh_hpa)
+            self._ownship = self._flight_model.apply_device_qnh_to_state(self._ownship)
+            return self._snapshot()
+
+    def set_device_altitude_m(self, altitude_m: float) -> SimulationSnapshot:
+        altitude_m = _finite_float(altitude_m, "altitude_m")
+        with self._lock:
+            qnh_hpa = qnh_hpa_for_static_pressure(self._ownship.static_pressure_hpa, altitude_m)
             self._flight_model.set_device_qnh_hpa(qnh_hpa)
             self._ownship = self._flight_model.apply_device_qnh_to_state(self._ownship)
             return self._snapshot()
@@ -471,3 +484,10 @@ class ScenarioOrchestrator:
         if value.tzinfo is None:
             return value.replace(tzinfo=timezone.utc)
         return value.astimezone(timezone.utc)
+
+
+def _finite_float(value: float, field_name: str) -> float:
+    resolved = float(value)
+    if not math.isfinite(resolved):
+        raise ValueError(f"{field_name} must be finite.")
+    return resolved

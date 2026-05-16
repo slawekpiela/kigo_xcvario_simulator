@@ -174,7 +174,7 @@ def build_wimwv(wind: WindState) -> str:
 
 def build_lxwp0(ownship: OwnshipState, wind: WindState) -> str:
     airspeed_kmh = max(0.0, min(250.0, float(ownship.speed_kmh)))
-    baro_altitude_m = float(ownship.gps_altitude_m)
+    baro_altitude_m = _device_altitude_m(ownship)
     vario_ms = float(ownship.vertical_speed_ms)
     heading_deg = math.fmod(float(ownship.track_deg), 360.0)
     if heading_deg < 0.0:
@@ -201,6 +201,12 @@ def build_lxwp0(ownship: OwnshipState, wind: WindState) -> str:
         ]
     )
     return build_nmea_sentence(body)
+
+
+def _device_altitude_m(ownship: OwnshipState) -> float:
+    if ownship.device_altitude_m is not None:
+        return float(ownship.device_altitude_m)
+    return float(ownship.gps_altitude_m)
 
 
 def build_lxwp1(

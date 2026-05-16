@@ -1,5 +1,7 @@
 const STORAGE_RUNTIME_URL = "kigo.sim.runtimeUrl";
 const STORAGE_RUNTIME_TOKEN = "kigo.sim.runtimeToken";
+const BARO_K1 = 0.190263;
+const BARO_K2 = 8.417286e-5;
 
 const runtimeUrlInput = document.getElementById("runtime-url-input");
 const runtimeTokenInput = document.getElementById("runtime-token-input");
@@ -33,6 +35,10 @@ const windSpeedInput = document.getElementById("wind-speed-input");
 const applyWindButton = document.getElementById("apply-wind-button");
 const oatInput = document.getElementById("oat-input");
 const applyOatButton = document.getElementById("apply-oat-button");
+const deviceQnhInput = document.getElementById("device-qnh-input");
+const deviceAltitudeInput = document.getElementById("device-altitude-input");
+const applyQnhButton = document.getElementById("apply-qnh-button");
+const applyDeviceAltitudeButton = document.getElementById("apply-device-altitude-button");
 
 const trafficEnabledInput = document.getElementById("traffic-enabled-input");
 const trafficCountInput = document.getElementById("traffic-count-input");
@@ -290,6 +296,8 @@ function syncControlValues() {
     setNumericValueIfIdle(manualHeadingInput, ownship.track_deg, 1);
     setNumericValueIfIdle(manualSpeedInput, ownship.speed_kmh, 1);
     setNumericValueIfIdle(manualBaroAltitudeInput, ownship.gps_altitude_m, 0);
+    setNumericValueIfIdle(deviceQnhInput, ownship.device_qnh_hpa, 1);
+    setNumericValueIfIdle(deviceAltitudeInput, ownship.device_altitude_m ?? ownship.gps_altitude_m, 0);
   }
   const wind = snapshot.wind || (state.runtime ? state.runtime.wind : null);
   if (wind) {
@@ -319,6 +327,54 @@ function setNumericValueIfIdle(node, value, digits) {
   node.value = Number(value).toFixed(digits);
 }
 
+function currentStaticPressureHpa() {
+  const ownship = state.snapshot ? state.snapshot.ownship : null;
+  if (ownship && ownship.static_pressure_hpa !== null && ownship.static_pressure_hpa !== undefined) {
+    return Number(ownship.static_pressure_hpa);
+  }
+  const qnhHpa = numericValue(deviceQnhInput);
+  const altitudeM = numericValue(deviceAltitudeInput);
+  if (qnhHpa === null || altitudeM === null || qnhHpa <= 0) {
+    return null;
+  }
+  return staticPressureForAltitude(qnhHpa, altitudeM);
+}
+
+function altitudeForStaticPressure(qnhHpa, staticPressureHpa) {
+  return (Math.pow(qnhHpa, BARO_K1) - Math.pow(staticPressureHpa, BARO_K1)) / BARO_K2;
+}
+
+function staticPressureForAltitude(qnhHpa, altitudeM) {
+  const base = Math.pow(qnhHpa, BARO_K1) - BARO_K2 * altitudeM;
+  if (base <= 0) {
+    return null;
+  }
+  return Math.pow(base, 1 / BARO_K1);
+}
+
+function qnhForStaticPressure(staticPressureHpa, altitudeM) {
+  const base = Math.pow(staticPressureHpa, BARO_K1) + BARO_K2 * altitudeM;
+  return Math.pow(base, 1 / BARO_K1);
+}
+
+function syncAltitudeFromQnhInput() {
+  const qnhHpa = numericValue(deviceQnhInput);
+  const staticPressureHpa = currentStaticPressureHpa();
+  if (qnhHpa === null || staticPressureHpa === null || qnhHpa <= 0 || staticPressureHpa <= 0) {
+    return;
+  }
+  deviceAltitudeInput.value = altitudeForStaticPressure(qnhHpa, staticPressureHpa).toFixed(0);
+}
+
+function syncQnhFromAltitudeInput() {
+  const altitudeM = numericValue(deviceAltitudeInput);
+  const staticPressureHpa = currentStaticPressureHpa();
+  if (altitudeM === null || staticPressureHpa === null || staticPressureHpa <= 0) {
+    return;
+  }
+  deviceQnhInput.value = qnhForStaticPressure(staticPressureHpa, altitudeM).toFixed(1);
+}
+
 function renderState() {
   renderOwnship(state.snapshot ? state.snapshot.ownship : null);
   renderTraffic(state.snapshot ? state.snapshot.traffic : []);
@@ -334,6 +390,7 @@ function renderOwnship(ownship) {
     ["Speed", ownship ? `${formatNumber(ownship.speed_kmh, 1)} km/h` : "-"],
     ["Vario", ownship ? `${formatNumber(ownship.vertical_speed_ms, 2)} m/s` : "-"],
     ["GPS Alt", ownship ? `${formatNumber(ownship.gps_altitude_m, 1)} m` : "-"],
+    ["Device Alt", ownship ? `${formatNumber(ownship.device_altitude_m ?? ownship.gps_altitude_m, 1)} m` : "-"],
     ["Static Pressure", ownship ? `${formatNumber(ownship.static_pressure_hpa, 2)} hPa` : "-"],
     ["Device QNH", ownship ? `${formatNumber(ownship.device_qnh_hpa, 2)} hPa` : "-"],
     ["Latitude", ownship ? formatNumber(ownship.latitude_deg, 5) : "-"],
@@ -525,6 +582,26 @@ applyWindButton.addEventListener("click", () => {
 applyOatButton.addEventListener("click", () => {
   void postCommand("/api/v1/simulation/oat", {
     oat_c: numericValue(oatInput) ?? 18.0,
+  }, { syncControls: true });
+});
+
+deviceQnhInput.addEventListener("input", () => {
+  syncAltitudeFromQnhInput();
+});
+
+deviceAltitudeInput.addEventListener("input", () => {
+  syncQnhFromAltitudeInput();
+});
+
+applyQnhButton.addEventListener("click", () => {
+  void postCommand("/api/v1/simulation/altimeter", {
+    qnh_hpa: numericValue(deviceQnhInput) ?? 1013.25,
+  }, { syncControls: true });
+});
+
+applyDeviceAltitudeButton.addEventListener("click", () => {
+  void postCommand("/api/v1/simulation/altimeter", {
+    altitude_m: numericValue(deviceAltitudeInput) ?? 0,
   }, { syncControls: true });
 });
 

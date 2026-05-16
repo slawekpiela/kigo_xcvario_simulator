@@ -118,6 +118,27 @@ class NmeaBuilderTests(unittest.TestCase):
 
         self.assertEqual(sentence, f"${body}*{nmea_checksum(body):02X}\r\n")
 
+    def test_lxwp0_builder_uses_device_altitude_when_available(self):
+        ownship = _ownship()
+        ownship = OwnshipState(
+            timestamp_utc=ownship.timestamp_utc,
+            latitude_deg=ownship.latitude_deg,
+            longitude_deg=ownship.longitude_deg,
+            gps_altitude_m=ownship.gps_altitude_m,
+            static_pressure_hpa=ownship.static_pressure_hpa,
+            device_qnh_hpa=ownship.device_qnh_hpa,
+            vertical_speed_ms=ownship.vertical_speed_ms,
+            speed_kmh=ownship.speed_kmh,
+            track_deg=ownship.track_deg,
+            on_ground=ownship.on_ground,
+            phase=ownship.phase,
+            device_altitude_m=455.4,
+        )
+
+        sentence = build_lxwp0(ownship, WindState(direction_deg=270.0, speed_kmh=25.5))
+
+        self.assertIn("$LXWP0,Y,90.0,455.4,2.35", sentence)
+
     def test_lxwp1_lxwp2_and_lxwp3_builders_cover_sxhawk_metadata_settings_and_qnh(self):
         lxwp1_body = "LXWP1,SxHAWK,SXSIM0001,I9.56/S9.54,SIM,"
         lxwp2_body = "LXWP2,1.5,1.20,7,,,,65"

@@ -35,6 +35,7 @@ class OwnshipState:
     track_deg: float
     on_ground: bool
     phase: FlightPhase
+    device_altitude_m: float | None = None
 
 
 @dataclass(frozen=True)

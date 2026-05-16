@@ -38,11 +38,13 @@ def _snapshot() -> SimulationSnapshot:
 class XcvarioAdapterTests(unittest.TestCase):
     def test_client_receives_sentences_and_qnh_command_is_forwarded(self):
         received_qnh: list[float] = []
+        received_altitudes: list[float] = []
         adapter = XcvarioTcpAdapter(
             bind_host="127.0.0.1",
             port=0,
             polar=get_xcvario_polar("DG 800B/15"),
             on_qnh_command=received_qnh.append,
+            on_altitude_command=received_altitudes.append,
         )
         adapter.start()
         self.addCleanup(adapter.stop)
@@ -55,6 +57,8 @@ class XcvarioAdapterTests(unittest.TestCase):
         payload = client.recv(4096).decode("ascii")
         qnh_command = f"!g,q999*{nmea_checksum('!g,q999'):02X}\r\n".encode("ascii")
         client.sendall(qnh_command)
+        altitude_command = f"!g,a875*{nmea_checksum('!g,a875'):02X}\r\n".encode("ascii")
+        client.sendall(altitude_command)
         time.sleep(0.05)
 
         self.assertIn("$GPRMC,", payload)
@@ -63,6 +67,7 @@ class XcvarioAdapterTests(unittest.TestCase):
         self.assertIn("$POV,P,965.4,Q,361.0,E,2.4,T,18.0*", payload)
         self.assertIn("$WIMWV,270.0,T,25.5,K,A*", payload)
         self.assertEqual(received_qnh, [999.0])
+        self.assertEqual(received_altitudes, [875.0])
 
     def test_cai302_style_commands_update_following_xcvario_frames(self):
         adapter = XcvarioTcpAdapter(bind_host="127.0.0.1", port=0, polar=get_xcvario_polar("DG 800B/15"))

@@ -215,6 +215,25 @@ class ControlApiServer:
                     self._write_cors_headers()
                     self.end_headers()
                     return True
+                if path == "/api/v1/simulation/altimeter":
+                    payload = self._read_json_body()
+                    altitude_m = _optional_float_any(
+                        payload,
+                        "altitude_m",
+                        "device_altitude_m",
+                        "height_m",
+                        "wysokosc",
+                    )
+                    if altitude_m is not None:
+                        controller.session.set_device_altitude_m(altitude_m)
+                    else:
+                        controller.session.set_device_qnh_hpa(
+                            _required_float_any(payload, "qnh_hpa", "qhn_hpa", "qnh", "qhn")
+                        )
+                    self.send_response(204)
+                    self._write_cors_headers()
+                    self.end_headers()
+                    return True
                 if path == "/api/v1/simulation/device":
                     payload = self._read_json_body()
                     controller.session.set_primary_device(

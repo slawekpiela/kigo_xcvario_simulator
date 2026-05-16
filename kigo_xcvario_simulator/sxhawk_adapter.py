@@ -30,6 +30,7 @@ class SxHawkTcpAdapter(XcvarioTcpAdapter):
         port: int,
         polar: XcvarioPolar,
         on_qnh_command=None,
+        on_altitude_command=None,
         on_client_connect=None,
         gps_every_baro_frames: int = DEFAULT_GPS_EVERY_BARO_FRAMES,
         device_info_every_baro_frames: int = DEFAULT_DEVICE_INFO_EVERY_BARO_FRAMES,
@@ -40,6 +41,7 @@ class SxHawkTcpAdapter(XcvarioTcpAdapter):
             port=port,
             polar=polar,
             on_qnh_command=on_qnh_command,
+            on_altitude_command=on_altitude_command,
             on_client_connect=on_client_connect,
             gps_every_baro_frames=gps_every_baro_frames,
             thread_name="sxhawk-adapter",
@@ -48,6 +50,7 @@ class SxHawkTcpAdapter(XcvarioTcpAdapter):
         self._settings_every_baro_frames = max(1, int(settings_every_baro_frames))
         self._ballast_overload_factor = 1.0
         self._volume_percent = DEFAULT_VOLUME_PERCENT
+        self._last_sent_qnh_hpa: float | None = None
 
     def publish_snapshot(self, snapshot: SimulationSnapshot) -> None:
         include_position = self._reserve_publish_frame()
@@ -59,6 +62,9 @@ class SxHawkTcpAdapter(XcvarioTcpAdapter):
             bugs_degradation_percent = self._bugs_degradation_percent
             ballast_overload_factor = self._ballast_overload_factor
             volume_percent = self._volume_percent
+            last_sent_qnh_hpa = self._last_sent_qnh_hpa
+        qnh_hpa = float(snapshot.ownship.device_qnh_hpa)
+        qnh_changed = last_sent_qnh_hpa is None or abs(qnh_hpa - last_sent_qnh_hpa) >= 0.005
 
         payload_parts = []
         if include_position:
@@ -68,9 +74,11 @@ class SxHawkTcpAdapter(XcvarioTcpAdapter):
             payload_parts.append(build_gpgga(position_ownship))
 
         payload_parts.append(build_lxwp0(snapshot.ownship, snapshot.wind))
-        if frame_index == 0 or frame_index % self._device_info_every_baro_frames == 0:
+        include_device_info = frame_index == 0 or frame_index % self._device_info_every_baro_frames == 0
+        if include_device_info:
             payload_parts.append(build_lxwp1())
-            payload_parts.append(build_lxwp3(qnh_hpa=snapshot.ownship.device_qnh_hpa))
+        if include_device_info or qnh_changed:
+            payload_parts.append(build_lxwp3(qnh_hpa=qnh_hpa))
         if frame_index == 0 or frame_index % self._settings_every_baro_frames == 0:
             payload_parts.append(
                 build_lxwp2(
@@ -82,6 +90,8 @@ class SxHawkTcpAdapter(XcvarioTcpAdapter):
             )
 
         self._send("".join(payload_parts).encode("ascii"))
+        with self._lock:
+            self._last_sent_qnh_hpa = qnh_hpa
 
     def _handle_command(self, line: str) -> None:
         body = _nmea_body(line)
@@ -155,7 +165,11 @@ class SxHawkTcpAdapter(XcvarioTcpAdapter):
         elif name == "QNH":
             value = _parse_float(value_text)
             if value is not None and math.isfinite(value):
-                self._notify_qnh_command(value / 100.0)
+                self._notify_qnh_command(value / 100.0 if value > 2000.0 else value)
+        elif name in {"ALT", "ALTITUDE", "BAROALT", "BARO_ALT", "HEIGHT"}:
+            value = _parse_float(value_text)
+            if value is not None and math.isfinite(value):
+                self._notify_altitude_command(value)
 
     def _notify_qnh_command(self, qnh_hpa: float) -> None:
         callback = self._on_qnh_command
@@ -163,6 +177,15 @@ class SxHawkTcpAdapter(XcvarioTcpAdapter):
             return
         try:
             callback(float(qnh_hpa))
+        except Exception:
+            return
+
+    def _notify_altitude_command(self, altitude_m: float) -> None:
+        callback = self._on_altitude_command
+        if callback is None:
+            return
+        try:
+            callback(float(altitude_m))
         except Exception:
             return
 

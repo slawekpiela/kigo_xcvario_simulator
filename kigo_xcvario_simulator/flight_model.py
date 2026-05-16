@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime, timezone
 
-from .baro import simulation_timestamp_utc, static_pressure_hpa_for_altitude
+from .baro import altitude_m_for_static_pressure, simulation_timestamp_utc, static_pressure_hpa_for_altitude
 from .contracts import FlightDirective, OwnshipState, WindState
 from .flight_math import advance_heading_deg, advance_position, ground_velocity_from_true_wind, normalize_heading_deg
 from .state import FlightPhase
@@ -166,7 +166,7 @@ class FlightModel:
         )
 
     def apply_device_qnh_to_state(self, state: OwnshipState) -> OwnshipState:
-        return replace(state, device_qnh_hpa=self._device_qnh_hpa)
+        return self._with_device_altimeter(state)
 
     def _build_state(
         self,
@@ -185,6 +185,10 @@ class FlightModel:
             gps_altitude_m if baro_altitude_m is None else float(baro_altitude_m),
             qnh_hpa=self._pressure_reference_qnh_hpa,
         )
+        device_altitude_m = altitude_m_for_static_pressure(
+            static_pressure_hpa,
+            qnh_hpa=self._device_qnh_hpa,
+        )
         return OwnshipState(
             timestamp_utc=simulation_timestamp_utc(self._start_utc, self._elapsed_s),
             latitude_deg=latitude_deg,
@@ -197,6 +201,17 @@ class FlightModel:
             track_deg=normalize_heading_deg(track_deg),
             on_ground=on_ground,
             phase=phase,
+            device_altitude_m=device_altitude_m,
+        )
+
+    def _with_device_altimeter(self, state: OwnshipState) -> OwnshipState:
+        return replace(
+            state,
+            device_qnh_hpa=self._device_qnh_hpa,
+            device_altitude_m=altitude_m_for_static_pressure(
+                state.static_pressure_hpa,
+                qnh_hpa=self._device_qnh_hpa,
+            ),
         )
 
     def _resolve_track_deg(

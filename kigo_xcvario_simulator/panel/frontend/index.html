@@ -84,7 +84,7 @@
               <input id="manual-speed-input" type="number" step="0.1" value="95">
             </label>
             <label class="field">
-              <span>Wysokosc [m]</span>
+              <span>Flight Altitude [m]</span>
               <input id="manual-baro-altitude-input" type="number" step="1" value="750">
             </label>
             <label class="field">
@@ -138,10 +138,20 @@
               <span>OAT [deg C]</span>
               <input id="oat-input" type="number" step="0.1" value="18.0">
             </label>
+            <label class="field">
+              <span>QNH [hPa]</span>
+              <input id="device-qnh-input" type="number" min="1" step="0.1" value="1013.3">
+            </label>
+            <label class="field">
+              <span>Device Altitude [m]</span>
+              <input id="device-altitude-input" type="number" step="1" value="401">
+            </label>
           </div>
           <div class="button-row">
             <button id="apply-wind-button" class="primary-button" type="button">Apply Wind</button>
             <button id="apply-oat-button" class="secondary-button" type="button">Apply OAT</button>
+            <button id="apply-qnh-button" class="secondary-button" type="button">Apply QNH</button>
+            <button id="apply-device-altitude-button" class="secondary-button" type="button">Apply Altitude</button>
           </div>
         </section>
 

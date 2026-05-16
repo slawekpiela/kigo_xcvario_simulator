@@ -87,11 +87,13 @@ class SxHawkAdapterTests(unittest.TestCase):
 
     def test_plxv0_settings_commands_are_accepted_for_compatibility(self):
         received_qnh: list[float] = []
+        received_altitudes: list[float] = []
         adapter = SxHawkTcpAdapter(
             bind_host="127.0.0.1",
             port=0,
             polar=get_xcvario_polar("DG 800B/15"),
             on_qnh_command=received_qnh.append,
+            on_altitude_command=received_altitudes.append,
         )
         adapter.start()
         self.addCleanup(adapter.stop)
@@ -104,6 +106,7 @@ class SxHawkAdapterTests(unittest.TestCase):
         client.sendall(build_nmea_sentence("PLXV0,BAL,W,1.30").encode("ascii"))
         client.sendall(build_nmea_sentence("PLXV0,BUGS,W,9").encode("ascii"))
         client.sendall(build_nmea_sentence("PLXV0,QNH,W,100500").encode("ascii"))
+        client.sendall(build_nmea_sentence("PLXV0,ALT,W,875").encode("ascii"))
         time.sleep(0.05)
 
         adapter.publish_snapshot(replace(_snapshot(), wind=WindState(direction_deg=90.0, speed_kmh=15.0)))
@@ -111,6 +114,32 @@ class SxHawkAdapterTests(unittest.TestCase):
 
         self.assertIn("$LXWP2,2.0,1.30,9,,,,80*", payload)
         self.assertEqual(received_qnh, [1005.0])
+        self.assertEqual(received_altitudes, [875.0])
+
+    def test_lxwp0_uses_device_altitude_and_lxwp3_is_sent_when_qnh_changes(self):
+        adapter = SxHawkTcpAdapter(
+            bind_host="127.0.0.1",
+            port=0,
+            polar=get_xcvario_polar("DG 800B/15"),
+            device_info_every_baro_frames=100,
+        )
+        adapter.start()
+        self.addCleanup(adapter.stop)
+
+        client = socket.create_connection(("127.0.0.1", adapter.bound_port), timeout=1.0)
+        self.addCleanup(client.close)
+        time.sleep(0.05)
+
+        first = replace(_snapshot().ownship, device_altitude_m=456.0)
+        changed_qnh = replace(first, device_qnh_hpa=995.5, device_altitude_m=612.0)
+        adapter.publish_snapshot(replace(_snapshot(), ownship=first))
+        client.recv(4096)
+
+        adapter.publish_snapshot(replace(_snapshot(), ownship=changed_qnh))
+        payload = client.recv(4096).decode("ascii")
+
+        self.assertIn("$LXWP0,Y,90.0,612.0,2.35", payload)
+        self.assertIn("$LXWP3,", payload)
 
 
 if __name__ == "__main__":

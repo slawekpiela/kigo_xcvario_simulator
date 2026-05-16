@@ -8,7 +8,7 @@ from kigo_xcvario_simulator.config import (
     SimulatorRuntimeConfig,
     XcvarioConfig,
 )
-from kigo_xcvario_simulator.baro import static_pressure_hpa_for_altitude
+from kigo_xcvario_simulator.baro import qnh_hpa_for_static_pressure, static_pressure_hpa_for_altitude
 from kigo_xcvario_simulator.contracts import ManualModeInput, PresetRequest
 from kigo_xcvario_simulator.orchestrator import ScenarioOrchestrator
 from kigo_xcvario_simulator.state import FlightPhase, HealthState, RuntimeState
@@ -217,6 +217,18 @@ class ScenarioOrchestratorTests(unittest.TestCase):
         self.assertAlmostEqual(changed.ownship.device_qnh_hpa, 995.5, places=4)
         self.assertAlmostEqual(after.ownship.static_pressure_hpa, before.ownship.static_pressure_hpa, places=6)
         self.assertAlmostEqual(after.ownship.gps_altitude_m, before.ownship.gps_altitude_m, places=6)
+
+    def test_device_altitude_change_recalculates_qnh_without_changing_pressure(self):
+        self.orchestrator.load_preset(PresetRequest(preset_id="straight", seed=5, autostart=True))
+        before = self.orchestrator.tick(5.0)
+
+        changed = self.orchestrator.set_device_altitude_m(875.0)
+        expected_qnh = qnh_hpa_for_static_pressure(before.ownship.static_pressure_hpa, 875.0)
+
+        self.assertAlmostEqual(changed.ownship.device_altitude_m or 0.0, 875.0, places=6)
+        self.assertAlmostEqual(changed.ownship.device_qnh_hpa, expected_qnh, places=6)
+        self.assertAlmostEqual(changed.ownship.static_pressure_hpa, before.ownship.static_pressure_hpa, places=6)
+        self.assertAlmostEqual(changed.ownship.gps_altitude_m, before.ownship.gps_altitude_m, places=6)
 
     def test_traffic_config_populates_snapshot_without_degrading_ownship(self):
         self.orchestrator.load_preset(PresetRequest(preset_id="straight", seed=5, autostart=True))

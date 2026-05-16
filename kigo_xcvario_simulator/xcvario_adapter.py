@@ -32,6 +32,7 @@ class XcvarioTcpAdapter:
         port: int,
         polar: XcvarioPolar,
         on_qnh_command: Callable[[float], object] | None = None,
+        on_altitude_command: Callable[[float], object] | None = None,
         on_client_connect: Callable[[], object] | None = None,
         gps_every_baro_frames: int = DEFAULT_GPS_EVERY_BARO_FRAMES,
         thread_name: str = "xcvario-adapter",
@@ -40,6 +41,7 @@ class XcvarioTcpAdapter:
         self._requested_port = int(port)
         self._polar = polar
         self._on_qnh_command = on_qnh_command
+        self._on_altitude_command = on_altitude_command
         self._on_client_connect = on_client_connect
         self._gps_every_baro_frames = max(1, int(gps_every_baro_frames))
         self._thread_name = str(thread_name or "xcvario-adapter")
@@ -254,6 +256,8 @@ class XcvarioTcpAdapter:
             return
         if command == "q":
             self._handle_qnh_command(value_text)
+        elif command in {"a", "h"}:
+            self._handle_altitude_command(value_text)
         elif command == "m":
             self._handle_mac_cready_command(value_text)
         elif command == "u":
@@ -271,6 +275,19 @@ class XcvarioTcpAdapter:
             return
         try:
             callback(qnh_hpa)
+        except Exception:
+            return
+
+    def _handle_altitude_command(self, value_text: str) -> None:
+        try:
+            altitude_m = float(value_text)
+        except ValueError:
+            return
+        callback = self._on_altitude_command
+        if callback is None:
+            return
+        try:
+            callback(altitude_m)
         except Exception:
             return
 

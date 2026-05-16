@@ -2,7 +2,7 @@ import http.client
 import json
 import unittest
 
-from kigo_xcvario_simulator.baro import static_pressure_hpa_for_altitude
+from kigo_xcvario_simulator.baro import qnh_hpa_for_static_pressure, static_pressure_hpa_for_altitude
 from kigo_xcvario_simulator.config import (
     ControlApiConfig,
     EndpointConfig,
@@ -154,6 +154,47 @@ class ControlApiTests(unittest.TestCase):
 
         self.assertEqual(payload["runtime"]["environment"]["oat_c"], 7.5)
         self.assertEqual(self.session.xcvario_adapter.oat_c, 7.5)
+
+    def test_altimeter_endpoint_updates_device_qnh_and_altitude(self):
+        self.connection.request(
+            "POST",
+            "/api/v1/simulation/altimeter",
+            body=json.dumps({"qnh_hpa": 995.5}),
+            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+        )
+        response = self.connection.getresponse()
+        response.read()
+        self.assertEqual(response.status, 204)
+
+        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
+        response = self.connection.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["device_qnh_hpa"], 995.5, places=6)
+        self.assertAlmostEqual(payload["runtime"]["environment"]["device_qnh_hpa"], 995.5, places=6)
+
+        static_pressure_hpa = payload["snapshot"]["ownship"]["static_pressure_hpa"]
+        self.connection.request(
+            "POST",
+            "/api/v1/simulation/altimeter",
+            body=json.dumps({"altitude_m": 875.0}),
+            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+        )
+        response = self.connection.getresponse()
+        response.read()
+        self.assertEqual(response.status, 204)
+
+        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
+        response = self.connection.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["device_altitude_m"], 875.0, places=6)
+        self.assertAlmostEqual(payload["runtime"]["environment"]["device_altitude_m"], 875.0, places=6)
+        self.assertAlmostEqual(
+            payload["snapshot"]["ownship"]["device_qnh_hpa"],
+            qnh_hpa_for_static_pressure(static_pressure_hpa, 875.0),
+            places=6,
+        )
 
     def test_device_endpoint_switches_primary_adapter(self):
         self.connection.request(

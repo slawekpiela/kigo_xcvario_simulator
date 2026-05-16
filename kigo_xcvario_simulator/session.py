@@ -36,6 +36,7 @@ class SimulatorRuntimeSession:
             port=runtime_config.xcvario.port,
             polar=xcvario_polar,
             on_qnh_command=self.set_device_qnh_hpa,
+            on_altitude_command=self.set_device_altitude_m,
             on_client_connect=self.activate_on_ground_default,
             gps_every_baro_frames=_gps_every_baro_frames(
                 gps_hz=runtime_config.scheduler.gps_hz,
@@ -47,6 +48,7 @@ class SimulatorRuntimeSession:
             port=runtime_config.xcvario.port,
             polar=xcvario_polar,
             on_qnh_command=self.set_device_qnh_hpa,
+            on_altitude_command=self.set_device_altitude_m,
             on_client_connect=self.activate_on_ground_default,
             gps_every_baro_frames=_gps_every_baro_frames(
                 gps_hz=runtime_config.scheduler.gps_hz,
@@ -122,11 +124,12 @@ class SimulatorRuntimeSession:
     def get_runtime_metadata(self) -> dict[str, object]:
         traffic_config = self.orchestrator.get_traffic_config()
         wind = self.orchestrator.get_wind()
+        snapshot = self.orchestrator.get_snapshot()
         primary_device = self.primary_device
         return {
             "session_id": self.runtime_config.session_id,
             "started": self._started,
-            "seed": self.orchestrator.get_snapshot().seed,
+            "seed": snapshot.seed,
             "primary_device": primary_device,
             "scheduler": {
                 "tick_count": self.scheduler.tick_count,
@@ -146,6 +149,8 @@ class SimulatorRuntimeSession:
             },
             "environment": {
                 "oat_c": self._oat_c,
+                "device_qnh_hpa": snapshot.ownship.device_qnh_hpa,
+                "device_altitude_m": snapshot.ownship.device_altitude_m,
             },
             "adapters": {
                 "xcvario": {
@@ -215,6 +220,9 @@ class SimulatorRuntimeSession:
 
     def set_device_qnh_hpa(self, qnh_hpa: float) -> SimulationSnapshot:
         return self.orchestrator.set_device_qnh_hpa(qnh_hpa)
+
+    def set_device_altitude_m(self, altitude_m: float) -> SimulationSnapshot:
+        return self.orchestrator.set_device_altitude_m(altitude_m)
 
     def set_primary_device(self, primary_device: str) -> SimulationSnapshot:
         resolved_device = normalize_primary_device(primary_device)
