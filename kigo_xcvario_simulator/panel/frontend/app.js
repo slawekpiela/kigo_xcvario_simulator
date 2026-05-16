@@ -35,6 +35,7 @@ const windSpeedInput = document.getElementById("wind-speed-input");
 const applyWindButton = document.getElementById("apply-wind-button");
 const oatInput = document.getElementById("oat-input");
 const applyOatButton = document.getElementById("apply-oat-button");
+const staticPressureInput = document.getElementById("static-pressure-input");
 const deviceQnhInput = document.getElementById("device-qnh-input");
 const deviceAltitudeInput = document.getElementById("device-altitude-input");
 const applyQnhButton = document.getElementById("apply-qnh-button");
@@ -296,6 +297,7 @@ function syncControlValues() {
     setNumericValueIfIdle(manualHeadingInput, ownship.track_deg, 1);
     setNumericValueIfIdle(manualSpeedInput, ownship.speed_kmh, 1);
     setNumericValueIfIdle(manualBaroAltitudeInput, ownship.gps_altitude_m, 0);
+    setNumericValueIfIdle(staticPressureInput, ownship.static_pressure_hpa, 2);
     setNumericValueIfIdle(deviceQnhInput, ownship.device_qnh_hpa, 1);
     setNumericValueIfIdle(deviceAltitudeInput, ownship.device_altitude_m ?? ownship.gps_altitude_m, 0);
   }
@@ -331,6 +333,10 @@ function currentStaticPressureHpa() {
   const ownship = state.snapshot ? state.snapshot.ownship : null;
   if (ownship && ownship.static_pressure_hpa !== null && ownship.static_pressure_hpa !== undefined) {
     return Number(ownship.static_pressure_hpa);
+  }
+  const staticPressureHpa = numericValue(staticPressureInput);
+  if (staticPressureHpa !== null && staticPressureHpa > 0) {
+    return staticPressureHpa;
   }
   const qnhHpa = numericValue(deviceQnhInput);
   const altitudeM = numericValue(deviceAltitudeInput);

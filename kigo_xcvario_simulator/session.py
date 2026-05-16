@@ -149,6 +149,7 @@ class SimulatorRuntimeSession:
             },
             "environment": {
                 "oat_c": self._oat_c,
+                "static_pressure_hpa": snapshot.ownship.static_pressure_hpa,
                 "device_qnh_hpa": snapshot.ownship.device_qnh_hpa,
                 "device_altitude_m": snapshot.ownship.device_altitude_m,
             },

@@ -172,6 +172,11 @@ class ControlApiTests(unittest.TestCase):
 
         self.assertAlmostEqual(payload["snapshot"]["ownship"]["device_qnh_hpa"], 995.5, places=6)
         self.assertAlmostEqual(payload["runtime"]["environment"]["device_qnh_hpa"], 995.5, places=6)
+        self.assertAlmostEqual(
+            payload["runtime"]["environment"]["static_pressure_hpa"],
+            payload["snapshot"]["ownship"]["static_pressure_hpa"],
+            places=6,
+        )
 
         static_pressure_hpa = payload["snapshot"]["ownship"]["static_pressure_hpa"]
         self.connection.request(
