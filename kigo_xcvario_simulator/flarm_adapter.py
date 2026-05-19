@@ -17,13 +17,18 @@ class FlarmTcpAdapter:
         self._server_thread: Thread | None = None
         self._stop_event = Event()
         self._lock = Lock()
-        self._client_socket: socket.socket | None = None
+        self._client_sockets: list[socket.socket] = []
         self.bound_port = int(port)
 
     @property
     def client_connected(self) -> bool:
         with self._lock:
-            return self._client_socket is not None
+            return bool(self._client_sockets)
+
+    @property
+    def client_count(self) -> int:
+        with self._lock:
+            return len(self._client_sockets)
 
     def start(self) -> None:
         with self._lock:
@@ -45,14 +50,14 @@ class FlarmTcpAdapter:
         with self._lock:
             server_socket = self._server_socket
             self._server_socket = None
-            client_socket = self._client_socket
-            self._client_socket = None
+            client_sockets = tuple(self._client_sockets)
+            self._client_sockets.clear()
         if server_socket is not None:
             try:
                 server_socket.close()
             except OSError:
                 pass
-        if client_socket is not None:
+        for client_socket in client_sockets:
             self._close_socket(client_socket)
         if self._server_thread is not None:
             self._server_thread.join(timeout=1.0)
@@ -77,23 +82,25 @@ class FlarmTcpAdapter:
                 return
             client_socket.settimeout(0.2)
             with self._lock:
-                previous_socket = self._client_socket
-                self._client_socket = client_socket
-            if previous_socket is not None:
-                self._close_socket(previous_socket)
+                self._client_sockets.append(client_socket)
 
     def _send(self, payload: bytes) -> None:
         with self._lock:
-            client_socket = self._client_socket
-        if client_socket is None:
+            client_sockets = tuple(self._client_sockets)
+        if not client_sockets:
             return
-        try:
-            client_socket.sendall(payload)
-        except OSError:
-            with self._lock:
-                if self._client_socket is client_socket:
-                    self._client_socket = None
-            self._close_socket(client_socket)
+        for client_socket in client_sockets:
+            try:
+                client_socket.sendall(payload)
+            except OSError:
+                self._remove_client(client_socket)
+
+    def _remove_client(self, client_socket: socket.socket) -> None:
+        with self._lock:
+            if client_socket not in self._client_sockets:
+                return
+            self._client_sockets.remove(client_socket)
+        self._close_socket(client_socket)
 
     @staticmethod
     def _close_socket(client_socket: socket.socket) -> None:

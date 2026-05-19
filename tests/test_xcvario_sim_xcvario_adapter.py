@@ -194,7 +194,7 @@ class XcvarioAdapterTests(unittest.TestCase):
         self.assertEqual(_gprmc_speed_knots(payload), 13.0)
         self.assertEqual(_gprmc_track_deg(payload), 90.0)
 
-    def test_new_client_replaces_old_client(self):
+    def test_multiple_clients_receive_same_xcvario_stream(self):
         adapter = XcvarioTcpAdapter(
             bind_host="127.0.0.1",
             port=0,
@@ -211,18 +211,16 @@ class XcvarioAdapterTests(unittest.TestCase):
         time.sleep(0.05)
 
         adapter.publish_snapshot(_snapshot())
-        second_payload = second.recv(4096).decode("ascii")
+        first_payload = _recv_until(first, "$PXCV,", expected_count=1)
+        second_payload = _recv_until(second, "$PXCV,", expected_count=1)
 
-        try:
-            first.settimeout(0.2)
-            first_payload = first.recv(4096)
-        except OSError:
-            first_payload = b""
-
+        self.assertEqual(adapter.client_count, 2)
+        self.assertIn("$PXCV,", first_payload)
+        self.assertIn("$POV,", first_payload)
+        self.assertIn("$WIMWV,", first_payload)
         self.assertIn("$PXCV,", second_payload)
         self.assertIn("$POV,", second_payload)
         self.assertIn("$WIMWV,", second_payload)
-        self.assertEqual(first_payload, b"")
 
     def test_circling_output_altitude_advances_by_vario_value_per_publish(self):
         adapter = XcvarioTcpAdapter(

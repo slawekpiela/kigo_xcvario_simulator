@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import replace
 import math
 import socket
-from threading import Event, Lock, Thread
+from threading import Event, Lock, Thread, current_thread
 
 from .contracts import OwnshipState, SimulationSnapshot, WindState
 from .baro import qnh_hpa_for_static_pressure, static_pressure_hpa_for_altitude
@@ -47,10 +47,10 @@ class XcvarioTcpAdapter:
         self._thread_name = str(thread_name or "xcvario-adapter")
         self._server_socket: socket.socket | None = None
         self._server_thread: Thread | None = None
-        self._reader_thread: Thread | None = None
+        self._reader_threads: list[Thread] = []
         self._stop_event = Event()
         self._lock = Lock()
-        self._client_socket: socket.socket | None = None
+        self._client_sockets: list[socket.socket] = []
         self._reported_ownship_altitude_m: float | None = None
         self._baro_frame_index = 0
         self._oat_c = DEFAULT_OAT_C
@@ -62,7 +62,12 @@ class XcvarioTcpAdapter:
     @property
     def client_connected(self) -> bool:
         with self._lock:
-            return self._client_socket is not None
+            return bool(self._client_sockets)
+
+    @property
+    def client_count(self) -> int:
+        with self._lock:
+            return len(self._client_sockets)
 
     @property
     def oat_c(self) -> float:
@@ -94,21 +99,24 @@ class XcvarioTcpAdapter:
         with self._lock:
             server_socket = self._server_socket
             self._server_socket = None
-            client_socket = self._client_socket
-            self._client_socket = None
+            client_sockets = tuple(self._client_sockets)
+            self._client_sockets.clear()
+            reader_threads = tuple(self._reader_threads)
+            self._reader_threads.clear()
         if server_socket is not None:
             try:
                 server_socket.close()
             except OSError:
                 pass
-        if client_socket is not None:
+        for client_socket in client_sockets:
             self._close_socket(client_socket)
         if self._server_thread is not None:
             self._server_thread.join(timeout=1.0)
             self._server_thread = None
-        if self._reader_thread is not None:
-            self._reader_thread.join(timeout=1.0)
-            self._reader_thread = None
+        current = current_thread()
+        for reader_thread in reader_threads:
+            if reader_thread is not current:
+                reader_thread.join(timeout=1.0)
 
     def publish_snapshot(self, snapshot: SimulationSnapshot) -> None:
         include_position = self._reserve_publish_frame()
@@ -155,7 +163,7 @@ class XcvarioTcpAdapter:
 
     def _reserve_publish_frame(self) -> bool | None:
         with self._lock:
-            if self._client_socket is None:
+            if not self._client_sockets:
                 return None
             include_position = self._baro_frame_index % self._gps_every_baro_frames == 0
             self._baro_frame_index += 1
@@ -200,52 +208,48 @@ class XcvarioTcpAdapter:
             except OSError:
                 return
             client_socket.settimeout(0.2)
-            self._swap_client(client_socket)
+            self._add_client(client_socket)
 
-    def _swap_client(self, client_socket: socket.socket) -> None:
-        with self._lock:
-            previous_socket = self._client_socket
-            self._client_socket = client_socket
-            self._reported_ownship_altitude_m = None
-            self._baro_frame_index = 0
-        if previous_socket is not None:
-            self._close_socket(previous_socket)
+    def _add_client(self, client_socket: socket.socket) -> None:
         reader = Thread(
             target=self._reader_loop,
             args=(client_socket,),
             name=f"{self._thread_name}-reader",
             daemon=True,
         )
-        self._reader_thread = reader
+        with self._lock:
+            self._client_sockets.append(client_socket)
+            self._reported_ownship_altitude_m = None
+            self._baro_frame_index = 0
+            self._reader_threads.append(reader)
         reader.start()
         self._notify_client_connect()
 
     def _reader_loop(self, client_socket: socket.socket) -> None:
         buffer = bytearray()
-        while not self._stop_event.is_set():
-            if not self._is_current_client(client_socket):
-                break
-            try:
-                chunk = client_socket.recv(4096)
-            except socket.timeout:
-                continue
-            except OSError:
-                break
-            if not chunk:
-                break
-            buffer.extend(chunk)
-            while True:
-                separator_index = _find_separator(buffer)
-                if separator_index < 0:
+        try:
+            while not self._stop_event.is_set():
+                if not self._is_current_client(client_socket):
                     break
-                line = bytes(buffer[:separator_index]).decode("ascii", "ignore").strip()
-                del buffer[: separator_index + 1]
-                self._handle_command(line)
-        if self._is_current_client(client_socket):
-            with self._lock:
-                if self._client_socket is client_socket:
-                    self._client_socket = None
-        self._close_socket(client_socket)
+                try:
+                    chunk = client_socket.recv(4096)
+                except socket.timeout:
+                    continue
+                except OSError:
+                    break
+                if not chunk:
+                    break
+                buffer.extend(chunk)
+                while True:
+                    separator_index = _find_separator(buffer)
+                    if separator_index < 0:
+                        break
+                    line = bytes(buffer[:separator_index]).decode("ascii", "ignore").strip()
+                    del buffer[: separator_index + 1]
+                    self._handle_command(line)
+        finally:
+            self._remove_client(client_socket)
+            self._remove_reader_thread(current_thread())
 
     def _handle_command(self, line: str) -> None:
         if not line.startswith("!g,") or len(line) < 5:
@@ -329,21 +333,30 @@ class XcvarioTcpAdapter:
 
     def _send(self, payload: bytes) -> None:
         with self._lock:
-            client_socket = self._client_socket
-        if client_socket is None:
+            client_sockets = tuple(self._client_sockets)
+        if not client_sockets:
             return
-        try:
-            client_socket.sendall(payload)
-        except OSError:
-            if self._is_current_client(client_socket):
-                with self._lock:
-                    if self._client_socket is client_socket:
-                        self._client_socket = None
-            self._close_socket(client_socket)
+        for client_socket in client_sockets:
+            try:
+                client_socket.sendall(payload)
+            except OSError:
+                self._remove_client(client_socket)
 
     def _is_current_client(self, client_socket: socket.socket) -> bool:
         with self._lock:
-            return self._client_socket is client_socket
+            return client_socket in self._client_sockets
+
+    def _remove_client(self, client_socket: socket.socket) -> None:
+        with self._lock:
+            if client_socket not in self._client_sockets:
+                return
+            self._client_sockets.remove(client_socket)
+        self._close_socket(client_socket)
+
+    def _remove_reader_thread(self, reader_thread: Thread) -> None:
+        with self._lock:
+            if reader_thread in self._reader_threads:
+                self._reader_threads.remove(reader_thread)
 
     @staticmethod
     def _close_socket(client_socket: socket.socket) -> None:

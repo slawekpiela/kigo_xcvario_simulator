@@ -111,6 +111,19 @@ PortIPAddress="<runtime-host>"
 PortTCPPort="4353"
 ```
 
+### 4a. Run Pi And VM In Parallel
+
+The runtime accepts multiple TCP clients on each simulator endpoint. Point both
+the `Pi` and `VM` navigation profiles at the same runtime host:
+
+- primary device stream: `<runtime-host>:4353`,
+- FLARM stream: `<runtime-host>:4354`.
+
+Every connected client receives the same telemetry frames. Write-side device
+settings such as QNH, altitude, MacCready, ballast and bugs are accepted from
+any connected primary-device client; if both clients send settings, the latest
+valid command wins.
+
 ### 5. Reuse An Existing Serial Profile Such As `SLAWEK2`
 
 If the navigation profile already expects serial devices instead of `tcp_client`,

@@ -67,6 +67,27 @@ class FlarmAdapterTests(unittest.TestCase):
 
         self.assertIn("$PFLAU,", payload)
 
+    def test_multiple_clients_receive_same_flarm_stream(self):
+        adapter = FlarmTcpAdapter(bind_host="127.0.0.1", port=0)
+        adapter.start()
+        self.addCleanup(adapter.stop)
+
+        first = socket.create_connection(("127.0.0.1", adapter.bound_port), timeout=1.0)
+        second = socket.create_connection(("127.0.0.1", adapter.bound_port), timeout=1.0)
+        self.addCleanup(first.close)
+        self.addCleanup(second.close)
+        time.sleep(0.05)
+
+        adapter.publish_snapshot(_snapshot())
+        first_payload = first.recv(4096).decode("ascii")
+        second_payload = second.recv(4096).decode("ascii")
+
+        self.assertEqual(adapter.client_count, 2)
+        self.assertIn("$PFLAU,", first_payload)
+        self.assertIn("$PFLAA,", first_payload)
+        self.assertIn("$PFLAU,", second_payload)
+        self.assertIn("$PFLAA,", second_payload)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -59,6 +59,31 @@ class SxHawkAdapterTests(unittest.TestCase):
         self.assertIn("$LXWP2,0.0,1.00,0,,,,80*", payload)
         self.assertIn("$LXWP3,", payload)
 
+    def test_multiple_clients_receive_same_sxhawk_stream(self):
+        adapter = SxHawkTcpAdapter(
+            bind_host="127.0.0.1",
+            port=0,
+            polar=get_xcvario_polar("DG 800B/15"),
+        )
+        adapter.start()
+        self.addCleanup(adapter.stop)
+
+        first = socket.create_connection(("127.0.0.1", adapter.bound_port), timeout=1.0)
+        second = socket.create_connection(("127.0.0.1", adapter.bound_port), timeout=1.0)
+        self.addCleanup(first.close)
+        self.addCleanup(second.close)
+        time.sleep(0.05)
+
+        adapter.publish_snapshot(_snapshot())
+        first_payload = _recv_until(first, "$LXWP0,", expected_count=1)
+        second_payload = _recv_until(second, "$LXWP0,", expected_count=1)
+
+        self.assertEqual(adapter.client_count, 2)
+        self.assertIn("$GPRMC,", first_payload)
+        self.assertIn("$LXWP0,", first_payload)
+        self.assertIn("$GPRMC,", second_payload)
+        self.assertIn("$LXWP0,", second_payload)
+
     def test_lx_style_settings_commands_update_following_sxhawk_frames(self):
         received_qnh: list[float] = []
         adapter = SxHawkTcpAdapter(
@@ -140,6 +165,19 @@ class SxHawkAdapterTests(unittest.TestCase):
 
         self.assertIn("$LXWP0,Y,90.0,612.0,2.35", payload)
         self.assertIn("$LXWP3,", payload)
+
+
+def _recv_until(client: socket.socket, needle: str, *, expected_count: int) -> str:
+    client.settimeout(1.0)
+    chunks = []
+    payload = ""
+    while payload.count(needle) < expected_count:
+        chunk = client.recv(8192).decode("ascii")
+        if not chunk:
+            break
+        chunks.append(chunk)
+        payload = "".join(chunks)
+    return payload
 
 
 if __name__ == "__main__":
