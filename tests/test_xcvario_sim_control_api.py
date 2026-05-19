@@ -36,6 +36,38 @@ class _FakePublisher:
         self.oat_c = float(oat_c)
 
 
+class _FakeBridgeControl:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict[str, object]]] = []
+
+    def status(self, payload: dict[str, object]) -> dict[str, object]:
+        return self._record("status", payload)
+
+    def start(self, payload: dict[str, object]) -> dict[str, object]:
+        return self._record("start", payload)
+
+    def stop(self, payload: dict[str, object]) -> dict[str, object]:
+        return self._record("stop", payload)
+
+    def restart(self, payload: dict[str, object]) -> dict[str, object]:
+        return self._record("restart", payload)
+
+    def _record(self, action: str, payload: dict[str, object]) -> dict[str, object]:
+        self.calls.append((action, payload))
+        return {
+            "action": action,
+            "nodes": [
+                {
+                    "id": "pi",
+                    "ssh_target": "admin@192.168.0.114",
+                    "simulator_host": "192.168.0.120",
+                    "primary_active": action in {"start", "restart", "status"},
+                    "flarm_active": action in {"start", "restart", "status"},
+                }
+            ],
+        }
+
+
 def _config() -> SimulatorRuntimeConfig:
     return SimulatorRuntimeConfig(
         session_id="xcvario-sim",
@@ -58,11 +90,13 @@ class ControlApiTests(unittest.TestCase):
             flarm_adapter=_FakePublisher(),
         )
         self.session.start()
+        self.bridge_control = _FakeBridgeControl()
         self.api = ControlApiServer(
             bind_host="127.0.0.1",
             port=0,
             token="token",
             session=self.session,
+            bridge_control=self.bridge_control,
         )
         self.api.start()
         self.connection = http.client.HTTPConnection("127.0.0.1", self.api.bound_port, timeout=2.0)
@@ -321,6 +355,34 @@ class ControlApiTests(unittest.TestCase):
         self.assertEqual(response.status, 400)
         self.assertEqual(payload["error"], "bad_request")
         self.assertIn("Unknown preset_id", payload["message"])
+
+    def test_bridge_control_endpoint_delegates_to_bridge_controller(self):
+        body = {
+            "primary_port": 4353,
+            "flarm_port": 4354,
+            "nodes": [
+                {
+                    "id": "pi",
+                    "ssh_target": "admin@192.168.0.114",
+                    "identity_file": "/Users/slawekpiela/.ssh/kigo_pi",
+                    "simulator_host": "192.168.0.120",
+                    "workdir": "/home/admin/kigo_xcvario_simulator",
+                }
+            ],
+        }
+        self.connection.request(
+            "POST",
+            "/api/v1/bridges/start",
+            body=json.dumps(body),
+            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+        )
+        response = self.connection.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(payload["action"], "start")
+        self.assertEqual(payload["nodes"][0]["id"], "pi")
+        self.assertEqual(self.bridge_control.calls, [("start", body)])
 
     def test_sse_endpoint_emits_initial_state_event(self):
         self.connection.request("GET", "/api/v1/events", headers={"X-Simulator-Token": "token"})

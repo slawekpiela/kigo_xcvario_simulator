@@ -79,6 +79,9 @@ class SxHawkAdapterTests(unittest.TestCase):
         second_payload = _recv_until(second, "$LXWP0,", expected_count=1)
 
         self.assertEqual(adapter.client_count, 2)
+        self.assertEqual(len(adapter.client_connections), 2)
+        self.assertTrue(all(connection["peer_host"] == "127.0.0.1" for connection in adapter.client_connections))
+        self.assertTrue(all(connection["local_port"] == adapter.bound_port for connection in adapter.client_connections))
         self.assertIn("$GPRMC,", first_payload)
         self.assertIn("$LXWP0,", first_payload)
         self.assertIn("$GPRMC,", second_payload)

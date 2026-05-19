@@ -83,6 +83,9 @@ class FlarmAdapterTests(unittest.TestCase):
         second_payload = second.recv(4096).decode("ascii")
 
         self.assertEqual(adapter.client_count, 2)
+        self.assertEqual(len(adapter.client_connections), 2)
+        self.assertTrue(all(connection["peer_host"] == "127.0.0.1" for connection in adapter.client_connections))
+        self.assertTrue(all(connection["local_port"] == adapter.bound_port for connection in adapter.client_connections))
         self.assertIn("$PFLAU,", first_payload)
         self.assertIn("$PFLAA,", first_payload)
         self.assertIn("$PFLAU,", second_payload)

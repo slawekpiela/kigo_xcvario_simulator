@@ -30,6 +30,12 @@ class FlarmTcpAdapter:
         with self._lock:
             return len(self._client_sockets)
 
+    @property
+    def client_connections(self) -> tuple[dict[str, object], ...]:
+        with self._lock:
+            client_sockets = tuple(self._client_sockets)
+        return tuple(_socket_connection_metadata(client_socket) for client_socket in client_sockets)
+
     def start(self) -> None:
         with self._lock:
             if self._server_socket is not None:
@@ -112,3 +118,30 @@ class FlarmTcpAdapter:
             client_socket.close()
         except OSError:
             pass
+
+
+def _socket_connection_metadata(client_socket: socket.socket) -> dict[str, object]:
+    local_host, local_port = _socket_endpoint(client_socket, local=True)
+    peer_host, peer_port = _socket_endpoint(client_socket, local=False)
+    return {
+        "local": _format_endpoint(local_host, local_port),
+        "local_host": local_host,
+        "local_port": local_port,
+        "peer": _format_endpoint(peer_host, peer_port),
+        "peer_host": peer_host,
+        "peer_port": peer_port,
+    }
+
+
+def _socket_endpoint(client_socket: socket.socket, *, local: bool) -> tuple[str, int | None]:
+    try:
+        endpoint = client_socket.getsockname() if local else client_socket.getpeername()
+    except OSError:
+        return "unknown", None
+    if not endpoint:
+        return "unknown", None
+    return str(endpoint[0]), int(endpoint[1]) if len(endpoint) > 1 else None
+
+
+def _format_endpoint(host: str, port: int | None) -> str:
+    return f"{host}:{port}" if port is not None else host

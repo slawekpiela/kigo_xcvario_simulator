@@ -215,6 +215,9 @@ class XcvarioAdapterTests(unittest.TestCase):
         second_payload = _recv_until(second, "$PXCV,", expected_count=1)
 
         self.assertEqual(adapter.client_count, 2)
+        self.assertEqual(len(adapter.client_connections), 2)
+        self.assertTrue(all(connection["peer_host"] == "127.0.0.1" for connection in adapter.client_connections))
+        self.assertTrue(all(connection["local_port"] == adapter.bound_port for connection in adapter.client_connections))
         self.assertIn("$PXCV,", first_payload)
         self.assertIn("$POV,", first_payload)
         self.assertIn("$WIMWV,", first_payload)

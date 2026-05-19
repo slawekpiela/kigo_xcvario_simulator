@@ -70,6 +70,12 @@ class XcvarioTcpAdapter:
             return len(self._client_sockets)
 
     @property
+    def client_connections(self) -> tuple[dict[str, object], ...]:
+        with self._lock:
+            client_sockets = tuple(self._client_sockets)
+        return tuple(_socket_connection_metadata(client_socket) for client_socket in client_sockets)
+
+    @property
     def oat_c(self) -> float:
         with self._lock:
             return self._oat_c
@@ -379,6 +385,33 @@ def _find_separator(buffer: bytearray) -> int:
 
 def _command_value_text(raw_value_text: str) -> str:
     return raw_value_text.split("*", 1)[0].strip()
+
+
+def _socket_connection_metadata(client_socket: socket.socket) -> dict[str, object]:
+    local_host, local_port = _socket_endpoint(client_socket, local=True)
+    peer_host, peer_port = _socket_endpoint(client_socket, local=False)
+    return {
+        "local": _format_endpoint(local_host, local_port),
+        "local_host": local_host,
+        "local_port": local_port,
+        "peer": _format_endpoint(peer_host, peer_port),
+        "peer_host": peer_host,
+        "peer_port": peer_port,
+    }
+
+
+def _socket_endpoint(client_socket: socket.socket, *, local: bool) -> tuple[str, int | None]:
+    try:
+        endpoint = client_socket.getsockname() if local else client_socket.getpeername()
+    except OSError:
+        return "unknown", None
+    if not endpoint:
+        return "unknown", None
+    return str(endpoint[0]), int(endpoint[1]) if len(endpoint) > 1 else None
+
+
+def _format_endpoint(host: str, port: int | None) -> str:
+    return f"{host}:{port}" if port is not None else host
 
 
 def _ownship_with_wind_adjusted_ground_velocity(ownship: OwnshipState, wind: WindState) -> OwnshipState:

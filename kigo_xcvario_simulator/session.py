@@ -158,6 +158,7 @@ class SimulatorRuntimeSession:
                     "bound_port": getattr(self.xcvario_adapter, "bound_port", self.runtime_config.xcvario.port),
                     "client_connected": bool(getattr(self.xcvario_adapter, "client_connected", False)),
                     "client_count": int(getattr(self.xcvario_adapter, "client_count", 0)),
+                    "client_connections": tuple(getattr(self.xcvario_adapter, "client_connections", ())),
                     "polar_name": self.runtime_config.xcvario.polar_name,
                     "active": primary_device == "xcvario",
                 },
@@ -165,6 +166,7 @@ class SimulatorRuntimeSession:
                     "bound_port": getattr(self.sxhawk_adapter, "bound_port", self.runtime_config.xcvario.port),
                     "client_connected": bool(getattr(self.sxhawk_adapter, "client_connected", False)),
                     "client_count": int(getattr(self.sxhawk_adapter, "client_count", 0)),
+                    "client_connections": tuple(getattr(self.sxhawk_adapter, "client_connections", ())),
                     "polar_name": self.runtime_config.xcvario.polar_name,
                     "active": primary_device == "sxhawk",
                 },
@@ -172,6 +174,7 @@ class SimulatorRuntimeSession:
                     "bound_port": getattr(self.flarm_adapter, "bound_port", self.runtime_config.flarm.port),
                     "client_connected": bool(getattr(self.flarm_adapter, "client_connected", False)),
                     "client_count": int(getattr(self.flarm_adapter, "client_count", 0)),
+                    "client_connections": tuple(getattr(self.flarm_adapter, "client_connections", ())),
                 },
             },
         }

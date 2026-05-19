@@ -10,6 +10,7 @@ from threading import Event, Lock, Thread
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
+from .bridge_control import BridgeControl
 from .config import CONTROL_TOKEN_HEADER
 from .contracts import ManualModeInput, PresetRequest, SimulationSnapshot
 from .state import HealthState, FlightPhase
@@ -24,12 +25,14 @@ class ControlApiServer:
         token: str,
         session,
         cors_allowed_origins: tuple[str, ...] = (),
+        bridge_control: BridgeControl | None = None,
     ) -> None:
         self._bind_host = bind_host
         self._requested_port = int(port)
         self._token = token
         self._session = session
         self._cors_allowed_origins = tuple(cors_allowed_origins)
+        self._bridge_control = bridge_control or BridgeControl()
         self._server: ThreadingHTTPServer | None = None
         self._server_thread: Thread | None = None
         self._running = Event()
@@ -243,6 +246,21 @@ class ControlApiServer:
                     self._write_cors_headers()
                     self.end_headers()
                     return True
+                if path.startswith("/api/v1/bridges/"):
+                    payload = self._read_json_body()
+                    action = path.rsplit("/", 1)[-1]
+                    if action == "status":
+                        self._write_json(200, controller._bridge_control.status(payload))
+                        return True
+                    if action == "start":
+                        self._write_json(200, controller._bridge_control.start(payload))
+                        return True
+                    if action == "stop":
+                        self._write_json(200, controller._bridge_control.stop(payload))
+                        return True
+                    if action == "restart":
+                        self._write_json(200, controller._bridge_control.restart(payload))
+                        return True
                 return False
 
             def _stream_events(self) -> None:
