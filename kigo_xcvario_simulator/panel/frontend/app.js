@@ -1,6 +1,7 @@
 const STORAGE_RUNTIME_URL = "kigo.sim.runtimeUrl";
 const STORAGE_RUNTIME_TOKEN = "kigo.sim.runtimeToken";
 const STORAGE_BRIDGE_PREFIX = "kigo.sim.bridge.";
+const DEFAULT_RUNTIME_TOKEN = "kigo-sim-20260508";
 const BARO_K1 = 0.190263;
 const BARO_K2 = 8.417286e-5;
 const BRIDGE_DEFAULTS = {
@@ -8,7 +9,7 @@ const BRIDGE_DEFAULTS = {
   flarmPort: "4354",
   piSshTarget: "admin@192.168.0.114",
   piIdentity: "/Users/slawekpiela/.ssh/kigo_pi",
-  piSimulatorHost: "192.168.0.120",
+  piSimulatorHost: "192.168.0.105",
   piWorkdir: "/home/admin/kigo_xcvario_simulator",
   vmSshTarget: "codex-vm",
   vmIdentity: "",
@@ -91,7 +92,7 @@ const state = {
 
 function loadStoredSettings() {
   runtimeUrlInput.value = localStorage.getItem(STORAGE_RUNTIME_URL) || "http://127.0.0.1:8181";
-  runtimeTokenInput.value = localStorage.getItem(STORAGE_RUNTIME_TOKEN) || "change-me-before-lab-use";
+  runtimeTokenInput.value = localStorage.getItem(STORAGE_RUNTIME_TOKEN) || DEFAULT_RUNTIME_TOKEN;
   loadStoredInput(bridgePrimaryPortInput, "primaryPort", BRIDGE_DEFAULTS.primaryPort);
   loadStoredInput(bridgeFlarmPortInput, "flarmPort", BRIDGE_DEFAULTS.flarmPort);
   loadStoredInput(piBridgeSshTargetInput, "piSshTarget", BRIDGE_DEFAULTS.piSshTarget);

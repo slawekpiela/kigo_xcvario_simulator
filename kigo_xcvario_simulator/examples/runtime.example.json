@@ -11,7 +11,7 @@
   "control_api": {
     "bind_host": "0.0.0.0",
     "port": 8181,
-    "token": "change-me-before-lab-use",
+    "token": "kigo-sim-20260508",
     "cors_allowed_origins": [
       "http://127.0.0.1:8180",
       "http://localhost:8180"

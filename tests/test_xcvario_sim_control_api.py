@@ -60,7 +60,7 @@ class _FakeBridgeControl:
                 {
                     "id": "pi",
                     "ssh_target": "admin@192.168.0.114",
-                    "simulator_host": "192.168.0.120",
+                    "simulator_host": "192.168.0.105",
                     "primary_active": action in {"start", "restart", "status"},
                     "flarm_active": action in {"start", "restart", "status"},
                 }
@@ -365,7 +365,7 @@ class ControlApiTests(unittest.TestCase):
                     "id": "pi",
                     "ssh_target": "admin@192.168.0.114",
                     "identity_file": "/Users/slawekpiela/.ssh/kigo_pi",
-                    "simulator_host": "192.168.0.120",
+                    "simulator_host": "192.168.0.105",
                     "workdir": "/home/admin/kigo_xcvario_simulator",
                 }
             ],
