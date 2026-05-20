@@ -13,6 +13,8 @@ PRIMARY_UNIT_NAME = PRIMARY_UNIT.removesuffix(".service")
 FLARM_UNIT_NAME = FLARM_UNIT.removesuffix(".service")
 DEFAULT_PRIMARY_SERIAL_PATH = "/tmp/kigo-sim/xcvario"
 DEFAULT_FLARM_SERIAL_PATH = "/tmp/kigo-sim/flarm"
+REMOTE_NODE_IDS = {"pi", "vm"}
+LOOPBACK_SIMULATOR_HOSTS = {"127.0.0.1", "localhost", "::1", "0.0.0.0"}
 
 
 @dataclass(frozen=True)
@@ -88,6 +90,8 @@ def _parse_node(node_raw: object) -> BridgeNode:
     node_id = _text(node_raw.get("id"), default="bridge")
     ssh_target = _required_text(node_raw.get("ssh_target"), "bridge ssh_target")
     simulator_host = _required_text(node_raw.get("simulator_host"), "bridge simulator_host")
+    if node_id.lower() in REMOTE_NODE_IDS and simulator_host.lower() in LOOPBACK_SIMULATOR_HOSTS:
+        raise ValueError(f"bridge {node_id} simulator_host must point to the Mac runtime, not {simulator_host}.")
     workdir = _required_text(node_raw.get("workdir"), "bridge workdir")
     return BridgeNode(
         node_id=node_id,
