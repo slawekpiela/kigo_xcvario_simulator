@@ -864,7 +864,7 @@ applyManualButton.addEventListener("click", () => {
   const numericFields = [
     ["heading_deg", numericValue(manualHeadingInput)],
   ];
-  if (phase !== "glider_launch") {
+  if (phase !== "on_ground") {
     numericFields.push(["speed_kmh", numericValue(manualSpeedInput)]);
   }
   if (phase === "straight") {
@@ -875,6 +875,12 @@ applyManualButton.addEventListener("click", () => {
       ["speed_min_kmh", numericValue(circlingSpeedMinInput)],
       ["speed_max_kmh", numericValue(circlingSpeedMaxInput)],
       ["turn_radius_m", numericValue(manualTurnRadiusInput)],
+      ["climb_min_ms", numericValue(manualClimbMinInput)],
+      ["climb_max_ms", numericValue(manualClimbMaxInput)],
+    );
+  }
+  if (phase === "glider_launch") {
+    numericFields.push(
       ["climb_min_ms", numericValue(manualClimbMinInput)],
       ["climb_max_ms", numericValue(manualClimbMaxInput)],
     );

@@ -319,6 +319,14 @@ class ControlApiTests(unittest.TestCase):
 
         self.assertEqual(response.status, 204)
 
+        self.connection.request("GET", "/api/v1/simulation/state")
+        response = self.connection.getresponse()
+        immediate_payload = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(immediate_payload["snapshot"]["ownship"]["phase"], "straight")
+        self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["speed_kmh"], 100.0, places=6)
+        self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["gps_altitude_m"], 875.0, places=6)
+
         self.session.orchestrator.start()
         self.session.orchestrator.tick(1.0)
         self.connection.request("GET", "/api/v1/simulation/state")

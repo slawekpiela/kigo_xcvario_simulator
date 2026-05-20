@@ -156,6 +156,7 @@ class ScenarioOrchestrator:
             self._preset_plan = None
             self._preset_segment_index = 0
             self._preset_segment_elapsed_s = 0.0
+            self._apply_manual_directive_preview()
             self._health = HealthState.READY
             return self._snapshot()
 
@@ -293,6 +294,12 @@ class ScenarioOrchestrator:
         if self._preset_segment_index >= len(self._preset_plan.segments):
             return None
         return self._preset_plan.segments[self._preset_segment_index]
+
+    def _apply_manual_directive_preview(self) -> None:
+        directive = self._resolve_active_directive()
+        if directive is None:
+            return
+        self._ownship = self._flight_model.preview_directive(self._ownship, directive, wind=self._wind)
 
     def _build_manual_directive(self, manual_input: ManualModeInput) -> FlightDirective:
         if manual_input.on_ground:

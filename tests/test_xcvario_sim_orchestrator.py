@@ -97,7 +97,7 @@ class ScenarioOrchestratorTests(unittest.TestCase):
         self.assertAlmostEqual(samples[96], 90.0, places=6)
 
     def test_manual_straight_uses_configured_altitude_for_gps_and_pressure(self):
-        self.orchestrator.set_manual_mode(
+        immediate = self.orchestrator.set_manual_mode(
             ManualModeInput(
                 phase=FlightPhase.STRAIGHT,
                 heading_deg=90.0,
@@ -109,6 +109,10 @@ class ScenarioOrchestratorTests(unittest.TestCase):
 
         snapshot = self.orchestrator.tick(1.0)
 
+        self.assertEqual(immediate.ownship.phase, FlightPhase.STRAIGHT)
+        self.assertAlmostEqual(immediate.ownship.track_deg, 90.0, places=6)
+        self.assertAlmostEqual(immediate.ownship.speed_kmh, 100.0, places=6)
+        self.assertAlmostEqual(immediate.ownship.gps_altitude_m, 900.0, places=6)
         self.assertAlmostEqual(snapshot.ownship.gps_altitude_m, 900.0, places=6)
         self.assertAlmostEqual(snapshot.ownship.vertical_speed_ms, 0.0, places=6)
         self.assertAlmostEqual(
@@ -116,6 +120,42 @@ class ScenarioOrchestratorTests(unittest.TestCase):
             static_pressure_hpa_for_altitude(900.0, qnh_hpa=_runtime_config().device_qnh_hpa),
             places=6,
         )
+
+    def test_manual_circling_and_sink_update_snapshot_immediately(self):
+        circling = self.orchestrator.set_manual_mode(
+            ManualModeInput(
+                phase=FlightPhase.CIRCLING_LEFT,
+                heading_deg=45.0,
+                speed_min_kmh=70.0,
+                speed_max_kmh=72.0,
+                turn_radius_m=80.0,
+                climb_min_ms=1.1,
+                climb_max_ms=1.1,
+            )
+        )
+
+        self.assertEqual(circling.ownship.phase, FlightPhase.CIRCLING_LEFT)
+        self.assertAlmostEqual(circling.ownship.track_deg, 45.0, places=6)
+        self.assertAlmostEqual(circling.ownship.speed_kmh, 70.0, places=6)
+        self.assertAlmostEqual(circling.ownship.vertical_speed_ms, 1.1, places=6)
+
+        self.orchestrator.start()
+        first_tick = self.orchestrator.tick(0.1)
+        self.assertAlmostEqual(first_tick.ownship.speed_kmh, 70.0, places=6)
+
+        sink = self.orchestrator.set_manual_mode(
+            ManualModeInput(
+                phase=FlightPhase.SINK,
+                heading_deg=222.0,
+                speed_kmh=99.0,
+                sink_ms=-3.3,
+            )
+        )
+
+        self.assertEqual(sink.ownship.phase, FlightPhase.SINK)
+        self.assertAlmostEqual(sink.ownship.track_deg, 222.0, places=6)
+        self.assertAlmostEqual(sink.ownship.speed_kmh, 99.0, places=6)
+        self.assertAlmostEqual(sink.ownship.vertical_speed_ms, -3.3, places=6)
 
     def test_manual_on_ground_resets_to_home_position(self):
         self.orchestrator.load_preset(PresetRequest(preset_id="straight", seed=7, autostart=True))

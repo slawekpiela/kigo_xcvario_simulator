@@ -148,6 +148,32 @@ class FlightModel:
             phase=directive.phase,
         )
 
+    def preview_directive(
+        self,
+        state: OwnshipState,
+        directive: FlightDirective,
+        *,
+        wind: WindState | None = None,
+    ) -> OwnshipState:
+        """Apply directive values without advancing time or consuming variation state."""
+        variation_state = (
+            self._elapsed_s,
+            self._active_directive_key,
+            self._active_variation_tick_index,
+            self._active_speed_directive_key,
+            self._active_speed_variation_tick_index,
+        )
+        try:
+            return self.step(state, directive, 0.0, wind=wind)
+        finally:
+            (
+                self._elapsed_s,
+                self._active_directive_key,
+                self._active_variation_tick_index,
+                self._active_speed_directive_key,
+                self._active_speed_variation_tick_index,
+            ) = variation_state
+
     @staticmethod
     def _movement_velocity(
         *,
