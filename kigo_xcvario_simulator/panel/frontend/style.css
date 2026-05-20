@@ -322,22 +322,72 @@ h1 {
 }
 
 .bridge-status-block {
-  display: grid;
-  gap: 0.8rem;
-  padding-top: 0.9rem;
-  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+  padding: 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--datum-bg);
 }
 
 .bridge-status-block__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .bridge-status-block h3 {
   margin: 0;
   font-size: 1rem;
+}
+
+.bridge-details-button {
+  flex: 0 0 auto;
+  padding: 0.6rem 0.9rem;
+}
+
+.bridge-dialog {
+  width: min(760px, calc(100vw - 2rem));
+  max-height: min(760px, calc(100vh - 2rem));
+  padding: 0;
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.bridge-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(3px);
+}
+
+.bridge-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.bridge-dialog__header h3 {
+  margin: 0;
+  font-size: 1.08rem;
+}
+
+.bridge-dialog__close {
+  padding: 0.55rem 0.85rem;
+}
+
+.bridge-details-content {
+  max-height: calc(100vh - 9rem);
+  overflow: auto;
+  padding: 1rem;
 }
 
 .bridge-status-details {
@@ -429,6 +479,19 @@ h1 {
 }
 
 @media (max-width: 640px) {
+  .bridge-status-block {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .bridge-status-block__header {
+    justify-content: space-between;
+  }
+
+  .bridge-details-button {
+    width: 100%;
+  }
+
   .bridge-status-details {
     grid-template-columns: 1fr;
   }

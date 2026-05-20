@@ -68,6 +68,10 @@ const bridgeRestartButton = document.getElementById("bridge-restart-button");
 const bridgeStatusButton = document.getElementById("bridge-status-button");
 const bridgeErrorNode = document.getElementById("bridge-error");
 const bridgeStatusGrid = document.getElementById("bridge-status-grid");
+const bridgeDetailsDialog = document.getElementById("bridge-details-dialog");
+const bridgeDetailsTitle = document.getElementById("bridge-details-title");
+const bridgeDetailsCloseButton = document.getElementById("bridge-details-close-button");
+const bridgeDetailsContent = document.getElementById("bridge-details-content");
 
 const state = {
   runtimeUrl: "",
@@ -606,8 +610,32 @@ function buildBridgeStatusBlock(node) {
   header.appendChild(heading);
   header.appendChild(pill);
 
+  const detailsButton = document.createElement("button");
+  detailsButton.className = "ghost-button bridge-details-button";
+  detailsButton.type = "button";
+  detailsButton.textContent = "Details";
+  detailsButton.addEventListener("click", () => openBridgeDetails(node));
+
+  block.appendChild(header);
+  block.appendChild(detailsButton);
+  return block;
+}
+
+function openBridgeDetails(node) {
+  bridgeDetailsTitle.textContent = `${String(node.id || "bridge").toUpperCase()} Bridge Details`;
+  bridgeDetailsContent.innerHTML = "";
+  const details = buildBridgeDetails(node);
+  bridgeDetailsContent.appendChild(details);
+  if (typeof bridgeDetailsDialog.showModal === "function") {
+    bridgeDetailsDialog.showModal();
+  } else {
+    bridgeDetailsDialog.setAttribute("open", "");
+  }
+}
+
+function buildBridgeDetails(node) {
   const details = document.createElement("dl");
-  details.className = "bridge-status-details";
+  details.className = "bridge-status-details bridge-status-details--dialog";
   appendBridgeDetail(details, "Bridge Target", node.ssh_target || "-");
   appendBridgeDetail(details, "Primary", node.primary_status || (node.primary_active ? "active" : "unknown"));
   appendBridgeDetail(details, "FLARM", node.flarm_status || (node.flarm_active ? "active" : "unknown"));
@@ -625,10 +653,15 @@ function buildBridgeStatusBlock(node) {
   if (node.processes) {
     appendBridgeDetail(details, "Processes", node.processes);
   }
+  return details;
+}
 
-  block.appendChild(header);
-  block.appendChild(details);
-  return block;
+function closeBridgeDetails() {
+  if (typeof bridgeDetailsDialog.close === "function" && bridgeDetailsDialog.open) {
+    bridgeDetailsDialog.close();
+    return;
+  }
+  bridgeDetailsDialog.removeAttribute("open");
 }
 
 function appendBridgeDetail(details, label, value) {
@@ -795,6 +828,14 @@ bridgeRestartButton.addEventListener("click", () => {
 
 bridgeStatusButton.addEventListener("click", () => {
   void requestBridge("status");
+});
+
+bridgeDetailsCloseButton.addEventListener("click", closeBridgeDetails);
+
+bridgeDetailsDialog.addEventListener("click", (event) => {
+  if (event.target === bridgeDetailsDialog) {
+    closeBridgeDetails();
+  }
 });
 
 applyDeviceButton.addEventListener("click", () => {
