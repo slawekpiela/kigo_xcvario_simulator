@@ -9,9 +9,9 @@ from kigo_xcvario_simulator.config import (
     SimulatorRuntimeConfig,
     XcvarioConfig,
 )
-from kigo_xcvario_simulator.contracts import PresetRequest
+from kigo_xcvario_simulator.contracts import ManualModeInput, PresetRequest
 from kigo_xcvario_simulator.session import SimulatorRuntimeSession
-from kigo_xcvario_simulator.state import RuntimeState
+from kigo_xcvario_simulator.state import FlightPhase, RuntimeState
 
 
 class _FakePublisher:
@@ -89,6 +89,29 @@ class SessionAndSchedulerTests(unittest.TestCase):
         self.assertAlmostEqual(snapshot.ownship.speed_kmh, 0.0, places=6)
         self.assertAlmostEqual(snapshot.ownship.latitude_deg, _config().home_position.latitude_deg, places=6)
         self.assertAlmostEqual(snapshot.ownship.longitude_deg, _config().home_position.longitude_deg, places=6)
+
+    def test_client_reconnect_preserves_pending_manual_mode(self):
+        ownship = _FakePublisher()
+        traffic = _FakePublisher()
+        session = SimulatorRuntimeSession(_config(), xcvario_adapter=ownship, flarm_adapter=traffic)
+        session.activate_on_ground_default()
+        session.set_manual_mode(
+            ManualModeInput(
+                phase=FlightPhase.STRAIGHT,
+                heading_deg=90.0,
+                speed_kmh=111.0,
+                baro_altitude_m=402.0,
+            )
+        )
+
+        session.activate_on_ground_default()
+        snapshot = session.orchestrator.tick(1.0)
+
+        self.assertEqual(snapshot.ownship.phase, FlightPhase.STRAIGHT)
+        self.assertFalse(snapshot.ownship.on_ground)
+        self.assertAlmostEqual(snapshot.ownship.track_deg, 90.0, places=6)
+        self.assertAlmostEqual(snapshot.ownship.speed_kmh, 111.0, places=6)
+        self.assertAlmostEqual(snapshot.ownship.gps_altitude_m, 402.0, places=6)
 
     def test_primary_device_switch_changes_publisher_without_rebuilding_session(self):
         xcvario = _FakePublisher()

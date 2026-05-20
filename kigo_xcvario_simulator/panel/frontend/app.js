@@ -7,11 +7,11 @@ const BRIDGE_DEFAULTS = {
   flarmPort: 4354,
   piBridgeTarget: "admin@192.168.0.114",
   piIdentity: "/Users/slawekpiela/.ssh/kigo_pi",
-  piSimulatorHost: "192.168.0.105",
+  piSimulatorHost: "127.0.0.1",
   piWorkdir: "/home/admin/kigo_xcvario_simulator",
   vmBridgeTarget: "slawek@172.16.119.135",
   vmIdentity: "/Users/slawekpiela/.ssh/codex_debian_vm",
-  vmSimulatorHost: "172.16.119.1",
+  vmSimulatorHost: "127.0.0.1",
   vmWorkdir: "/home/slawek/kigo_xcvario_simulator",
 };
 

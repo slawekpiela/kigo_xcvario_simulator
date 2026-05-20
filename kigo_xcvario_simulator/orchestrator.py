@@ -260,6 +260,10 @@ class ScenarioOrchestrator:
         with self._lock:
             return self._snapshot()
 
+    def has_manual_mode(self) -> bool:
+        with self._lock:
+            return self._manual_directive is not None or self._manual_plan is not None
+
     def _update_traffic(self, dt_s: float) -> None:
         if not self._traffic_config.enabled or self._traffic_config.contact_count == 0:
             self._traffic = ()

@@ -66,9 +66,11 @@ The `SxHAWK` telemetry stream follows the LXNAV/LX protocol parsed by the
 and `LXWP3`. It accepts `PFLX2`/`PFLX3` and `PLXV0` write-side settings for
 MC, ballast, bugs, QNH and device altitude.
 
-When `kigo_nav` or another primary-device client connects or reconnects, the runtime
+When `kigo_nav` or another primary-device client connects, the runtime
 automatically activates manual `on_ground` at the configured home position:
-speed `0 km/h`, vertical speed `0 m/s`, glider on the runway.
+speed `0 km/h`, vertical speed `0 m/s`, glider on the runway. Reconnects do
+not overwrite an active manual-mode command, so an operator-set speed or
+altitude keeps flowing after `Apply Manual Mode`.
 
 ### 3. Start The Panel On Mac
 

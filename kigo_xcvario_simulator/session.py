@@ -9,7 +9,7 @@ from .contracts import ManualModeInput, PresetRequest, SimulationSnapshot
 from .flarm_adapter import FlarmTcpAdapter
 from .orchestrator import ScenarioOrchestrator
 from .scheduler import TelemetryScheduler
-from .state import FlightPhase
+from .state import FlightPhase, RuntimeState
 from .sxhawk_adapter import SxHawkTcpAdapter
 from .xcvario_adapter import DEFAULT_OAT_C, XcvarioTcpAdapter, validate_oat_c
 from .xcvario_polar import get_xcvario_polar
@@ -192,6 +192,9 @@ class SimulatorRuntimeSession:
         return self.orchestrator.load_preset(request, overrides=overrides)
 
     def activate_on_ground_default(self) -> SimulationSnapshot:
+        snapshot = self.orchestrator.get_snapshot()
+        if snapshot.runtime_state == RuntimeState.RUNNING and self.orchestrator.has_manual_mode():
+            return snapshot
         self.orchestrator.reset()
         self.orchestrator.set_manual_mode(
             ManualModeInput(
