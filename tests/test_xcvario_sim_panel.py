@@ -111,6 +111,8 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             "readErrorMessage(response)",
             "looksLikeHtml(body)",
             "runtimeUrlCandidates(state.runtimeUrl)",
+            "controlApiRuntimeUrl(rawRuntimeUrl)",
+            "syncRuntimeSettingsFromInputs();",
             'withPort(primary, "8181")',
             "Expected simulator JSON",
             "formatCommandError(path, error)",

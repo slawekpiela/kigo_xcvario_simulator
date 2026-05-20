@@ -105,8 +105,9 @@ function persistInput(node, key) {
 }
 
 function syncRuntimeSettingsFromInputs() {
+  state.runtimeUrl = controlApiRuntimeUrl(runtimeUrlInput.value);
+  runtimeUrlInput.value = state.runtimeUrl;
   persistSettings();
-  state.runtimeUrl = normalizeRuntimeUrl(runtimeUrlInput.value);
 }
 
 function setStatus(kind, message) {
@@ -209,7 +210,7 @@ async function connectPanel() {
 }
 
 function runtimeUrlCandidates(rawRuntimeUrl) {
-  const primary = normalizeRuntimeUrl(rawRuntimeUrl);
+  const primary = controlApiRuntimeUrl(rawRuntimeUrl);
   const candidates = [];
   appendUnique(candidates, primary);
   const correctedControlApiUrl = withPort(primary, "8181");
@@ -220,6 +221,11 @@ function runtimeUrlCandidates(rawRuntimeUrl) {
     appendUnique(candidates, "http://127.0.0.1:8181");
   }
   return candidates;
+}
+
+function controlApiRuntimeUrl(rawRuntimeUrl) {
+  const runtimeUrl = normalizeRuntimeUrl(rawRuntimeUrl);
+  return isLikelyPanelUrl(runtimeUrl) ? withPort(runtimeUrl, "8181") : runtimeUrl;
 }
 
 function isLikelyPanelUrl(runtimeUrl) {
@@ -361,6 +367,11 @@ function handleSseEvent(rawEvent) {
 
 async function postCommand(path, payload = null, { syncControls = false } = {}) {
   showApiError("");
+  syncRuntimeSettingsFromInputs();
+  if (!state.runtimeUrl) {
+    showApiError("Runtime URL is required.");
+    return;
+  }
   try {
     await requestJson(path, {
       method: "POST",
