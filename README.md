@@ -31,7 +31,6 @@ cp kigo_xcvario_simulator/examples/runtime.example.json /tmp/runtime.local.json
 
 Recommended edits:
 
-- set `control_api.token` to a lab token,
 - set `primary_device` to `xcvario` or `sxhawk`,
 - keep `xcvario.port=4353` and `flarm.port=4354`; the `xcvario` block is the primary device endpoint for both protocols,
 - set `cors_allowed_origins` to the panel URL you will use on the `Mac`,
@@ -80,7 +79,6 @@ python3 -m kigo_xcvario_simulator.panel.start_frontend --host 127.0.0.1 --port 8
 Open [http://127.0.0.1:8180/](http://127.0.0.1:8180/), enter:
 
 - runtime URL, for example `http://192.168.0.50:8181`,
-- the same simulator token as in the runtime config.
 - choose `XCvario` or `SxHAWK` as the active primary device when needed.
 
 ### 4. Configure XCSoar/KIGO Test Profile

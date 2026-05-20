@@ -20,7 +20,7 @@ def _runtime_config() -> SimulatorRuntimeConfig:
         seed=321,
         device_qnh_hpa=1013.25,
         home_position=HomePosition(latitude_deg=49.83833, longitude_deg=19.00202, gps_altitude_m=401.0),
-        control_api=ControlApiConfig(token="token"),
+        control_api=ControlApiConfig(),
         xcvario=XcvarioConfig(port=4353, polar_name="DG 800B/15"),
         flarm=EndpointConfig(port=4354),
         scheduler=SchedulerConfig(),

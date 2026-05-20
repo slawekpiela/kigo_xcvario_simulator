@@ -11,7 +11,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
 from .bridge_control import BridgeControl
-from .config import CONTROL_TOKEN_HEADER
 from .contracts import ManualModeInput, PresetRequest, SimulationSnapshot
 from .state import HealthState, FlightPhase
 
@@ -22,14 +21,12 @@ class ControlApiServer:
         *,
         bind_host: str,
         port: int,
-        token: str,
         session,
         cors_allowed_origins: tuple[str, ...] = (),
         bridge_control: BridgeControl | None = None,
     ) -> None:
         self._bind_host = bind_host
         self._requested_port = int(port)
-        self._token = token
         self._session = session
         self._cors_allowed_origins = tuple(cors_allowed_origins)
         self._bridge_control = bridge_control or BridgeControl()
@@ -110,21 +107,15 @@ class ControlApiServer:
                     self._write_json(status_code, {"status": "ready" if status_code == 200 else "starting"})
                     return
                 if parsed.path == "/api/v1/simulation/state":
-                    if not self._require_token():
-                        return
                     self._write_json(200, controller._state_payload())
                     return
                 if parsed.path == "/api/v1/events":
-                    if not self._require_token():
-                        return
                     self._stream_events()
                     return
                 self._write_json(404, {"error": "not_found"})
 
             def do_POST(self) -> None:
                 parsed = urlparse(self.path)
-                if not self._require_token():
-                    return
                 try:
                     handled = self._handle_post(parsed.path)
                 except KeyError as exc:
@@ -171,9 +162,9 @@ class ControlApiServer:
                     return True
                 if path == "/api/v1/simulation/manual-mode":
                     payload = self._read_json_body()
-                    phase_token = str(payload["phase"])
+                    phase_value = str(payload["phase"])
                     manual = ManualModeInput(
-                        phase=FlightPhase.GLIDER_LAUNCH if phase_token == "on_ground" else FlightPhase(phase_token),
+                        phase=FlightPhase.GLIDER_LAUNCH if phase_value == "on_ground" else FlightPhase(phase_value),
                         heading_deg=_optional_float(payload.get("heading_deg")),
                         speed_kmh=_optional_float(payload.get("speed_kmh")),
                         baro_altitude_m=_optional_float_any(payload, "wysokosc", "baro_altitude_m", "altitude_m"),
@@ -183,7 +174,7 @@ class ControlApiServer:
                         climb_min_ms=_optional_float(payload.get("climb_min_ms")),
                         climb_max_ms=_optional_float(payload.get("climb_max_ms")),
                         sink_ms=_optional_float(payload.get("sink_ms")),
-                        on_ground=phase_token == "on_ground" or bool(payload.get("on_ground", False)),
+                        on_ground=phase_value == "on_ground" or bool(payload.get("on_ground", False)),
                     )
                     controller.session.set_manual_mode(manual)
                     self.send_response(204)
@@ -301,12 +292,6 @@ class ControlApiServer:
                     raise ValueError("invalid_json")
                 return parsed
 
-            def _require_token(self) -> bool:
-                if self.headers.get(CONTROL_TOKEN_HEADER) == controller._token:
-                    return True
-                self._write_json(401, {"error": "unauthorized"})
-                return False
-
             def _write_json(self, status_code: int, payload: dict[str, object]) -> None:
                 response = json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
                 self.send_response(status_code)
@@ -320,7 +305,7 @@ class ControlApiServer:
                 origin = self.headers.get("Origin")
                 if origin and origin in controller._cors_allowed_origins:
                     self.send_header("Access-Control-Allow-Origin", origin)
-                    self.send_header("Access-Control-Allow-Headers", f"Content-Type, {CONTROL_TOKEN_HEADER}")
+                    self.send_header("Access-Control-Allow-Headers", "Content-Type")
                     self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 
             def log_message(self, format: str, *args) -> None:

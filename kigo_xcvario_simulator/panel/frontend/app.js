@@ -1,26 +1,21 @@
 const STORAGE_RUNTIME_URL = "kigo.sim.runtimeUrl";
-const STORAGE_RUNTIME_TOKEN = "kigo.sim.runtimeToken";
 const STORAGE_BRIDGE_PREFIX = "kigo.sim.bridge.";
-const DEFAULT_RUNTIME_TOKEN = "kigo-sim-20260508";
-const LEGACY_RUNTIME_TOKEN = "change-me-before-lab-use";
-const LEGACY_PI_SIMULATOR_HOST = "192.168.0.120";
 const BARO_K1 = 0.190263;
 const BARO_K2 = 8.417286e-5;
 const BRIDGE_DEFAULTS = {
-  primaryPort: "4353",
-  flarmPort: "4354",
-  piSshTarget: "admin@192.168.0.114",
+  primaryPort: 4353,
+  flarmPort: 4354,
+  piBridgeTarget: "admin@192.168.0.114",
   piIdentity: "/Users/slawekpiela/.ssh/kigo_pi",
   piSimulatorHost: "192.168.0.105",
   piWorkdir: "/home/admin/kigo_xcvario_simulator",
-  vmSshTarget: "codex-vm",
-  vmIdentity: "",
+  vmBridgeTarget: "slawek@172.16.119.135",
+  vmIdentity: "/Users/slawekpiela/.ssh/codex_debian_vm",
   vmSimulatorHost: "172.16.119.1",
   vmWorkdir: "/home/slawek/kigo_xcvario_simulator",
 };
 
 const runtimeUrlInput = document.getElementById("runtime-url-input");
-const runtimeTokenInput = document.getElementById("runtime-token-input");
 const connectButton = document.getElementById("connect-button");
 const disconnectButton = document.getElementById("disconnect-button");
 const refreshButton = document.getElementById("refresh-button");
@@ -65,17 +60,8 @@ const applyTrafficButton = document.getElementById("apply-traffic-button");
 const ownshipGrid = document.getElementById("ownship-grid");
 const trafficTableBody = document.getElementById("traffic-table-body");
 const healthGrid = document.getElementById("health-grid");
-const streamGrid = document.getElementById("stream-grid");
-const bridgePrimaryPortInput = document.getElementById("bridge-primary-port-input");
-const bridgeFlarmPortInput = document.getElementById("bridge-flarm-port-input");
-const piBridgeSshTargetInput = document.getElementById("pi-bridge-ssh-target-input");
-const piBridgeIdentityInput = document.getElementById("pi-bridge-identity-input");
-const piBridgeSimulatorHostInput = document.getElementById("pi-bridge-simulator-host-input");
-const piBridgeWorkdirInput = document.getElementById("pi-bridge-workdir-input");
-const vmBridgeSshTargetInput = document.getElementById("vm-bridge-ssh-target-input");
-const vmBridgeIdentityInput = document.getElementById("vm-bridge-identity-input");
-const vmBridgeSimulatorHostInput = document.getElementById("vm-bridge-simulator-host-input");
-const vmBridgeWorkdirInput = document.getElementById("vm-bridge-workdir-input");
+const piBridgeTargetInput = document.getElementById("pi-bridge-target-input");
+const vmBridgeTargetInput = document.getElementById("vm-bridge-target-input");
 const bridgeStartButton = document.getElementById("bridge-start-button");
 const bridgeStopButton = document.getElementById("bridge-stop-button");
 const bridgeRestartButton = document.getElementById("bridge-restart-button");
@@ -85,7 +71,6 @@ const bridgeStatusGrid = document.getElementById("bridge-status-grid");
 
 const state = {
   runtimeUrl: "",
-  token: "",
   streamAbortController: null,
   connected: false,
   snapshot: null,
@@ -94,32 +79,15 @@ const state = {
 
 function loadStoredSettings() {
   runtimeUrlInput.value = localStorage.getItem(STORAGE_RUNTIME_URL) || "http://127.0.0.1:8181";
-  runtimeTokenInput.value = loadStoredRuntimeToken();
-  loadStoredInput(bridgePrimaryPortInput, "primaryPort", BRIDGE_DEFAULTS.primaryPort);
-  loadStoredInput(bridgeFlarmPortInput, "flarmPort", BRIDGE_DEFAULTS.flarmPort);
-  loadStoredInput(piBridgeSshTargetInput, "piSshTarget", BRIDGE_DEFAULTS.piSshTarget);
-  loadStoredInput(piBridgeIdentityInput, "piIdentity", BRIDGE_DEFAULTS.piIdentity);
-  loadStoredInput(piBridgeSimulatorHostInput, "piSimulatorHost", BRIDGE_DEFAULTS.piSimulatorHost);
-  loadStoredInput(piBridgeWorkdirInput, "piWorkdir", BRIDGE_DEFAULTS.piWorkdir);
-  loadStoredInput(vmBridgeSshTargetInput, "vmSshTarget", BRIDGE_DEFAULTS.vmSshTarget);
-  loadStoredInput(vmBridgeIdentityInput, "vmIdentity", BRIDGE_DEFAULTS.vmIdentity);
-  loadStoredInput(vmBridgeSimulatorHostInput, "vmSimulatorHost", BRIDGE_DEFAULTS.vmSimulatorHost);
-  loadStoredInput(vmBridgeWorkdirInput, "vmWorkdir", BRIDGE_DEFAULTS.vmWorkdir);
+  localStorage.removeItem("kigo.sim.runtimeToken");
+  loadStoredInput(piBridgeTargetInput, "piBridgeTarget", BRIDGE_DEFAULTS.piBridgeTarget);
+  loadStoredInput(vmBridgeTargetInput, "vmBridgeTarget", BRIDGE_DEFAULTS.vmBridgeTarget);
 }
 
 function persistSettings() {
   localStorage.setItem(STORAGE_RUNTIME_URL, runtimeUrlInput.value.trim());
-  localStorage.setItem(STORAGE_RUNTIME_TOKEN, runtimeTokenInput.value);
-  persistInput(bridgePrimaryPortInput, "primaryPort");
-  persistInput(bridgeFlarmPortInput, "flarmPort");
-  persistInput(piBridgeSshTargetInput, "piSshTarget");
-  persistInput(piBridgeIdentityInput, "piIdentity");
-  persistInput(piBridgeSimulatorHostInput, "piSimulatorHost");
-  persistInput(piBridgeWorkdirInput, "piWorkdir");
-  persistInput(vmBridgeSshTargetInput, "vmSshTarget");
-  persistInput(vmBridgeIdentityInput, "vmIdentity");
-  persistInput(vmBridgeSimulatorHostInput, "vmSimulatorHost");
-  persistInput(vmBridgeWorkdirInput, "vmWorkdir");
+  persistInput(piBridgeTargetInput, "piBridgeTarget");
+  persistInput(vmBridgeTargetInput, "vmBridgeTarget");
 }
 
 function normalizeRuntimeUrl(rawValue) {
@@ -127,18 +95,9 @@ function normalizeRuntimeUrl(rawValue) {
   return trimmed.replace(/\/+$/, "");
 }
 
-function loadStoredRuntimeToken() {
-  const storedToken = localStorage.getItem(STORAGE_RUNTIME_TOKEN);
-  return storedToken && storedToken !== LEGACY_RUNTIME_TOKEN ? storedToken : DEFAULT_RUNTIME_TOKEN;
-}
-
 function loadStoredInput(node, key, defaultValue) {
   const storedValue = localStorage.getItem(`${STORAGE_BRIDGE_PREFIX}${key}`);
-  if (key === "piSimulatorHost" && storedValue === LEGACY_PI_SIMULATOR_HOST) {
-    node.value = defaultValue;
-    return;
-  }
-  node.value = storedValue || defaultValue;
+  node.value = isLegacyBridgeTarget(key, storedValue) ? defaultValue : storedValue || defaultValue;
 }
 
 function persistInput(node, key) {
@@ -148,7 +107,6 @@ function persistInput(node, key) {
 function syncRuntimeSettingsFromInputs() {
   persistSettings();
   state.runtimeUrl = normalizeRuntimeUrl(runtimeUrlInput.value);
-  state.token = runtimeTokenInput.value;
 }
 
 function setStatus(kind, message) {
@@ -168,9 +126,7 @@ function showApiError(message) {
 }
 
 function buildHeaders(includeJson = false) {
-  const headers = {
-    "X-Simulator-Token": state.token,
-  };
+  const headers = {};
   if (includeJson) {
     headers["Content-Type"] = "application/json";
   }
@@ -349,8 +305,8 @@ async function postCommand(path, payload = null, { syncControls = false } = {}) 
 async function requestBridge(action) {
   showBridgeError("");
   syncRuntimeSettingsFromInputs();
-  if (!state.runtimeUrl || !state.token) {
-    showBridgeError("Runtime URL and simulator token are required.");
+  if (!state.runtimeUrl) {
+    showBridgeError("Runtime URL is required.");
     return;
   }
   try {
@@ -371,22 +327,22 @@ async function requestBridge(action) {
 
 function buildBridgePayload() {
   const payload = {
-    primary_port: bridgePortValue(bridgePrimaryPortInput, 4353),
-    flarm_port: bridgePortValue(bridgeFlarmPortInput, 4354),
+    primary_port: BRIDGE_DEFAULTS.primaryPort,
+    flarm_port: BRIDGE_DEFAULTS.flarmPort,
     nodes: [
-      bridgeNodeFromInputs(
+      bridgeNodeFromTarget(
         "pi",
-        piBridgeSshTargetInput,
-        piBridgeIdentityInput,
-        piBridgeSimulatorHostInput,
-        piBridgeWorkdirInput,
+        piBridgeTargetInput.value,
+        BRIDGE_DEFAULTS.piIdentity,
+        BRIDGE_DEFAULTS.piSimulatorHost,
+        BRIDGE_DEFAULTS.piWorkdir,
       ),
-      bridgeNodeFromInputs(
+      bridgeNodeFromTarget(
         "vm",
-        vmBridgeSshTargetInput,
-        vmBridgeIdentityInput,
-        vmBridgeSimulatorHostInput,
-        vmBridgeWorkdirInput,
+        vmBridgeTargetInput.value,
+        BRIDGE_DEFAULTS.vmIdentity,
+        BRIDGE_DEFAULTS.vmSimulatorHost,
+        BRIDGE_DEFAULTS.vmWorkdir,
       ),
     ].filter((node) => node.ssh_target && node.simulator_host && node.workdir),
   };
@@ -396,22 +352,21 @@ function buildBridgePayload() {
   return payload;
 }
 
-function bridgeNodeFromInputs(id, sshTargetInput, identityInput, simulatorHostInput, workdirInput) {
+function bridgeNodeFromTarget(id, sshTarget, identityFile, simulatorHost, workdir) {
   return {
     id,
-    ssh_target: sshTargetInput.value.trim(),
-    identity_file: identityInput.value.trim(),
-    simulator_host: simulatorHostInput.value.trim(),
-    workdir: workdirInput.value.trim(),
+    ssh_target: String(sshTarget || "").trim(),
+    identity_file: identityFile,
+    simulator_host: simulatorHost,
+    workdir,
   };
 }
 
-function bridgePortValue(node, defaultValue) {
-  const port = Number(node.value || defaultValue);
-  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-    throw new Error("Bridge ports must be integers between 1 and 65535.");
+function isLegacyBridgeTarget(key, storedValue) {
+  if (key === "vmBridgeTarget" && storedValue === "codex-vm") {
+    return true;
   }
-  return port;
+  return key === "piBridgeTarget" && storedValue === "192.168.0.120";
 }
 
 function showBridgeError(message) {
@@ -535,86 +490,9 @@ function syncQnhFromAltitudeInput() {
 }
 
 function renderState() {
-  renderStreams(state.runtime);
   renderOwnship(state.snapshot ? state.snapshot.ownship : null);
   renderTraffic(state.snapshot ? state.snapshot.traffic : []);
   renderHealth(state.snapshot, state.runtime);
-}
-
-function renderStreams(runtime) {
-  streamGrid.innerHTML = "";
-  const adapters = runtime && runtime.adapters ? runtime.adapters : {};
-  const primaryDevice = runtime && runtime.primary_device === "sxhawk" ? "sxhawk" : "xcvario";
-  const primaryAdapter = adapters[primaryDevice] || null;
-  const flarmAdapter = adapters.flarm || null;
-  const streams = [
-    {
-      title: "Primary Stream",
-      protocol: primaryDevice === "sxhawk" ? "SxHAWK" : "XCvario",
-      adapter: primaryAdapter,
-    },
-    {
-      title: "FLARM Stream",
-      protocol: "FLARM",
-      adapter: flarmAdapter,
-    },
-  ];
-  for (const stream of streams) {
-    streamGrid.appendChild(buildStreamBlock(stream));
-  }
-}
-
-function buildStreamBlock({ title, protocol, adapter }) {
-  const block = document.createElement("div");
-  block.className = "stream-block";
-
-  const header = document.createElement("div");
-  header.className = "stream-block__header";
-  const heading = document.createElement("h3");
-  heading.textContent = title;
-  const count = document.createElement("span");
-  count.className = "stream-count";
-  count.textContent = `${adapter ? adapter.client_count || 0 : 0} clients`;
-  header.appendChild(heading);
-  header.appendChild(count);
-
-  const details = document.createElement("dl");
-  details.className = "stream-details";
-  appendStreamDetail(details, "Protocol", protocol);
-  appendStreamDetail(details, "Port", adapter && adapter.bound_port ? adapter.bound_port : "-");
-  appendStreamDetail(details, "Bridge Targets", streamConnectionValues(adapter, "local"));
-  appendStreamDetail(details, "Connected Peers", streamConnectionValues(adapter, "peer"));
-
-  block.appendChild(header);
-  block.appendChild(details);
-  return block;
-}
-
-function appendStreamDetail(details, label, value) {
-  const wrapper = document.createElement("div");
-  const dt = document.createElement("dt");
-  dt.textContent = label;
-  const dd = document.createElement("dd");
-  dd.textContent = Array.isArray(value) && value.length > 0 ? value.join(" / ") : String(value || "-");
-  wrapper.appendChild(dt);
-  wrapper.appendChild(dd);
-  details.appendChild(wrapper);
-}
-
-function streamConnectionValues(adapter, key) {
-  const connections = adapter && Array.isArray(adapter.client_connections) ? adapter.client_connections : [];
-  const values = [];
-  for (const connection of connections) {
-    const value = connection && connection[key] ? String(connection[key]) : "";
-    if (value && !values.includes(value)) {
-      values.push(value);
-    }
-  }
-  if (values.length > 0) {
-    return values;
-  }
-  const clientCount = adapter && adapter.client_count ? adapter.client_count : 0;
-  return clientCount > 0 ? [`${clientCount} connected`] : ["-"];
 }
 
 function renderBridgeStatus(payload) {
@@ -648,9 +526,8 @@ function buildBridgeStatusBlock(node) {
   header.appendChild(pill);
 
   const details = document.createElement("dl");
-  details.className = "stream-details";
-  appendBridgeDetail(details, "SSH Target", node.ssh_target || "-");
-  appendBridgeDetail(details, "Mac Host", node.simulator_host || "-");
+  details.className = "bridge-status-details";
+  appendBridgeDetail(details, "Bridge Target", node.ssh_target || "-");
   appendBridgeDetail(details, "Primary", node.primary_status || (node.primary_active ? "active" : "unknown"));
   appendBridgeDetail(details, "FLARM", node.flarm_status || (node.flarm_active ? "active" : "unknown"));
   appendBridgeDetail(details, "Return Code", node.returncode ?? node.action_returncode ?? "-");

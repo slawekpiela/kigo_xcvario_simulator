@@ -21,7 +21,7 @@
           <div class="hero-status-top">
             <span id="connection-status" class="status-pill status-pill--idle">Disconnected</span>
           </div>
-          <p id="status-message" class="status-copy">Save the runtime URL and token, then connect the panel.</p>
+          <p id="status-message" class="status-copy">Save the runtime URL, then connect the panel.</p>
         </div>
       </header>
 
@@ -35,10 +35,6 @@
             <label class="field">
               <span>Runtime URL</span>
               <input id="runtime-url-input" type="url" placeholder="http://127.0.0.1:8181">
-            </label>
-            <label class="field">
-              <span>Simulator Token</span>
-              <input id="runtime-token-input" type="password" placeholder="kigo-sim-20260508">
             </label>
             <label class="field">
               <span>Primary Device</span>
@@ -59,70 +55,18 @@
 
         <section class="panel-card panel-card--wide">
           <div class="panel-heading">
-            <h2>Stream Links</h2>
-            <p>TCP bridge targets and connected peers for the primary device and FLARM streams.</p>
-          </div>
-          <div id="stream-grid" class="stream-grid"></div>
-        </section>
-
-        <section class="panel-card panel-card--wide">
-          <div class="panel-heading">
             <h2>Bridge Control</h2>
             <p>Start or stop the TCP-to-PTY bridge services on PI and VM.</p>
           </div>
-          <div class="field-grid bridge-port-grid">
+          <div class="field-grid bridge-target-grid">
             <label class="field">
-              <span>Primary Port</span>
-              <input id="bridge-primary-port-input" type="number" min="1" max="65535" step="1" value="4353">
+              <span>PI Bridge Target</span>
+              <input id="pi-bridge-target-input" type="text" value="admin@192.168.0.114">
             </label>
             <label class="field">
-              <span>FLARM Port</span>
-              <input id="bridge-flarm-port-input" type="number" min="1" max="65535" step="1" value="4354">
+              <span>VM Bridge Target</span>
+              <input id="vm-bridge-target-input" type="text" value="slawek@172.16.119.135">
             </label>
-          </div>
-          <div class="bridge-form">
-            <div class="bridge-node">
-              <h3>PI Bridge</h3>
-              <div class="field-grid">
-                <label class="field">
-                  <span>PI SSH Target</span>
-                  <input id="pi-bridge-ssh-target-input" type="text" value="admin@192.168.0.114">
-                </label>
-                <label class="field">
-                  <span>PI SSH Identity</span>
-                  <input id="pi-bridge-identity-input" type="text" value="/Users/slawekpiela/.ssh/kigo_pi">
-                </label>
-                <label class="field">
-                  <span>Mac Host For PI</span>
-                  <input id="pi-bridge-simulator-host-input" type="text" value="192.168.0.105">
-                </label>
-                <label class="field">
-                  <span>PI Workdir</span>
-                  <input id="pi-bridge-workdir-input" type="text" value="/home/admin/kigo_xcvario_simulator">
-                </label>
-              </div>
-            </div>
-            <div class="bridge-node">
-              <h3>VM Bridge</h3>
-              <div class="field-grid">
-                <label class="field">
-                  <span>VM SSH Target</span>
-                  <input id="vm-bridge-ssh-target-input" type="text" value="codex-vm">
-                </label>
-                <label class="field">
-                  <span>VM SSH Identity</span>
-                  <input id="vm-bridge-identity-input" type="text" placeholder="default SSH config">
-                </label>
-                <label class="field">
-                  <span>Mac Host For VM</span>
-                  <input id="vm-bridge-simulator-host-input" type="text" value="172.16.119.1">
-                </label>
-                <label class="field">
-                  <span>VM Workdir</span>
-                  <input id="vm-bridge-workdir-input" type="text" value="/home/slawek/kigo_xcvario_simulator">
-                </label>
-              </div>
-            </div>
           </div>
           <div class="button-row">
             <button id="bridge-start-button" class="primary-button" type="button">Start Bridges</button>

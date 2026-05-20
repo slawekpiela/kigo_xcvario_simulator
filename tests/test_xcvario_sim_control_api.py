@@ -74,7 +74,7 @@ def _config() -> SimulatorRuntimeConfig:
         seed=15,
         device_qnh_hpa=1013.25,
         home_position=HomePosition(latitude_deg=49.83833, longitude_deg=19.00202, gps_altitude_m=401.0),
-        control_api=ControlApiConfig(bind_host="127.0.0.1", port=0, token="token"),
+        control_api=ControlApiConfig(bind_host="127.0.0.1", port=0),
         xcvario=XcvarioConfig(port=4353, polar_name="DG 800B/15"),
         flarm=EndpointConfig(port=4354),
         scheduler=SchedulerConfig(tick_hz=10, ownship_hz=2, traffic_hz=1),
@@ -94,7 +94,6 @@ class ControlApiTests(unittest.TestCase):
         self.api = ControlApiServer(
             bind_host="127.0.0.1",
             port=0,
-            token="token",
             session=self.session,
             bridge_control=self.bridge_control,
         )
@@ -106,15 +105,8 @@ class ControlApiTests(unittest.TestCase):
         self.api.stop()
         self.session.stop()
 
-    def test_state_endpoint_requires_token(self):
+    def test_state_endpoint_returns_snapshot_without_auth(self):
         self.connection.request("GET", "/api/v1/simulation/state")
-        response = self.connection.getresponse()
-        body = response.read().decode("utf-8")
-
-        self.assertEqual(response.status, 401)
-        self.assertIn("unauthorized", body)
-
-        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
         response = self.connection.getresponse()
         payload = json.loads(response.read().decode("utf-8"))
 
@@ -127,7 +119,7 @@ class ControlApiTests(unittest.TestCase):
             "POST",
             "/api/v1/simulation/preset",
             body=json.dumps({"preset_id": "straight", "seed": 7, "autostart": True}),
-            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+            headers={"Content-Type": "application/json"},
         )
         response = self.connection.getresponse()
         response.read()
@@ -137,13 +129,13 @@ class ControlApiTests(unittest.TestCase):
             "POST",
             "/api/v1/simulation/traffic",
             body=json.dumps({"enabled": True, "contact_count": 2, "collision_course": True}),
-            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+            headers={"Content-Type": "application/json"},
         )
         response = self.connection.getresponse()
         response.read()
         self.assertEqual(response.status, 204)
 
-        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
+        self.connection.request("GET", "/api/v1/simulation/state")
         response = self.connection.getresponse()
         payload = json.loads(response.read().decode("utf-8"))
 
@@ -156,13 +148,13 @@ class ControlApiTests(unittest.TestCase):
             "POST",
             "/api/v1/simulation/wind",
             body=json.dumps({"direction_deg": 450.0, "speed_kmh": 25.5}),
-            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+            headers={"Content-Type": "application/json"},
         )
         response = self.connection.getresponse()
         response.read()
         self.assertEqual(response.status, 204)
 
-        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
+        self.connection.request("GET", "/api/v1/simulation/state")
         response = self.connection.getresponse()
         payload = json.loads(response.read().decode("utf-8"))
 
@@ -176,13 +168,13 @@ class ControlApiTests(unittest.TestCase):
             "POST",
             "/api/v1/simulation/oat",
             body=json.dumps({"oat_c": 7.5}),
-            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+            headers={"Content-Type": "application/json"},
         )
         response = self.connection.getresponse()
         response.read()
         self.assertEqual(response.status, 204)
 
-        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
+        self.connection.request("GET", "/api/v1/simulation/state")
         response = self.connection.getresponse()
         payload = json.loads(response.read().decode("utf-8"))
 
@@ -194,13 +186,13 @@ class ControlApiTests(unittest.TestCase):
             "POST",
             "/api/v1/simulation/altimeter",
             body=json.dumps({"qnh_hpa": 995.5}),
-            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+            headers={"Content-Type": "application/json"},
         )
         response = self.connection.getresponse()
         response.read()
         self.assertEqual(response.status, 204)
 
-        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
+        self.connection.request("GET", "/api/v1/simulation/state")
         response = self.connection.getresponse()
         payload = json.loads(response.read().decode("utf-8"))
 
@@ -217,13 +209,13 @@ class ControlApiTests(unittest.TestCase):
             "POST",
             "/api/v1/simulation/altimeter",
             body=json.dumps({"altitude_m": 875.0}),
-            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+            headers={"Content-Type": "application/json"},
         )
         response = self.connection.getresponse()
         response.read()
         self.assertEqual(response.status, 204)
 
-        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
+        self.connection.request("GET", "/api/v1/simulation/state")
         response = self.connection.getresponse()
         payload = json.loads(response.read().decode("utf-8"))
 
@@ -240,13 +232,13 @@ class ControlApiTests(unittest.TestCase):
             "POST",
             "/api/v1/simulation/device",
             body=json.dumps({"primary_device": "sxhawk"}),
-            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+            headers={"Content-Type": "application/json"},
         )
         response = self.connection.getresponse()
         response.read()
         self.assertEqual(response.status, 204)
 
-        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
+        self.connection.request("GET", "/api/v1/simulation/state")
         response = self.connection.getresponse()
         payload = json.loads(response.read().decode("utf-8"))
 
@@ -261,14 +253,14 @@ class ControlApiTests(unittest.TestCase):
             "POST",
             "/api/v1/simulation/preset",
             body=json.dumps({"preset_id": "on_ground", "seed": 7, "autostart": True}),
-            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+            headers={"Content-Type": "application/json"},
         )
         response = self.connection.getresponse()
         response.read()
 
         self.assertEqual(response.status, 204)
 
-        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
+        self.connection.request("GET", "/api/v1/simulation/state")
         response = self.connection.getresponse()
         payload = json.loads(response.read().decode("utf-8"))
 
@@ -282,14 +274,14 @@ class ControlApiTests(unittest.TestCase):
             "POST",
             "/api/v1/simulation/manual-mode",
             body=json.dumps({"phase": "on_ground"}),
-            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+            headers={"Content-Type": "application/json"},
         )
         response = self.connection.getresponse()
         response.read()
 
         self.assertEqual(response.status, 204)
 
-        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
+        self.connection.request("GET", "/api/v1/simulation/state")
         response = self.connection.getresponse()
         payload = json.loads(response.read().decode("utf-8"))
 
@@ -309,7 +301,7 @@ class ControlApiTests(unittest.TestCase):
                     "climb_max_ms": 2.0,
                 }
             ),
-            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+            headers={"Content-Type": "application/json"},
         )
         response = self.connection.getresponse()
         response.read()
@@ -320,7 +312,7 @@ class ControlApiTests(unittest.TestCase):
             "POST",
             "/api/v1/simulation/manual-mode",
             body=json.dumps({"phase": "straight", "speed_kmh": 100.0, "wysokosc": 875.0}),
-            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+            headers={"Content-Type": "application/json"},
         )
         response = self.connection.getresponse()
         response.read()
@@ -329,7 +321,7 @@ class ControlApiTests(unittest.TestCase):
 
         self.session.orchestrator.start()
         self.session.orchestrator.tick(1.0)
-        self.connection.request("GET", "/api/v1/simulation/state", headers={"X-Simulator-Token": "token"})
+        self.connection.request("GET", "/api/v1/simulation/state")
         response = self.connection.getresponse()
         payload = json.loads(response.read().decode("utf-8"))
 
@@ -347,7 +339,7 @@ class ControlApiTests(unittest.TestCase):
             "POST",
             "/api/v1/simulation/preset",
             body=json.dumps({"preset_id": "missing", "seed": 7, "autostart": True}),
-            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+            headers={"Content-Type": "application/json"},
         )
         response = self.connection.getresponse()
         payload = json.loads(response.read().decode("utf-8"))
@@ -374,7 +366,7 @@ class ControlApiTests(unittest.TestCase):
             "POST",
             "/api/v1/bridges/start",
             body=json.dumps(body),
-            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+            headers={"Content-Type": "application/json"},
         )
         response = self.connection.getresponse()
         payload = json.loads(response.read().decode("utf-8"))
@@ -385,7 +377,7 @@ class ControlApiTests(unittest.TestCase):
         self.assertEqual(self.bridge_control.calls, [("start", body)])
 
     def test_sse_endpoint_emits_initial_state_event(self):
-        self.connection.request("GET", "/api/v1/events", headers={"X-Simulator-Token": "token"})
+        self.connection.request("GET", "/api/v1/events")
         response = self.connection.getresponse()
         lines = [response.fp.readline().decode("utf-8") for _ in range(6)]
         payload = "".join(lines)

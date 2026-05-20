@@ -38,7 +38,6 @@ def main(argv: list[str] | None = None) -> int:
     control_api = ControlApiServer(
         bind_host=runtime_config.control_api.bind_host,
         port=runtime_config.control_api.port,
-        token=runtime_config.control_api.token,
         session=session,
         cors_allowed_origins=runtime_config.control_api.cors_allowed_origins,
     )

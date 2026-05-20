@@ -16,12 +16,10 @@ DEFAULT_SIMULATION_TICK_HZ = 10
 DEFAULT_OWNSHIP_HZ = 2
 DEFAULT_XCVARIO_GPS_HZ = 1
 DEFAULT_TRAFFIC_HZ = 1
-DEFAULT_CONTROL_TOKEN = "kigo-sim-20260508"
 DEFAULT_QNH_HPA = 1013.25
 DEFAULT_SESSION_ID = "xcvario-sim"
 DEFAULT_PRIMARY_DEVICE = "xcvario"
 SUPPORTED_PRIMARY_DEVICES = ("xcvario", "sxhawk")
-CONTROL_TOKEN_HEADER = "X-Simulator-Token"
 
 
 @dataclass(frozen=True)
@@ -48,7 +46,6 @@ class XcvarioConfig:
 class ControlApiConfig:
     bind_host: str = DEFAULT_BIND_HOST
     port: int = DEFAULT_CONTROL_API_PORT
-    token: str = DEFAULT_CONTROL_TOKEN
     cors_allowed_origins: tuple[str, ...] = field(default_factory=tuple)
 
 
@@ -96,7 +93,6 @@ def parse_runtime_config(raw: Mapping[str, Any]) -> SimulatorRuntimeConfig:
     control_api = ControlApiConfig(
         bind_host=_text(control_api_raw.get("bind_host"), default=DEFAULT_BIND_HOST),
         port=_port(control_api_raw.get("port"), default=DEFAULT_CONTROL_API_PORT),
-        token=_required_text(control_api_raw.get("token"), key_name="control_api.token"),
         cors_allowed_origins=tuple(_string_list(control_api_raw.get("cors_allowed_origins", ()))),
     )
     xcvario = EndpointConfig(

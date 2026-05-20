@@ -13,12 +13,20 @@ DEFAULT_FRONTEND_PORT = 8180
 FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
 
 
+class NoCacheRequestHandler(SimpleHTTPRequestHandler):
+    def end_headers(self) -> None:
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+        super().end_headers()
+
+
 def build_frontend_server(
     *,
     host: str = DEFAULT_FRONTEND_HOST,
     port: int = DEFAULT_FRONTEND_PORT,
 ) -> ThreadingHTTPServer:
-    handler = functools.partial(SimpleHTTPRequestHandler, directory=str(FRONTEND_DIR))
+    handler = functools.partial(NoCacheRequestHandler, directory=str(FRONTEND_DIR))
     return ThreadingHTTPServer((host, int(port)), handler)
 
 

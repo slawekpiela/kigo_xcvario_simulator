@@ -23,7 +23,7 @@ def _config() -> SimulatorRuntimeConfig:
         seed=42,
         device_qnh_hpa=1013.25,
         home_position=HomePosition(latitude_deg=49.83833, longitude_deg=19.00202, gps_altitude_m=401.0),
-        control_api=ControlApiConfig(bind_host="127.0.0.1", port=0, token="token"),
+        control_api=ControlApiConfig(bind_host="127.0.0.1", port=0),
         xcvario=XcvarioConfig(bind_host="127.0.0.1", port=0, polar_name="DG 800B/15"),
         flarm=EndpointConfig(bind_host="127.0.0.1", port=0),
         scheduler=SchedulerConfig(tick_hz=10, ownship_hz=2, traffic_hz=1),
@@ -37,7 +37,6 @@ class SimulatorEndToEndSmokeTests(unittest.TestCase):
         self.api = ControlApiServer(
             bind_host="127.0.0.1",
             port=0,
-            token="token",
             session=self.session,
         )
         self.api.start()
@@ -188,14 +187,14 @@ class SimulatorEndToEndSmokeTests(unittest.TestCase):
             "POST",
             path,
             body=json.dumps(payload),
-            headers={"Content-Type": "application/json", "X-Simulator-Token": "token"},
+            headers={"Content-Type": "application/json"},
         )
         response = self.api_connection.getresponse()
         response.read()
         self.assertEqual(response.status, 204)
 
     def _get_json(self, path: str) -> dict[str, object]:
-        self.api_connection.request("GET", path, headers={"X-Simulator-Token": "token"})
+        self.api_connection.request("GET", path)
         response = self.api_connection.getresponse()
         payload = json.loads(response.read().decode("utf-8"))
         self.assertEqual(response.status, 200)
