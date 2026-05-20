@@ -150,6 +150,26 @@ def _stop_script() -> str:
     return (
         f"systemctl --user stop {PRIMARY_UNIT} 2>/dev/null || true\n"
         f"systemctl --user stop {FLARM_UNIT} 2>/dev/null || true\n"
+        "python3 - <<'PY'\n"
+        "from pathlib import Path\n"
+        "import os\n"
+        "import signal\n"
+        "\n"
+        "current_pid = os.getpid()\n"
+        "for cmdline_path in Path('/proc').glob('[0-9]*/cmdline'):\n"
+        "    try:\n"
+        "        pid = int(cmdline_path.parent.name)\n"
+        "        if pid == current_pid:\n"
+        "            continue\n"
+        "        parts = [part.decode('utf-8', 'ignore') for part in cmdline_path.read_bytes().split(b'\\0') if part]\n"
+        "    except (OSError, ValueError):\n"
+        "        continue\n"
+        "    if len(parts) >= 3 and os.path.basename(parts[0]).startswith('python') and '-m' in parts and 'kigo_xcvario_simulator.pty_bridge' in parts:\n"
+        "        try:\n"
+        "            os.kill(pid, signal.SIGTERM)\n"
+        "        except ProcessLookupError:\n"
+        "            pass\n"
+        "PY\n"
     )
 
 
