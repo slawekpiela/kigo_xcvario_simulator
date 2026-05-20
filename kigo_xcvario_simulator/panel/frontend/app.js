@@ -2,6 +2,8 @@ const STORAGE_RUNTIME_URL = "kigo.sim.runtimeUrl";
 const STORAGE_RUNTIME_TOKEN = "kigo.sim.runtimeToken";
 const STORAGE_BRIDGE_PREFIX = "kigo.sim.bridge.";
 const DEFAULT_RUNTIME_TOKEN = "kigo-sim-20260508";
+const LEGACY_RUNTIME_TOKEN = "change-me-before-lab-use";
+const LEGACY_PI_SIMULATOR_HOST = "192.168.0.120";
 const BARO_K1 = 0.190263;
 const BARO_K2 = 8.417286e-5;
 const BRIDGE_DEFAULTS = {
@@ -92,7 +94,7 @@ const state = {
 
 function loadStoredSettings() {
   runtimeUrlInput.value = localStorage.getItem(STORAGE_RUNTIME_URL) || "http://127.0.0.1:8181";
-  runtimeTokenInput.value = localStorage.getItem(STORAGE_RUNTIME_TOKEN) || DEFAULT_RUNTIME_TOKEN;
+  runtimeTokenInput.value = loadStoredRuntimeToken();
   loadStoredInput(bridgePrimaryPortInput, "primaryPort", BRIDGE_DEFAULTS.primaryPort);
   loadStoredInput(bridgeFlarmPortInput, "flarmPort", BRIDGE_DEFAULTS.flarmPort);
   loadStoredInput(piBridgeSshTargetInput, "piSshTarget", BRIDGE_DEFAULTS.piSshTarget);
@@ -125,8 +127,18 @@ function normalizeRuntimeUrl(rawValue) {
   return trimmed.replace(/\/+$/, "");
 }
 
+function loadStoredRuntimeToken() {
+  const storedToken = localStorage.getItem(STORAGE_RUNTIME_TOKEN);
+  return storedToken && storedToken !== LEGACY_RUNTIME_TOKEN ? storedToken : DEFAULT_RUNTIME_TOKEN;
+}
+
 function loadStoredInput(node, key, defaultValue) {
-  node.value = localStorage.getItem(`${STORAGE_BRIDGE_PREFIX}${key}`) || defaultValue;
+  const storedValue = localStorage.getItem(`${STORAGE_BRIDGE_PREFIX}${key}`);
+  if (key === "piSimulatorHost" && storedValue === LEGACY_PI_SIMULATOR_HOST) {
+    node.value = defaultValue;
+    return;
+  }
+  node.value = storedValue || defaultValue;
 }
 
 function persistInput(node, key) {
