@@ -134,7 +134,8 @@ function buildHeaders(includeJson = false) {
 }
 
 async function requestJson(path, options = {}) {
-  const response = await fetch(`${state.runtimeUrl}${path}`, {
+  const requestUrl = runtimeUrlForPath(path);
+  const response = await fetch(requestUrl, {
     ...options,
     headers: {
       ...buildHeaders(options.body !== undefined),
@@ -148,13 +149,26 @@ async function requestJson(path, options = {}) {
   if (response.status === 204) {
     return null;
   }
+  const contentType = response.headers.get("Content-Type") || "";
+  if (!contentType.includes("application/json")) {
+    throw new Error(
+      `Expected simulator JSON from ${response.url}, got ${contentType || "unknown content type"}. Check Runtime URL.`,
+    );
+  }
   return response.json();
+}
+
+function runtimeUrlForPath(path) {
+  return new URL(path, `${state.runtimeUrl}/`).toString();
 }
 
 async function readErrorMessage(response) {
   const body = await response.text();
   if (!body) {
     return "";
+  }
+  if (looksLikeHtml(body)) {
+    return `${response.status} from ${response.url}. This looks like the panel/static server, not the simulator runtime. Use the control API port, usually http://127.0.0.1:8181.`;
   }
   try {
     const payload = JSON.parse(body);
@@ -164,19 +178,75 @@ async function readErrorMessage(response) {
   }
 }
 
+function looksLikeHtml(body) {
+  return String(body || "").trimStart().startsWith("<");
+}
+
 async function connectPanel() {
   syncRuntimeSettingsFromInputs();
   disconnectPanel();
+  const candidates = runtimeUrlCandidates(state.runtimeUrl);
+  const errors = [];
+  for (const runtimeUrl of candidates) {
+    state.runtimeUrl = runtimeUrl;
+    runtimeUrlInput.value = runtimeUrl;
+    try {
+      await fetchState({ syncControls: true });
+      await openEventStream();
+      state.connected = true;
+      persistSettings();
+      setStatus("ok", `Panel API connected to ${state.runtimeUrl}`);
+      showApiError("");
+      return;
+    } catch (error) {
+      disconnectPanel();
+      errors.push(`${runtimeUrl}: ${String(error.message || error)}`);
+    }
+  }
+  state.connected = false;
+  setStatus("error", `Failed to connect to ${candidates[0] || state.runtimeUrl}`);
+  showApiError(errors.join("\n"));
+}
+
+function runtimeUrlCandidates(rawRuntimeUrl) {
+  const primary = normalizeRuntimeUrl(rawRuntimeUrl);
+  const candidates = [];
+  appendUnique(candidates, primary);
+  const correctedControlApiUrl = withPort(primary, "8181");
+  if (isLikelyPanelUrl(primary)) {
+    appendUnique(candidates, correctedControlApiUrl);
+  }
+  if (!primary) {
+    appendUnique(candidates, "http://127.0.0.1:8181");
+  }
+  return candidates;
+}
+
+function isLikelyPanelUrl(runtimeUrl) {
+  if (!runtimeUrl) {
+    return true;
+  }
   try {
-    await fetchState({ syncControls: true });
-    await openEventStream();
-    state.connected = true;
-    setStatus("ok", `Panel API connected to ${state.runtimeUrl}`);
-    showApiError("");
+    const url = new URL(runtimeUrl);
+    return url.port === "8180" || url.host === window.location.host;
   } catch (error) {
-    state.connected = false;
-    setStatus("error", `Failed to connect to ${state.runtimeUrl}`);
-    showApiError(String(error.message || error));
+    return true;
+  }
+}
+
+function withPort(runtimeUrl, port) {
+  try {
+    const url = new URL(runtimeUrl || window.location.origin);
+    url.port = port;
+    return normalizeRuntimeUrl(url.toString());
+  } catch (_error) {
+    return `http://127.0.0.1:${port}`;
+  }
+}
+
+function appendUnique(values, value) {
+  if (value && !values.includes(value)) {
+    values.push(value);
   }
 }
 
