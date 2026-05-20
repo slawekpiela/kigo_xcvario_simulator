@@ -25,6 +25,7 @@ from .flight_model import FlightModel
 from .nmea import (
     build_gpgga,
     build_gprmc,
+    build_hchdm,
     build_lxwp0,
     build_lxwp1,
     build_lxwp2,
@@ -75,6 +76,7 @@ __all__ = [
     "XcvarioPolar",
     "build_gpgga",
     "build_gprmc",
+    "build_hchdm",
     "build_lxwp0",
     "build_lxwp1",
     "build_lxwp2",

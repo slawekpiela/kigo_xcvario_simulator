@@ -4,6 +4,7 @@ from kigo_xcvario_simulator.contracts import OwnshipState, TrafficContact, WindS
 from kigo_xcvario_simulator.nmea import (
     build_gpgga,
     build_gprmc,
+    build_hchdm,
     build_lxwp0,
     build_lxwp1,
     build_lxwp2,
@@ -109,6 +110,12 @@ class NmeaBuilderTests(unittest.TestCase):
     def test_wimwv_builder_matches_xcvario_true_wind_output(self):
         sentence = build_wimwv(WindState(direction_deg=270.0, speed_kmh=25.5))
         body = "WIMWV,270.0,T,25.5,K,A"
+
+        self.assertEqual(sentence, f"${body}*{nmea_checksum(body):02X}\r\n")
+
+    def test_hchdm_builder_provides_heading_for_heading_up_consumers(self):
+        sentence = build_hchdm(_ownship())
+        body = "HCHDM,84.4,M"
 
         self.assertEqual(sentence, f"${body}*{nmea_checksum(body):02X}\r\n")
 

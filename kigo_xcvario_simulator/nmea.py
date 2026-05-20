@@ -79,6 +79,13 @@ def build_gpgga(ownship: OwnshipState, *, satellites: int = 8, hdop: float = 1.0
     return build_nmea_sentence(body)
 
 
+def build_hchdm(ownship: OwnshipState) -> str:
+    heading_deg = math.fmod(float(ownship.track_deg), 360.0)
+    if heading_deg < 0.0:
+        heading_deg += 360.0
+    return build_nmea_sentence(f"HCHDM,{heading_deg:.1f},M")
+
+
 def build_pxcv(
     ownship: OwnshipState,
     *,

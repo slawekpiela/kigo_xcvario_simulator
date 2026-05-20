@@ -63,6 +63,7 @@ class XcvarioAdapterTests(unittest.TestCase):
 
         self.assertIn("$GPRMC,", payload)
         self.assertIn("$GPGGA,", payload)
+        self.assertIn("$HCHDM,84.4,M*", payload)
         self.assertIn("$PXCV,2.4,0.00,0,1.000,0,18.0,1019.8,965.4,361.0", payload)
         self.assertIn("$POV,P,965.4,Q,361.0,E,2.4,T,18.0*", payload)
         self.assertIn("$WIMWV,270.0,T,25.5,K,A*", payload)
@@ -167,6 +168,7 @@ class XcvarioAdapterTests(unittest.TestCase):
 
         self.assertEqual(_gprmc_speed_knots(payload), 55.1)
         self.assertEqual(_gprmc_track_deg(payload), 101.3)
+        self.assertIn("$HCHDM,90.0,M*", payload)
 
     def test_gprmc_ignores_wind_for_ground_roll(self):
         adapter = XcvarioTcpAdapter(

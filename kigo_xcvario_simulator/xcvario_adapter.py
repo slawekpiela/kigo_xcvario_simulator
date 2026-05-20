@@ -11,7 +11,7 @@ from threading import Event, Lock, Thread, current_thread
 from .contracts import OwnshipState, SimulationSnapshot, WindState
 from .baro import qnh_hpa_for_static_pressure, static_pressure_hpa_for_altitude
 from .flight_math import ground_velocity_from_true_wind
-from .nmea import build_gpgga, build_gprmc, build_pov, build_pxcv, build_wimwv, dynamic_pressure_pa_for_speed
+from .nmea import build_gpgga, build_gprmc, build_hchdm, build_pov, build_pxcv, build_wimwv, dynamic_pressure_pa_for_speed
 from .state import FlightPhase
 from .xcvario_polar import XcvarioPolar
 
@@ -146,6 +146,7 @@ class XcvarioTcpAdapter:
             gps_ownship = _ownship_with_wind_adjusted_ground_velocity(position_ownship, snapshot.wind)
             payload_parts.append(build_gprmc(gps_ownship))
             payload_parts.append(build_gpgga(position_ownship))
+        payload_parts.append(build_hchdm(snapshot.ownship))
         payload_parts.append(
             build_pxcv(
                 snapshot.ownship,
