@@ -8,10 +8,7 @@ const BRIDGE_DEFAULTS = {
   readyTimeoutS: 8,
   pollIntervalMs: 1000,
   pollTimeoutMs: 14000,
-  piBridgeTarget: "admin@192.168.0.114",
-  piIdentity: "/Users/slawekpiela/.ssh/kigo_pi",
-  piSimulatorHost: "127.0.0.1",
-  piWorkdir: "/home/admin/kigo_xcvario_simulator",
+  vmRuntimeUrl: "http://172.16.119.135:8181",
   vmBridgeTarget: "slawek@172.16.119.135",
   vmIdentity: "/Users/slawekpiela/.ssh/codex_debian_vm",
   vmSimulatorHost: "127.0.0.1",
@@ -63,7 +60,6 @@ const applyTrafficButton = document.getElementById("apply-traffic-button");
 const ownshipGrid = document.getElementById("ownship-grid");
 const trafficTableBody = document.getElementById("traffic-table-body");
 const healthGrid = document.getElementById("health-grid");
-const piBridgeTargetInput = document.getElementById("pi-bridge-target-input");
 const vmBridgeTargetInput = document.getElementById("vm-bridge-target-input");
 const bridgeStartButton = document.getElementById("bridge-start-button");
 const bridgeStopButton = document.getElementById("bridge-stop-button");
@@ -85,15 +81,16 @@ const state = {
 };
 
 function loadStoredSettings() {
-  runtimeUrlInput.value = localStorage.getItem(STORAGE_RUNTIME_URL) || "http://127.0.0.1:8181";
+  const storedRuntimeUrl = localStorage.getItem(STORAGE_RUNTIME_URL);
+  runtimeUrlInput.value = isLegacyRuntimeUrl(storedRuntimeUrl)
+    ? BRIDGE_DEFAULTS.vmRuntimeUrl
+    : storedRuntimeUrl || BRIDGE_DEFAULTS.vmRuntimeUrl;
   localStorage.removeItem("kigo.sim.runtimeToken");
-  loadStoredInput(piBridgeTargetInput, "piBridgeTarget", BRIDGE_DEFAULTS.piBridgeTarget);
   loadStoredInput(vmBridgeTargetInput, "vmBridgeTarget", BRIDGE_DEFAULTS.vmBridgeTarget);
 }
 
 function persistSettings() {
   localStorage.setItem(STORAGE_RUNTIME_URL, runtimeUrlInput.value.trim());
-  persistInput(piBridgeTargetInput, "piBridgeTarget");
   persistInput(vmBridgeTargetInput, "vmBridgeTarget");
 }
 
@@ -103,12 +100,31 @@ function normalizeRuntimeUrl(rawValue) {
 }
 
 function loadStoredInput(node, key, defaultValue) {
+  if (!node) {
+    return;
+  }
   const storedValue = localStorage.getItem(`${STORAGE_BRIDGE_PREFIX}${key}`);
   node.value = isLegacyBridgeTarget(key, storedValue) ? defaultValue : storedValue || defaultValue;
 }
 
 function persistInput(node, key) {
+  if (!node) {
+    return;
+  }
   localStorage.setItem(`${STORAGE_BRIDGE_PREFIX}${key}`, node.value.trim());
+}
+
+function isLegacyRuntimeUrl(rawValue) {
+  const runtimeUrl = normalizeRuntimeUrl(rawValue);
+  if (!runtimeUrl) {
+    return false;
+  }
+  try {
+    const url = new URL(runtimeUrl);
+    return ["127.0.0.1", "localhost", "::1"].includes(url.hostname) && url.port === "8181";
+  } catch (_error) {
+    return true;
+  }
 }
 
 function syncRuntimeSettingsFromInputs() {
@@ -460,13 +476,6 @@ function buildBridgePayload() {
     ready_timeout_s: BRIDGE_DEFAULTS.readyTimeoutS,
     nodes: [
       bridgeNodeFromTarget(
-        "pi",
-        piBridgeTargetInput.value,
-        BRIDGE_DEFAULTS.piIdentity,
-        BRIDGE_DEFAULTS.piSimulatorHost,
-        BRIDGE_DEFAULTS.piWorkdir,
-      ),
-      bridgeNodeFromTarget(
         "vm",
         vmBridgeTargetInput.value,
         BRIDGE_DEFAULTS.vmIdentity,
@@ -476,7 +485,7 @@ function buildBridgePayload() {
     ].filter((node) => node.ssh_target && node.simulator_host && node.workdir),
   };
   if (payload.nodes.length === 0) {
-    throw new Error("At least one bridge target is required.");
+    throw new Error("VM bridge target is required.");
   }
   return payload;
 }
