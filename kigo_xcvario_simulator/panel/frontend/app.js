@@ -5,13 +5,16 @@ const BARO_K2 = 8.417286e-5;
 const BRIDGE_DEFAULTS = {
   primaryPort: 4353,
   flarmPort: 4354,
+  readyTimeoutS: 8,
+  pollIntervalMs: 1000,
+  pollTimeoutMs: 14000,
   piBridgeTarget: "admin@192.168.0.114",
   piIdentity: "/Users/slawekpiela/.ssh/kigo_pi",
-  piSimulatorHost: "192.168.0.106",
+  piSimulatorHost: "127.0.0.1",
   piWorkdir: "/home/admin/kigo_xcvario_simulator",
   vmBridgeTarget: "slawek@172.16.119.135",
   vmIdentity: "/Users/slawekpiela/.ssh/codex_debian_vm",
-  vmSimulatorHost: "172.16.119.1",
+  vmSimulatorHost: "127.0.0.1",
   vmWorkdir: "/home/slawek/kigo_xcvario_simulator",
 };
 
@@ -394,19 +397,30 @@ async function requestBridge(action) {
     showBridgeError("Runtime URL is required.");
     return;
   }
+  let isBusy = false;
   try {
+    const bridgePayload = buildBridgePayload();
+    setBridgeBusy(true, action);
+    isBusy = true;
     const payload = await requestJson(`/api/v1/bridges/${action}`, {
       method: "POST",
-      body: JSON.stringify(buildBridgePayload()),
+      body: JSON.stringify(bridgePayload),
     });
     renderBridgeStatus(payload);
+    if (action === "status") {
+      showBridgeError("");
+    }
     if (action !== "status") {
-      window.setTimeout(() => {
-        void fetchState().catch(() => undefined);
-      }, 1000);
+      const finalStatus = await pollBridgeStatus(bridgePayload, action);
+      renderBridgeStatus(finalStatus);
+      await fetchState().catch(() => undefined);
     }
   } catch (error) {
     showBridgeError(String(error.message || error));
+  } finally {
+    if (isBusy) {
+      setBridgeBusy(false, action);
+    }
   }
 }
 
@@ -414,6 +428,7 @@ function buildBridgePayload() {
   const payload = {
     primary_port: BRIDGE_DEFAULTS.primaryPort,
     flarm_port: BRIDGE_DEFAULTS.flarmPort,
+    ready_timeout_s: BRIDGE_DEFAULTS.readyTimeoutS,
     nodes: [
       bridgeNodeFromTarget(
         "pi",
@@ -445,6 +460,79 @@ function bridgeNodeFromTarget(id, sshTarget, identityFile, simulatorHost, workdi
     simulator_host: simulatorHost,
     workdir,
   };
+}
+
+async function pollBridgeStatus(bridgePayload, action) {
+  const waitForReady = action === "start" || action === "restart";
+  const waitForStopped = action === "stop";
+  const deadline = Date.now() + BRIDGE_DEFAULTS.pollTimeoutMs;
+  let latest = null;
+  while (Date.now() < deadline) {
+    await sleep(BRIDGE_DEFAULTS.pollIntervalMs);
+    latest = await requestJson("/api/v1/bridges/status", {
+      method: "POST",
+      body: JSON.stringify(bridgePayload),
+    });
+    renderBridgeStatus(latest);
+    if (waitForReady && bridgesReady(latest)) {
+      showBridgeError("");
+      return latest;
+    }
+    if (waitForStopped && bridgesStopped(latest)) {
+      showBridgeError("");
+      return latest;
+    }
+    if (!waitForReady && !waitForStopped) {
+      return latest;
+    }
+  }
+  if (latest) {
+    showBridgeError(bridgeTimeoutMessage(action, latest));
+    return latest;
+  }
+  throw new Error(`Bridge ${action} did not return status before timeout.`);
+}
+
+function bridgesReady(payload) {
+  const nodes = payload && Array.isArray(payload.nodes) ? payload.nodes : [];
+  return nodes.length > 0 && nodes.every((node) => Boolean(node.ready));
+}
+
+function bridgesStopped(payload) {
+  const nodes = payload && Array.isArray(payload.nodes) ? payload.nodes : [];
+  return nodes.length > 0 && nodes.every((node) => !node.primary_active && !node.flarm_active);
+}
+
+function bridgeTimeoutMessage(action, payload) {
+  const nodes = payload && Array.isArray(payload.nodes) ? payload.nodes : [];
+  const details = nodes
+    .map((node) => {
+      const id = String(node.id || "bridge").toUpperCase();
+      return `${id}: primary=${bridgePartSummary(node, "primary")}, flarm=${bridgePartSummary(node, "flarm")}`;
+    })
+    .join("; ");
+  return `Bridge ${action} timed out. ${details || "No node status returned."}`;
+}
+
+function bridgePartSummary(node, prefix) {
+  const status = node[`${prefix}_status`] || "unknown";
+  const pty = node[`${prefix}_pty_exists`] ? "pty" : "no-pty";
+  const tcp = node[`${prefix}_tcp_connected`] ? "tcp" : "no-tcp";
+  const error = node[`${prefix}_last_error`];
+  return `${status}/${pty}/${tcp}${error ? `/${error}` : ""}`;
+}
+
+function setBridgeBusy(isBusy, action) {
+  for (const button of [bridgeStartButton, bridgeStopButton, bridgeRestartButton, bridgeStatusButton]) {
+    button.disabled = isBusy;
+  }
+  if (isBusy) {
+    showBridgeError(`Bridge ${action} in progress...`);
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function isLegacyBridgeTarget(key, storedValue) {
@@ -604,9 +692,9 @@ function buildBridgeStatusBlock(node) {
   const heading = document.createElement("h3");
   heading.textContent = `${String(node.id || "bridge").toUpperCase()} Bridge`;
   const pill = document.createElement("span");
-  const bothActive = Boolean(node.primary_active) && Boolean(node.flarm_active);
-  pill.className = `bridge-state ${bothActive ? "bridge-state--ok" : "bridge-state--idle"}`;
-  pill.textContent = bothActive ? "Active" : "Needs attention";
+  const ready = Boolean(node.ready);
+  pill.className = `bridge-state ${ready ? "bridge-state--ok" : "bridge-state--idle"}`;
+  pill.textContent = ready ? "Ready" : "Needs attention";
   header.appendChild(heading);
   header.appendChild(pill);
 
@@ -637,12 +725,22 @@ function buildBridgeDetails(node) {
   const details = document.createElement("dl");
   details.className = "bridge-status-details bridge-status-details--dialog";
   appendBridgeDetail(details, "Bridge Target", node.ssh_target || "-");
+  appendBridgeDetail(details, "Ready", node.ready ? "yes" : "no");
   appendBridgeDetail(details, "Primary", node.primary_status || (node.primary_active ? "active" : "unknown"));
+  appendBridgeDetail(details, "Primary Ready", node.primary_ready ? "yes" : "no");
+  appendBridgeDetail(details, "Primary PTY", node.primary_pty_target || node.primary_serial_path || "-");
+  appendBridgeDetail(details, "Primary TCP", node.primary_tcp_connected ? "connected" : "disconnected");
+  appendBridgeDetail(details, "Primary Bytes", `${node.primary_bytes_tcp_to_pty ?? 0} rx / ${node.primary_bytes_pty_to_tcp ?? 0} tx`);
   appendBridgeDetail(details, "FLARM", node.flarm_status || (node.flarm_active ? "active" : "unknown"));
+  appendBridgeDetail(details, "FLARM Ready", node.flarm_ready ? "yes" : "no");
+  appendBridgeDetail(details, "FLARM PTY", node.flarm_pty_target || node.flarm_serial_path || "-");
+  appendBridgeDetail(details, "FLARM TCP", node.flarm_tcp_connected ? "connected" : "disconnected");
+  appendBridgeDetail(details, "FLARM Bytes", `${node.flarm_bytes_tcp_to_pty ?? 0} rx / ${node.flarm_bytes_pty_to_tcp ?? 0} tx`);
   appendBridgeDetail(details, "Return Code", node.returncode ?? node.action_returncode ?? "-");
   const actionFailed = Number(node.action_returncode ?? 0) !== 0;
   const statusFailed = Number(node.returncode ?? 0) !== 0;
-  const errorText = actionFailed ? node.action_stderr : statusFailed ? node.stderr : "";
+  const bridgeError = node.primary_last_error || node.flarm_last_error || "";
+  const errorText = actionFailed ? node.action_stderr : statusFailed ? node.stderr : bridgeError;
   if (errorText) {
     appendBridgeDetail(details, "Error", errorText);
   }

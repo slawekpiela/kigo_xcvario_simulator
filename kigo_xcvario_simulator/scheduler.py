@@ -40,6 +40,8 @@ class TelemetryScheduler:
         self._tick_count = 0
         self._last_tick_started_s: float | None = None
         self._last_jitter_s = 0.0
+        self._error_count = 0
+        self._last_error = ""
         self._latest_snapshot = self._orchestrator.get_snapshot()
 
     @property
@@ -53,6 +55,14 @@ class TelemetryScheduler:
     @property
     def last_jitter_s(self) -> float:
         return self._last_jitter_s
+
+    @property
+    def error_count(self) -> int:
+        return self._error_count
+
+    @property
+    def last_error(self) -> str:
+        return self._last_error
 
     def add_snapshot_listener(self, listener) -> None:
         with self._listener_lock:
@@ -87,15 +97,19 @@ class TelemetryScheduler:
 
         if self._tick_count % self._ownship_every_ticks == 0:
             for publisher in self._ownship_publishers:
-                publisher.publish_snapshot(snapshot)
+                self._publish_safely(publisher, snapshot)
 
         if self._tick_count % self._traffic_every_ticks == 0:
             for publisher in self._traffic_publishers:
-                publisher.publish_snapshot(snapshot)
+                self._publish_safely(publisher, snapshot)
 
-        listeners = self._snapshot_listeners
+        with self._listener_lock:
+            listeners = tuple(self._snapshot_listeners)
         for listener in listeners:
-            listener(snapshot)
+            try:
+                listener(snapshot)
+            except Exception as exc:
+                self._record_error(exc)
 
         return snapshot
 
@@ -107,3 +121,13 @@ class TelemetryScheduler:
             sleep_s = max(0.0, self._tick_interval_s - elapsed_s)
             if sleep_s > 0.0:
                 self._time.sleep(sleep_s)
+
+    def _publish_safely(self, publisher: SnapshotPublisher, snapshot: SimulationSnapshot) -> None:
+        try:
+            publisher.publish_snapshot(snapshot)
+        except Exception as exc:
+            self._record_error(exc)
+
+    def _record_error(self, exc: Exception) -> None:
+        self._error_count += 1
+        self._last_error = f"{type(exc).__name__}: {exc}"

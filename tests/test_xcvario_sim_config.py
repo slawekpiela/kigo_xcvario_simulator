@@ -1,10 +1,19 @@
 import unittest
+from pathlib import Path
 
-from kigo_xcvario_simulator.config import build_xcsoar_profile_snippet, parse_runtime_config
+from kigo_xcvario_simulator.config import build_xcsoar_profile_snippet, load_runtime_config, parse_runtime_config
 from kigo_xcvario_simulator.xcvario_polar import get_xcvario_polar
 
 
 class XcvarioConfigTests(unittest.TestCase):
+    def test_runtime_example_starts_at_epba(self):
+        config_path = Path(__file__).resolve().parents[1] / "kigo_xcvario_simulator" / "examples" / "runtime.example.json"
+        config = load_runtime_config(config_path)
+
+        self.assertAlmostEqual(config.home_position.latitude_deg, 49.804997, places=6)
+        self.assertAlmostEqual(config.home_position.longitude_deg, 19.002019, places=6)
+        self.assertAlmostEqual(config.home_position.gps_altitude_m, 401.0, places=6)
+
     def test_runtime_config_accepts_sxhawk_primary_device(self):
         config = parse_runtime_config(
             {

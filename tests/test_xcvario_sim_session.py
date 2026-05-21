@@ -30,6 +30,11 @@ class _FakePublisher:
         self.published.append(snapshot)
 
 
+class _FailingPublisher(_FakePublisher):
+    def publish_snapshot(self, snapshot) -> None:
+        raise RuntimeError("publish failed")
+
+
 def _config() -> SimulatorRuntimeConfig:
     return SimulatorRuntimeConfig(
         session_id="xcvario-sim",
@@ -57,6 +62,19 @@ class SessionAndSchedulerTests(unittest.TestCase):
         self.assertEqual(len(ownship.published), 2)
         self.assertEqual(len(traffic.published), 1)
         self.assertEqual(session.scheduler.tick_count, 10)
+
+    def test_publisher_error_does_not_stop_scheduler_tick(self):
+        ownship = _FailingPublisher()
+        traffic = _FakePublisher()
+        session = SimulatorRuntimeSession(_config(), xcvario_adapter=ownship, flarm_adapter=traffic)
+
+        for _ in range(5):
+            session.scheduler.run_tick()
+
+        metadata = session.get_runtime_metadata()
+        self.assertEqual(session.scheduler.tick_count, 5)
+        self.assertEqual(metadata["scheduler"]["error_count"], 1)
+        self.assertIn("RuntimeError: publish failed", metadata["scheduler"]["last_error"])
 
     def test_headless_session_starts_and_stops_without_hanging_threads(self):
         ownship = _FakePublisher()

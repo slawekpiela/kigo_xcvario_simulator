@@ -137,6 +137,8 @@ class SimulatorRuntimeSession:
                 "gps_hz": self.runtime_config.scheduler.gps_hz,
                 "baro_hz": self.runtime_config.scheduler.baro_hz or self.runtime_config.scheduler.ownship_hz,
                 "traffic_hz": self.runtime_config.scheduler.traffic_hz,
+                "error_count": getattr(self.scheduler, "error_count", 0),
+                "last_error": getattr(self.scheduler, "last_error", ""),
             },
             "traffic_config": {
                 "enabled": traffic_config.enabled,

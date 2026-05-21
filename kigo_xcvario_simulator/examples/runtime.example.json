@@ -4,8 +4,8 @@
   "device_qnh_hpa": 1013.25,
   "primary_device": "xcvario",
   "home_position": {
-    "latitude_deg": 49.83833,
-    "longitude_deg": 19.00202,
+    "latitude_deg": 49.804997,
+    "longitude_deg": 19.002019,
     "gps_altitude_m": 401.0
   },
   "control_api": {
