@@ -203,8 +203,9 @@ async function connectPanel() {
       await openEventStream();
       state.connected = true;
       persistSettings();
-      setStatus("ok", `Panel API connected to ${state.runtimeUrl}`);
+      setStatus("ok", `Panel API connected to ${state.runtimeUrl}. Restarting bridges...`);
       showApiError("");
+      await restartBridgesAfterConnect();
       return;
     } catch (error) {
       disconnectPanel();
@@ -214,6 +215,34 @@ async function connectPanel() {
   state.connected = false;
   setStatus("error", `Failed to connect to ${candidates[0] || state.runtimeUrl}`);
   showApiError(errors.join("\n"));
+}
+
+async function restartBridgesAfterConnect() {
+  let bridgePayload = null;
+  try {
+    bridgePayload = buildBridgePayload();
+    setBridgeBusy(true, "restart");
+    const payload = await requestJson("/api/v1/bridges/restart", {
+      method: "POST",
+      body: JSON.stringify(bridgePayload),
+    });
+    renderBridgeStatus(payload);
+    const finalStatus = await pollBridgeStatus(bridgePayload, "restart");
+    renderBridgeStatus(finalStatus);
+    await fetchState({ syncControls: true }).catch(() => undefined);
+    if (bridgesReady(finalStatus)) {
+      setStatus("ok", `Panel API connected to ${state.runtimeUrl}. Bridges ready.`);
+      showBridgeError("");
+    }
+  } catch (error) {
+    state.connected = true;
+    setStatus("error", `Panel API connected to ${state.runtimeUrl}, but bridge restart needs attention.`);
+    showBridgeError(String(error.message || error));
+  } finally {
+    if (bridgePayload) {
+      setBridgeBusy(false, "restart");
+    }
+  }
 }
 
 function runtimeUrlCandidates(rawRuntimeUrl) {
