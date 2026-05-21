@@ -13,6 +13,10 @@ const BRIDGE_DEFAULTS = {
   vmIdentity: "/Users/slawekpiela/.ssh/codex_debian_vm",
   vmSimulatorHost: "127.0.0.1",
   vmWorkdir: "/home/slawek/kigo_xcvario_simulator",
+  piBridgeTarget: "admin@192.168.0.114",
+  piIdentity: "/home/slawek/.ssh/kigo_pi",
+  piSimulatorHost: "172.16.119.135",
+  piWorkdir: "/home/admin/kigo_xcvario_simulator",
 };
 
 const runtimeUrlInput = document.getElementById("runtime-url-input");
@@ -61,6 +65,7 @@ const ownshipGrid = document.getElementById("ownship-grid");
 const trafficTableBody = document.getElementById("traffic-table-body");
 const healthGrid = document.getElementById("health-grid");
 const vmBridgeTargetInput = document.getElementById("vm-bridge-target-input");
+const piBridgeTargetInput = document.getElementById("pi-bridge-target-input");
 const bridgeStartButton = document.getElementById("bridge-start-button");
 const bridgeStopButton = document.getElementById("bridge-stop-button");
 const bridgeRestartButton = document.getElementById("bridge-restart-button");
@@ -87,11 +92,13 @@ function loadStoredSettings() {
     : storedRuntimeUrl || BRIDGE_DEFAULTS.vmRuntimeUrl;
   localStorage.removeItem("kigo.sim.runtimeToken");
   loadStoredInput(vmBridgeTargetInput, "vmBridgeTarget", BRIDGE_DEFAULTS.vmBridgeTarget);
+  loadStoredInput(piBridgeTargetInput, "piBridgeTarget", BRIDGE_DEFAULTS.piBridgeTarget);
 }
 
 function persistSettings() {
   localStorage.setItem(STORAGE_RUNTIME_URL, runtimeUrlInput.value.trim());
   persistInput(vmBridgeTargetInput, "vmBridgeTarget");
+  persistInput(piBridgeTargetInput, "piBridgeTarget");
 }
 
 function normalizeRuntimeUrl(rawValue) {
@@ -482,10 +489,17 @@ function buildBridgePayload() {
         BRIDGE_DEFAULTS.vmSimulatorHost,
         BRIDGE_DEFAULTS.vmWorkdir,
       ),
+      bridgeNodeFromTarget(
+        "pi",
+        piBridgeTargetInput.value,
+        BRIDGE_DEFAULTS.piIdentity,
+        BRIDGE_DEFAULTS.piSimulatorHost,
+        BRIDGE_DEFAULTS.piWorkdir,
+      ),
     ].filter((node) => node.ssh_target && node.simulator_host && node.workdir),
   };
-  if (payload.nodes.length === 0) {
-    throw new Error("VM bridge target is required.");
+  if (payload.nodes.length < 2) {
+    throw new Error("VM and PI bridge targets are required.");
   }
   return payload;
 }

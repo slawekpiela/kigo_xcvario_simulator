@@ -56,18 +56,22 @@
         <section class="panel-card panel-card--wide">
           <div class="panel-heading">
             <h2>Bridge Control</h2>
-            <p>Start or stop the TCP-to-PTY bridge services on VM.</p>
+            <p>Start or stop the TCP-to-PTY bridge services on VM and PI.</p>
           </div>
           <div class="field-grid bridge-target-grid">
             <label class="field">
               <span>VM Bridge Target</span>
               <input id="vm-bridge-target-input" type="text" value="slawek@172.16.119.135">
             </label>
+            <label class="field">
+              <span>PI Bridge Target</span>
+              <input id="pi-bridge-target-input" type="text" value="admin@192.168.0.114">
+            </label>
           </div>
           <div class="button-row">
-            <button id="bridge-start-button" class="primary-button" type="button">Start VM Bridge</button>
-            <button id="bridge-stop-button" class="secondary-button" type="button">Stop VM Bridge</button>
-            <button id="bridge-restart-button" class="secondary-button" type="button">Restart VM Bridge</button>
+            <button id="bridge-start-button" class="primary-button" type="button">Start Bridges</button>
+            <button id="bridge-stop-button" class="secondary-button" type="button">Stop Bridges</button>
+            <button id="bridge-restart-button" class="secondary-button" type="button">Restart Bridges</button>
             <button id="bridge-status-button" class="ghost-button" type="button">Bridge Status</button>
           </div>
           <p id="bridge-error" class="panel-error" hidden></p>

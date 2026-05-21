@@ -53,6 +53,29 @@ class BridgeControlPayloadTests(unittest.TestCase):
         self.assertEqual(run.returncode, 0)
         self.assertEqual(run.stdout, "local-bridge")
 
+    def test_remote_ssh_skips_missing_identity_and_accepts_known_host(self):
+        node = BridgeNode(
+            node_id="pi",
+            ssh_target="admin@192.168.0.114",
+            simulator_host="172.16.119.135",
+            workdir="/home/admin/kigo_xcvario_simulator",
+            identity_file="/missing/kigo_pi",
+        )
+
+        with (
+            patch("kigo_xcvario_simulator.bridge_control._is_local_target", return_value=False),
+            patch(
+                "kigo_xcvario_simulator.bridge_control.subprocess.run",
+                return_value=subprocess.CompletedProcess(["ssh"], 0, "ok", ""),
+            ) as run_mock,
+        ):
+            run = _run_remote(node, "printf ok")
+
+        command = run_mock.call_args.args[0]
+        self.assertEqual(run.returncode, 0)
+        self.assertIn("StrictHostKeyChecking=accept-new", command)
+        self.assertNotIn("-i", command)
+
     def test_node_status_requires_units_pty_and_tcp_connection(self):
         node = BridgeNode(
             node_id="pi",

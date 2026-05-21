@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+from pathlib import Path
 import socket
 import subprocess
 import time
@@ -186,9 +187,12 @@ def _run_remote(node: BridgeNode, script: str) -> subprocess.CompletedProcess[st
         "BatchMode=yes",
         "-o",
         "ConnectTimeout=6",
+        "-o",
+        "StrictHostKeyChecking=accept-new",
     ]
-    if node.identity_file:
-        command.extend(["-i", node.identity_file])
+    identity_file = Path(node.identity_file).expanduser() if node.identity_file else None
+    if identity_file and identity_file.is_file():
+        command.extend(["-i", str(identity_file)])
     command.extend([node.ssh_target, f"bash -lc {_shell_quote(script)}"])
     try:
         return subprocess.run(command, text=True, capture_output=True, timeout=14, check=False)
