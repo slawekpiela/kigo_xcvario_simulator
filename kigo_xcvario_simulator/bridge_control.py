@@ -30,6 +30,7 @@ class BridgeNode:
     identity_file: str = ""
     primary_serial_path: str = DEFAULT_PRIMARY_SERIAL_PATH
     flarm_serial_path: str = DEFAULT_FLARM_SERIAL_PATH
+    reverse_tunnel: bool = False
 
 
 class BridgeControl:
@@ -41,9 +42,15 @@ class BridgeControl:
         config = _parse_payload(payload)
         results = []
         for node in config.nodes:
+            tunnel_run = _start_reverse_tunnel(node, config.primary_port, config.flarm_port)
             command = _start_script(node, config.primary_port, config.flarm_port)
             run = _run_remote(node, command)
             status = _wait_node_status(node, want_ready=True, timeout_s=config.ready_timeout_s)
+            if tunnel_run is not None:
+                status["tunnel_status"] = _reverse_tunnel_status(node)
+                status["tunnel_returncode"] = tunnel_run.returncode
+                status["tunnel_stdout"] = tunnel_run.stdout.strip()
+                status["tunnel_stderr"] = tunnel_run.stderr.strip()
             status["action_returncode"] = run.returncode
             status["action_stdout"] = run.stdout.strip()
             status["action_stderr"] = run.stderr.strip()
@@ -55,7 +62,13 @@ class BridgeControl:
         results = []
         for node in config.nodes:
             run = _run_remote(node, _stop_script(node))
+            tunnel_run = _stop_reverse_tunnel(node)
             status = _wait_node_status(node, want_ready=False, timeout_s=min(3.0, config.ready_timeout_s))
+            if tunnel_run is not None:
+                status["tunnel_status"] = _reverse_tunnel_status(node)
+                status["tunnel_returncode"] = tunnel_run.returncode
+                status["tunnel_stdout"] = tunnel_run.stdout.strip()
+                status["tunnel_stderr"] = tunnel_run.stderr.strip()
             status["action_returncode"] = run.returncode
             status["action_stdout"] = run.stdout.strip()
             status["action_stderr"] = run.stderr.strip()
@@ -105,6 +118,7 @@ def _parse_node(node_raw: object) -> BridgeNode:
         identity_file=_text(node_raw.get("identity_file"), default=""),
         primary_serial_path=_text(node_raw.get("primary_serial_path"), default=DEFAULT_PRIMARY_SERIAL_PATH),
         flarm_serial_path=_text(node_raw.get("flarm_serial_path"), default=DEFAULT_FLARM_SERIAL_PATH),
+        reverse_tunnel=bool(node_raw.get("reverse_tunnel", False)),
     )
 
 
@@ -121,7 +135,7 @@ def _node_status(node: BridgeNode) -> dict[str, object]:
     flarm_tcp_connected = bool(flarm_status_payload.get("tcp_connected"))
     primary_ready = primary_active and primary_pty_exists and primary_tcp_connected
     flarm_ready = flarm_active and flarm_pty_exists and flarm_tcp_connected
-    return {
+    status = {
         "id": node.node_id,
         "ssh_target": node.ssh_target,
         "simulator_host": node.simulator_host,
@@ -154,6 +168,10 @@ def _node_status(node: BridgeNode) -> dict[str, object]:
         "stdout": run.stdout.strip(),
         "stderr": run.stderr.strip(),
     }
+    if node.reverse_tunnel:
+        status["reverse_tunnel"] = True
+        status["tunnel_status"] = _reverse_tunnel_status(node)
+    return status
 
 
 def _wait_node_status(node: BridgeNode, *, want_ready: bool, timeout_s: float) -> dict[str, object]:
@@ -198,6 +216,37 @@ def _run_remote(node: BridgeNode, script: str) -> subprocess.CompletedProcess[st
         return subprocess.run(command, text=True, capture_output=True, timeout=14, check=False)
     except (OSError, subprocess.TimeoutExpired) as exc:
         return subprocess.CompletedProcess(command, 255, "", str(exc))
+
+
+def _run_local(script: str, *, timeout: float = 14.0) -> subprocess.CompletedProcess[str]:
+    command = ["bash", "-lc", script]
+    try:
+        return subprocess.run(command, text=True, capture_output=True, timeout=timeout, check=False)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return subprocess.CompletedProcess(command, 255, "", str(exc))
+
+
+def _start_reverse_tunnel(
+    node: BridgeNode,
+    primary_port: int,
+    flarm_port: int,
+) -> subprocess.CompletedProcess[str] | None:
+    if not node.reverse_tunnel:
+        return None
+    return _run_local(_start_reverse_tunnel_script(node, primary_port, flarm_port))
+
+
+def _stop_reverse_tunnel(node: BridgeNode) -> subprocess.CompletedProcess[str] | None:
+    if not node.reverse_tunnel:
+        return None
+    return _run_local(_stop_reverse_tunnel_script(node))
+
+
+def _reverse_tunnel_status(node: BridgeNode) -> str:
+    if not node.reverse_tunnel:
+        return ""
+    run = _run_local(f"systemctl --user is-active {_reverse_tunnel_unit(node)}.service 2>/dev/null || true", timeout=4.0)
+    return run.stdout.strip() or "unknown"
 
 
 def _is_local_target(ssh_target: str) -> bool:
@@ -251,6 +300,46 @@ def _status_script(node: BridgeNode) -> str:
         "pgrep -fl 'kigo_xcvario_simulator.pty_bridge' || true\n"
         "printf 'EOF\\n'\n"
     )
+
+
+def _start_reverse_tunnel_script(node: BridgeNode, primary_port: int, flarm_port: int) -> str:
+    unit = _reverse_tunnel_unit(node)
+    identity_file = Path(node.identity_file).expanduser() if node.identity_file else None
+    identity_args = f"-i {_shell_quote(str(identity_file))} " if identity_file and identity_file.is_file() else ""
+    log_path = f"/tmp/kigo-sim/{unit}.log"
+    return (
+        "set -eu\n"
+        "command -v systemd-run >/dev/null\n"
+        "mkdir -p /tmp/kigo-sim\n"
+        f"systemctl --user stop {unit}.service 2>/dev/null || true\n"
+        f"systemctl --user reset-failed {unit}.service 2>/dev/null || true\n"
+        f"systemd-run --user --unit={unit} "
+        "--property=Restart=always "
+        "--property=RestartSec=1 "
+        "--property=StartLimitIntervalSec=0 "
+        f"--property=StandardOutput=append:{_shell_quote(log_path)} "
+        f"--property=StandardError=append:{_shell_quote(log_path)} "
+        "ssh -N "
+        "-o BatchMode=yes "
+        "-o ConnectTimeout=6 "
+        "-o ExitOnForwardFailure=yes "
+        "-o ServerAliveInterval=10 "
+        "-o ServerAliveCountMax=3 "
+        "-o StrictHostKeyChecking=accept-new "
+        f"{identity_args}"
+        f"-R 127.0.0.1:{int(primary_port)}:127.0.0.1:{int(primary_port)} "
+        f"-R 127.0.0.1:{int(flarm_port)}:127.0.0.1:{int(flarm_port)} "
+        f"{_shell_quote(node.ssh_target)}\n"
+    )
+
+
+def _stop_reverse_tunnel_script(node: BridgeNode) -> str:
+    return f"systemctl --user stop {_reverse_tunnel_unit(node)}.service 2>/dev/null || true\n"
+
+
+def _reverse_tunnel_unit(node: BridgeNode) -> str:
+    safe_id = "".join(char if char.isalnum() else "-" for char in node.node_id.casefold()).strip("-")
+    return f"kigo-xcvario-tunnel-{safe_id or 'bridge'}"
 
 
 def _stop_script(node: BridgeNode) -> str:

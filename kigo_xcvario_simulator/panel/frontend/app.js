@@ -15,7 +15,7 @@ const BRIDGE_DEFAULTS = {
   vmWorkdir: "/home/slawek/kigo_xcvario_simulator",
   piBridgeTarget: "admin@192.168.0.114",
   piIdentity: "/home/slawek/.ssh/kigo_pi",
-  piSimulatorHost: "172.16.119.135",
+  piSimulatorHost: "127.0.0.1",
   piWorkdir: "/home/admin/kigo_xcvario_simulator",
 };
 
@@ -495,6 +495,7 @@ function buildBridgePayload() {
         BRIDGE_DEFAULTS.piIdentity,
         BRIDGE_DEFAULTS.piSimulatorHost,
         BRIDGE_DEFAULTS.piWorkdir,
+        true,
       ),
     ].filter((node) => node.ssh_target && node.simulator_host && node.workdir),
   };
@@ -504,13 +505,14 @@ function buildBridgePayload() {
   return payload;
 }
 
-function bridgeNodeFromTarget(id, sshTarget, identityFile, simulatorHost, workdir) {
+function bridgeNodeFromTarget(id, sshTarget, identityFile, simulatorHost, workdir, reverseTunnel = false) {
   return {
     id,
     ssh_target: String(sshTarget || "").trim(),
     identity_file: identityFile,
     simulator_host: simulatorHost,
     workdir,
+    reverse_tunnel: reverseTunnel,
   };
 }
 
@@ -777,6 +779,9 @@ function buildBridgeDetails(node) {
   const details = document.createElement("dl");
   details.className = "bridge-status-details bridge-status-details--dialog";
   appendBridgeDetail(details, "Bridge Target", node.ssh_target || "-");
+  if (node.reverse_tunnel || node.tunnel_status) {
+    appendBridgeDetail(details, "Reverse Tunnel", node.tunnel_status || "unknown");
+  }
   appendBridgeDetail(details, "Ready", node.ready ? "yes" : "no");
   appendBridgeDetail(details, "Primary", node.primary_status || (node.primary_active ? "active" : "unknown"));
   appendBridgeDetail(details, "Primary Ready", node.primary_ready ? "yes" : "no");

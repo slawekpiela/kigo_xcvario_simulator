@@ -3,7 +3,14 @@ import subprocess
 import unittest
 from unittest.mock import patch
 
-from kigo_xcvario_simulator.bridge_control import BridgeNode, _node_status, _parse_payload, _run_remote, _start_script
+from kigo_xcvario_simulator.bridge_control import (
+    BridgeNode,
+    _node_status,
+    _parse_payload,
+    _run_remote,
+    _start_reverse_tunnel_script,
+    _start_script,
+)
 
 
 class BridgeControlPayloadTests(unittest.TestCase):
@@ -30,14 +37,16 @@ class BridgeControlPayloadTests(unittest.TestCase):
                     {
                         "id": "pi",
                         "ssh_target": "admin@192.168.0.114",
-                        "simulator_host": "192.168.0.106",
+                        "simulator_host": "127.0.0.1",
                         "workdir": "/home/admin/kigo_xcvario_simulator",
+                        "reverse_tunnel": True,
                     }
                 ],
             }
         )
 
-        self.assertEqual(config.nodes[0].simulator_host, "192.168.0.106")
+        self.assertEqual(config.nodes[0].simulator_host, "127.0.0.1")
+        self.assertTrue(config.nodes[0].reverse_tunnel)
 
     def test_local_ssh_target_runs_without_ssh(self):
         run = _run_remote(
@@ -129,6 +138,23 @@ class BridgeControlPayloadTests(unittest.TestCase):
         self.assertIn("--property=RestartSec=1", script)
         self.assertIn("--status-path '/tmp/kigo-sim/xcvario.status.json'", script)
         self.assertIn("--status-path '/tmp/kigo-sim/flarm.status.json'", script)
+
+    def test_reverse_tunnel_script_opens_remote_forwards_to_controller_runtime(self):
+        node = BridgeNode(
+            node_id="pi",
+            ssh_target="admin@192.168.0.114",
+            simulator_host="127.0.0.1",
+            workdir="/home/admin/kigo_xcvario_simulator",
+            identity_file="/missing/kigo_pi",
+            reverse_tunnel=True,
+        )
+
+        script = _start_reverse_tunnel_script(node, 4353, 4354)
+
+        self.assertIn("--unit=kigo-xcvario-tunnel-pi", script)
+        self.assertIn("-o ExitOnForwardFailure=yes", script)
+        self.assertIn("-R 127.0.0.1:4353:127.0.0.1:4353", script)
+        self.assertIn("-R 127.0.0.1:4354:127.0.0.1:4354", script)
 
 
 if __name__ == "__main__":
