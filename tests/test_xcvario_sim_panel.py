@@ -1,5 +1,9 @@
 import http.client
+import json
+import os
 from pathlib import Path
+import tempfile
+import threading
 import unittest
 
 from kigo_xcvario_simulator.panel.start_frontend import build_frontend_server
@@ -49,6 +53,8 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             "Device Altitude [m]",
             'id="static-pressure-input"',
             "Static Pressure [hPa]",
+            'id="cpu-chart-button"',
+            'href="/cpu-chart.html"',
             'id="circling-speed-min-input"',
             'id="circling-speed-max-input"',
             'id="apply-manual-button"',
@@ -212,6 +218,9 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             ".bridge-status-details",
             ".bridge-status-grid",
             ".bridge-state--ok",
+            ".chart-shell",
+            ".cpu-chart-canvas",
+            ".chart-summary-grid",
         ):
             with self.subTest(snippet=snippet):
                 self.assertIn(snippet, css)
@@ -232,7 +241,6 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
         server = build_frontend_server(host="127.0.0.1", port=0)
         try:
             server_address = server.server_address
-            import threading
 
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
@@ -249,6 +257,68 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
         finally:
             server.shutdown()
             server.server_close()
+
+    def test_frontend_server_serves_cpu_chart_page(self):
+        server = build_frontend_server(host="127.0.0.1", port=0)
+        try:
+            server_address = server.server_address
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+
+            connection = http.client.HTTPConnection(server_address[0], server_address[1], timeout=2.0)
+            connection.request("GET", "/cpu-chart.html")
+            response = connection.getresponse()
+            payload = response.read().decode("utf-8")
+            connection.close()
+
+            self.assertEqual(response.status, 200)
+            self.assertIn("CPU Temperature And Usage", payload)
+            self.assertIn("/cpu-chart.js", payload)
+            self.assertIn("Back To Panel", payload)
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_frontend_server_serves_cpu_log_json_from_local_file(self):
+        old_local_file = os.environ.get("KIGO_CPU_LOG_LOCAL_FILE")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            log_path = Path(tmp_dir) / "CPU_temperature"
+            log_path.write_text(
+                "\n".join(
+                    [
+                        "2026-05-22T00:00:00+02:00 cpu_temp_c=38.1 cpu_used_percent=2.5",
+                        "2026-05-22T00:00:01+02:00 cpu_temp_c=39.2 cpu_used_percent=4.0",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            os.environ["KIGO_CPU_LOG_LOCAL_FILE"] = str(log_path)
+            server = build_frontend_server(host="127.0.0.1", port=0)
+            try:
+                server_address = server.server_address
+                thread = threading.Thread(target=server.serve_forever, daemon=True)
+                thread.start()
+
+                connection = http.client.HTTPConnection(server_address[0], server_address[1], timeout=2.0)
+                connection.request("GET", "/api/v1/pi/cpu-temperature-log?limit=1")
+                response = connection.getresponse()
+                payload = json.loads(response.read().decode("utf-8"))
+                connection.close()
+
+                self.assertEqual(response.status, 200)
+                self.assertEqual(payload["source"]["raw_lines"], 1)
+                self.assertEqual(len(payload["records"]), 1)
+                self.assertEqual(payload["records"][0]["timestamp"], "2026-05-22T00:00:01+02:00")
+                self.assertEqual(payload["records"][0]["cpu_temp_c"], 39.2)
+                self.assertEqual(payload["records"][0]["cpu_used_percent"], 4.0)
+                self.assertEqual(payload["summary"]["sample_count"], 1)
+            finally:
+                server.shutdown()
+                server.server_close()
+                if old_local_file is None:
+                    os.environ.pop("KIGO_CPU_LOG_LOCAL_FILE", None)
+                else:
+                    os.environ["KIGO_CPU_LOG_LOCAL_FILE"] = old_local_file
 
 
 if __name__ == "__main__":

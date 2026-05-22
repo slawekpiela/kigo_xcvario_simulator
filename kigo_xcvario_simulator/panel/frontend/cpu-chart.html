@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#080c0a">
+    <title>PI CPU Chart</title>
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body data-page="cpu-chart">
+    <div class="page-shell chart-shell">
+      <header class="chart-header">
+        <div>
+          <p class="eyebrow">PI Monitor</p>
+          <h1>CPU Temperature And Usage</h1>
+        </div>
+        <div class="button-row chart-actions">
+          <button id="refresh-cpu-chart-button" class="secondary-button" type="button">Refresh Snapshot</button>
+          <a class="ghost-button" href="/">Back To Panel</a>
+        </div>
+      </header>
+
+      <main class="chart-panel">
+        <div class="chart-toolbar">
+          <span id="cpu-chart-status" class="status-pill status-pill--idle">Loading</span>
+          <p id="cpu-chart-range" class="status-copy">Waiting for PI log snapshot.</p>
+        </div>
+        <canvas id="cpu-chart-canvas" class="cpu-chart-canvas" width="1400" height="720"></canvas>
+        <dl id="cpu-chart-summary" class="chart-summary-grid"></dl>
+        <p id="cpu-chart-error" class="panel-error" hidden></p>
+      </main>
+    </div>
+
+    <script src="/cpu-chart.js"></script>
+  </body>
+</html>

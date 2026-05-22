@@ -16,6 +16,7 @@ Then open [http://127.0.0.1:8180/](http://127.0.0.1:8180/).
 - loads the latest state from `GET /api/v1/simulation/state`,
 - subscribes to `GET /api/v1/events`,
 - sends operator commands for primary device selection, lifecycle, manual mode, wind, OAT and traffic,
+- opens a snapshot chart for Raspberry Pi CPU temperature and CPU usage from `logs/CPU_temperature`,
 - renders read-only ownship, traffic and health status,
 - exposes traffic count, visible aircraft IDs and an optional collision-course mode for contact `1`.
 
