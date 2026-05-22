@@ -226,8 +226,10 @@ async function connectPanel() {
       await openEventStream();
       state.connected = true;
       persistSettings();
-      setStatus("ok", `Panel API connected to ${state.runtimeUrl}. Restarting bridges...`);
       showApiError("");
+      setStatus("ok", `Panel API connected to ${state.runtimeUrl}. Resetting to EPBA...`);
+      await resetRuntimeToHomeOnConnect();
+      setStatus("ok", `Panel API connected to ${state.runtimeUrl}. Restarting bridges...`);
       await restartBridgesAfterConnect();
       return;
     } catch (error) {
@@ -238,6 +240,23 @@ async function connectPanel() {
   state.connected = false;
   setStatus("error", `Failed to connect to ${candidates[0] || state.runtimeUrl}`);
   showApiError(errors.join("\n"));
+}
+
+async function resetRuntimeToHomeOnConnect() {
+  await requestJson("/api/v1/simulation/reset", {
+    method: "POST",
+  });
+  await requestJson("/api/v1/simulation/manual-mode", {
+    method: "POST",
+    body: JSON.stringify({
+      phase: "on_ground",
+      on_ground: true,
+    }),
+  });
+  await requestJson("/api/v1/simulation/start", {
+    method: "POST",
+  });
+  await fetchState({ syncControls: true });
 }
 
 async function restartBridgesAfterConnect() {
