@@ -1,0 +1,26 @@
+#!/bin/sh
+# Require an explicit documentation impact decision for every commit.
+
+msg_file="$1"
+
+if [ -z "$msg_file" ] || [ ! -f "$msg_file" ]; then
+  echo "commit-msg hook error: missing commit message file" >&2
+  exit 1
+fi
+
+if grep -Eq '^Docs-Impact:[[:space:]]*(updated|none)[[:space:]]*(-|project_tech_documentation/|$)' "$msg_file"; then
+  exit 0
+fi
+
+cat >&2 <<'EOF'
+Commit rejected: missing documentation impact trailer.
+
+Add one of these lines to the commit message:
+
+  Docs-Impact: updated project_tech_documentation/README.md
+  Docs-Impact: none - <short reason>
+
+Before using "none", verify whether the code analysis or change revealed durable knowledge
+that should be saved in project_tech_documentation/README.md.
+EOF
+exit 1
