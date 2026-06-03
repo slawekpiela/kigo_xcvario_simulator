@@ -1044,13 +1044,17 @@ applyManualButton.addEventListener("click", () => {
   if (phase === "straight") {
     numericFields.push(["wysokosc", numericValue(manualBaroAltitudeInput)]);
   }
+  if (phase === "straight" || phase === "circling_left" || phase === "circling_right") {
+    numericFields.push(
+      ["climb_min_ms", numericValue(manualClimbMinInput)],
+      ["climb_max_ms", numericValue(manualClimbMaxInput)],
+    );
+  }
   if (phase === "circling_left" || phase === "circling_right") {
     numericFields.push(
       ["speed_min_kmh", numericValue(circlingSpeedMinInput)],
       ["speed_max_kmh", numericValue(circlingSpeedMaxInput)],
       ["turn_radius_m", numericValue(manualTurnRadiusInput)],
-      ["climb_min_ms", numericValue(manualClimbMinInput)],
-      ["climb_max_ms", numericValue(manualClimbMaxInput)],
     );
   }
   if (phase === "glider_launch") {

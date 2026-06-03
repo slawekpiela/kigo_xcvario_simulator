@@ -47,6 +47,13 @@ _To be filled as durable knowledge is discovered._
   phase is `circling_left` or `circling_right`. The simulated circling bank magnitude follows a
   smooth sinusoid between `35` and `50` degrees over an `8 s` period, with negative roll for left
   turns and positive roll for right turns. Pitch and acceleration fields remain empty.
+- Manual `straight` mode has two altitude behaviors. Without `climb_min_ms`/`climb_max_ms`, a
+  `FlightDirective.baro_altitude_m` pins GPS altitude and static pressure to the requested manual
+  altitude on every tick. When a climb range is present, `baro_altitude_m` is only the starting
+  altitude applied when the directive first becomes active; subsequent ticks update GPS altitude and
+  pressure from a smooth oscillating vertical speed between the configured climb min/max. The panel
+  sends the visible `Climb Min [m/s]` and `Climb Max [m/s]` fields for `straight`,
+  `circling_left`, and `circling_right`.
 
 ## Build, Run, And Test Notes
 
@@ -78,3 +85,4 @@ _To be filled as durable knowledge is discovered._
 - 2026-06-03: Documented synthetic XCVario AHRS roll output during circling.
 - 2026-06-03: Documented IGC logger sample loading from `../kigo_nav/logs` with packaged fixture fallback.
 - 2026-06-03: Documented direct FLARM endpoint declaration/logger support in addition to XCVario passthrough.
+- 2026-06-03: Documented manual straight-mode climb/sink behavior using frontend climb min/max.

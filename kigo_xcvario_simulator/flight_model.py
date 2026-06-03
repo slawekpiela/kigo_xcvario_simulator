@@ -15,6 +15,7 @@ from .variation import SeededRangeGenerator
 DEFAULT_HOME_TRACK_DEG = 90.0
 DEFAULT_CIRCLING_VARIATION_TICKS = 24
 DEFAULT_CIRCLING_SPEED_VARIATION_TICKS = 48
+DEFAULT_STRAIGHT_CLIMB_VARIATION_TICKS = 48
 DEFAULT_GLIDER_LAUNCH_VARIATION_TICKS = 12
 DEFAULT_GENERIC_VARIATION_TICKS = 8
 
@@ -98,12 +99,25 @@ class FlightModel:
         if dt_s < 0.0:
             raise ValueError("dt_s must be >= 0.")
 
+        straight_has_climb_range = (
+            directive.phase == FlightPhase.STRAIGHT
+            and (directive.climb_min_ms is not None or directive.climb_max_ms is not None)
+        )
+        straight_start_altitude_m = None
+        if (
+            straight_has_climb_range
+            and directive.baro_altitude_m is not None
+            and self._directive_changed(directive)
+        ):
+            straight_start_altitude_m = max(self._home_altitude_m, float(directive.baro_altitude_m))
+
         speed_kmh = self._resolve_speed_kmh(directive)
         track_deg = self._resolve_track_deg(state, directive, dt_s, speed_kmh)
         vertical_speed_ms = self._resolve_vertical_speed_ms(directive)
         on_ground = bool(directive.on_ground)
 
-        proposed_altitude_m = state.gps_altitude_m + vertical_speed_ms * dt_s
+        base_altitude_m = state.gps_altitude_m if straight_start_altitude_m is None else straight_start_altitude_m
+        proposed_altitude_m = base_altitude_m + vertical_speed_ms * dt_s
         if on_ground:
             gps_altitude_m = self._home_altitude_m
             vertical_speed_ms = 0.0
@@ -116,7 +130,11 @@ class FlightModel:
             gps_altitude_m = proposed_altitude_m
             on_ground = False
 
-        if directive.phase == FlightPhase.STRAIGHT and directive.baro_altitude_m is not None:
+        if (
+            directive.phase == FlightPhase.STRAIGHT
+            and directive.baro_altitude_m is not None
+            and not straight_has_climb_range
+        ):
             gps_altitude_m = max(self._home_altitude_m, float(directive.baro_altitude_m))
             vertical_speed_ms = 0.0
             on_ground = False
@@ -314,6 +332,15 @@ class FlightModel:
             maximum = float(directive.climb_max_ms if directive.climb_max_ms is not None else directive.climb_min_ms)
             if maximum < minimum:
                 minimum, maximum = maximum, minimum
+            if directive.phase == FlightPhase.STRAIGHT:
+                value = self._oscillating_value_at(
+                    self._active_variation_tick_index,
+                    minimum=minimum,
+                    maximum=maximum,
+                    half_cycle_ticks=DEFAULT_STRAIGHT_CLIMB_VARIATION_TICKS,
+                )
+                self._active_variation_tick_index += 1
+                return value
             generator = SeededRangeGenerator(
                 seed=self._seed,
                 minimum=minimum,

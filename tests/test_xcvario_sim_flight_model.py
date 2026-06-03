@@ -57,6 +57,37 @@ class FlightModelTests(unittest.TestCase):
             places=6,
         )
 
+    def test_straight_climb_range_varies_smoothly_from_configured_altitude(self):
+        directive = FlightDirective(
+            segment_id="straight_leg",
+            phase=FlightPhase.STRAIGHT,
+            duration_s=20.0,
+            target_heading_deg=90.0,
+            target_speed_kmh=90.0,
+            baro_altitude_m=850.0,
+            climb_min_ms=-1.0,
+            climb_max_ms=3.0,
+        )
+
+        state = self.model.preview_directive(self.initial_state, directive)
+
+        self.assertAlmostEqual(state.gps_altitude_m, 850.0, places=4)
+        samples = []
+        altitudes = []
+        for _ in range(100):
+            state = self.model.step(state, directive, 0.1)
+            samples.append(state.vertical_speed_ms)
+            altitudes.append(state.gps_altitude_m)
+
+        deltas = [abs(right - left) for left, right in zip(samples, samples[1:])]
+
+        self.assertAlmostEqual(samples[0], -1.0, places=6)
+        self.assertAlmostEqual(samples[48], 3.0, places=6)
+        self.assertAlmostEqual(samples[96], -1.0, places=6)
+        self.assertLess(max(deltas), 0.14)
+        self.assertLess(min(altitudes), 850.0)
+        self.assertGreater(max(altitudes), 850.0)
+
     def test_baro_altitude_is_ignored_outside_straight_mode(self):
         directive = FlightDirective(
             segment_id="circling_core",

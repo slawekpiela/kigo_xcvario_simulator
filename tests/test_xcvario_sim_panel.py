@@ -148,6 +148,7 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             '["speed_kmh", numericValue(manualSpeedInput)]',
             'if (phase === "straight")',
             '["wysokosc", numericValue(manualBaroAltitudeInput)]',
+            'if (phase === "straight" || phase === "circling_left" || phase === "circling_right")',
             'if (phase === "circling_left" || phase === "circling_right")',
             '["speed_min_kmh", numericValue(circlingSpeedMinInput)]',
             '["speed_max_kmh", numericValue(circlingSpeedMaxInput)]',

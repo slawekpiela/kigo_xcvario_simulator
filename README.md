@@ -185,14 +185,15 @@ PTY such as `/tmp/kigo-sim/sxhawk`, and set `DeviceA="LX"` with
 
 1. Connect the panel.
 2. Choose a `Manual Mode` phase; `on_ground` is the default after an `XCvario` client connect/reconnect.
-3. Set `Wysokosc [m]` when using `straight`; it changes both GPS altitude and barometric pressure output.
-4. Set circling speed min/max in `Manual Mode` when using `circling_left` or `circling_right`.
-5. Set wind direction and speed; the runtime sends them to `kigo_nav` as `WIMWV`.
-6. Set OAT when you need a non-default outside air temperature in the `PXCV`/`POV` stream.
-7. Set `QNH [hPa]` or `Wysokosc [m]` in `Atmosphere` to adjust the simulated device altimeter; changing one recalculates the other from the current static pressure.
-8. Adjust traffic count if needed, and enable `collision course` when you want the first traffic contact to converge on the ownship.
-9. Use `Start / Resume`, `Pause`, `Reset` or `Apply Manual Mode`.
-10. Watch `Ownship`, `Traffic` and `Health` update from `GET /state` and `SSE`, including the emitted visible aircraft ID for each contact.
+3. Set `Flight Altitude [m]` when using `straight`; without climb values it pins both GPS altitude and barometric pressure output.
+4. Set `Climb Min/Max [m/s]` for `straight` when you want smooth manual sink/climb around that starting altitude.
+5. Set circling speed min/max in `Manual Mode` when using `circling_left` or `circling_right`.
+6. Set wind direction and speed; the runtime sends them to `kigo_nav` as `WIMWV`.
+7. Set OAT when you need a non-default outside air temperature in the `PXCV`/`POV` stream.
+8. Set `QNH [hPa]` or `Wysokosc [m]` in `Atmosphere` to adjust the simulated device altimeter; changing one recalculates the other from the current static pressure.
+9. Adjust traffic count if needed, and enable `collision course` when you want the first traffic contact to converge on the ownship.
+10. Use `Start / Resume`, `Pause`, `Reset` or `Apply Manual Mode`.
+11. Watch `Ownship`, `Traffic` and `Health` update from `GET /state` and `SSE`, including the emitted visible aircraft ID for each contact.
 
 ## Test Commands
 

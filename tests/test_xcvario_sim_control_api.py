@@ -342,6 +342,49 @@ class ControlApiTests(unittest.TestCase):
             places=6,
         )
 
+    def test_manual_straight_accepts_climb_range(self):
+        self.connection.request(
+            "POST",
+            "/api/v1/simulation/manual-mode",
+            body=json.dumps(
+                {
+                    "phase": "straight",
+                    "speed_kmh": 100.0,
+                    "wysokosc": 875.0,
+                    "climb_min_ms": -1.0,
+                    "climb_max_ms": 3.0,
+                }
+            ),
+            headers={"Content-Type": "application/json"},
+        )
+        response = self.connection.getresponse()
+        response.read()
+
+        self.assertEqual(response.status, 204)
+
+        self.connection.request("GET", "/api/v1/simulation/state")
+        response = self.connection.getresponse()
+        immediate_payload = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(immediate_payload["snapshot"]["ownship"]["phase"], "straight")
+        self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["gps_altitude_m"], 875.0, places=6)
+        self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["vertical_speed_ms"], -1.0, places=6)
+
+        self.session.orchestrator.start()
+        self.session.orchestrator.tick(1.0)
+        self.connection.request("GET", "/api/v1/simulation/state")
+        response = self.connection.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(payload["snapshot"]["ownship"]["phase"], "straight")
+        self.assertLess(payload["snapshot"]["ownship"]["gps_altitude_m"], 875.0)
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["vertical_speed_ms"], -1.0, places=6)
+        self.assertAlmostEqual(
+            payload["snapshot"]["ownship"]["static_pressure_hpa"],
+            static_pressure_hpa_for_altitude(payload["snapshot"]["ownship"]["gps_altitude_m"], qnh_hpa=1013.25),
+            places=6,
+        )
+
     def test_bad_preset_returns_json_error(self):
         self.connection.request(
             "POST",
