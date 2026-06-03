@@ -93,11 +93,10 @@ class SxHawkTcpAdapter(XcvarioTcpAdapter):
         with self._lock:
             self._last_sent_qnh_hpa = qnh_hpa
 
-    def _handle_command(self, line: str) -> None:
+    def _handle_command(self, line: str, flarm_state) -> bytes:
         body = _nmea_body(line)
         if not body:
-            super()._handle_command(line)
-            return
+            return super()._handle_command(line, flarm_state)
 
         fields = body.split(",")
         sentence_type = fields[0].strip().upper()
@@ -109,7 +108,8 @@ class SxHawkTcpAdapter(XcvarioTcpAdapter):
         elif sentence_type == "PLXV0":
             self._handle_plxv0_command(values)
         elif sentence_type != "PFLX0":
-            super()._handle_command(line)
+            return super()._handle_command(line, flarm_state)
+        return b""
 
     def _handle_pflx2_command(self, fields: list[str]) -> None:
         mac_cready_ms = _parse_optional_float_at(fields, 0)

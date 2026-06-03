@@ -10,6 +10,7 @@ from threading import Event, Lock, Thread, current_thread
 
 from .contracts import OwnshipState, SimulationSnapshot, WindState
 from .baro import qnh_hpa_for_static_pressure, static_pressure_hpa_for_altitude
+from .flarm_passthrough import FlarmPassthroughSimulator
 from .flight_math import ground_velocity_from_true_wind
 from .nmea import build_gpgga, build_gprmc, build_hchdm, build_pov, build_pxcv, build_wimwv, dynamic_pressure_pa_for_speed
 from .state import FlightPhase
@@ -22,6 +23,9 @@ DEFAULT_MAC_CREADY_MS = 0.0
 DEFAULT_BUGS_DEGRADATION_PERCENT = 0
 DEFAULT_BALLAST_FILL_FRACTION = 0.0
 KNOTS_TO_MS = 0.514444
+CIRCLING_AHRS_ROLL_MIN_DEG = 35.0
+CIRCLING_AHRS_ROLL_MAX_DEG = 50.0
+CIRCLING_AHRS_ROLL_PERIOD_S = 8.0
 
 
 class XcvarioTcpAdapter:
@@ -34,6 +38,7 @@ class XcvarioTcpAdapter:
         on_qnh_command: Callable[[float], object] | None = None,
         on_altitude_command: Callable[[float], object] | None = None,
         on_client_connect: Callable[[], object] | None = None,
+        flarm_passthrough: FlarmPassthroughSimulator | None = None,
         gps_every_baro_frames: int = DEFAULT_GPS_EVERY_BARO_FRAMES,
         thread_name: str = "xcvario-adapter",
     ) -> None:
@@ -43,6 +48,7 @@ class XcvarioTcpAdapter:
         self._on_qnh_command = on_qnh_command
         self._on_altitude_command = on_altitude_command
         self._on_client_connect = on_client_connect
+        self._flarm_passthrough = flarm_passthrough or FlarmPassthroughSimulator()
         self._gps_every_baro_frames = max(1, int(gps_every_baro_frames))
         self._thread_name = str(thread_name or "xcvario-adapter")
         self._server_socket: socket.socket | None = None
@@ -79,6 +85,18 @@ class XcvarioTcpAdapter:
     def oat_c(self) -> float:
         with self._lock:
             return self._oat_c
+
+    @property
+    def flarm_declaration(self) -> dict[str, object]:
+        return self._flarm_passthrough.declaration
+
+    @property
+    def flarm_record_count(self) -> int:
+        return self._flarm_passthrough.record_count
+
+    @property
+    def flarm_record_names(self) -> tuple[str, ...]:
+        return self._flarm_passthrough.record_names
 
     def set_oat_c(self, oat_c: float) -> None:
         resolved_oat_c = validate_oat_c(oat_c)
@@ -134,6 +152,7 @@ class XcvarioTcpAdapter:
             bugs_degradation_percent = self._bugs_degradation_percent
             ballast_fill_fraction = self._ballast_fill_fraction
         ballast_overload_factor = self._polar.ballast_overload_factor(ballast_fill_fraction)
+        roll_angle_deg = _circling_ahrs_roll_angle_deg(snapshot)
         dynamic_pressure_pa = dynamic_pressure_pa_for_speed(
             static_pressure_hpa=snapshot.ownship.static_pressure_hpa,
             speed_kmh=snapshot.ownship.speed_kmh,
@@ -155,6 +174,7 @@ class XcvarioTcpAdapter:
                 bugs_degradation_percent=bugs_degradation_percent,
                 ballast_overload_factor=ballast_overload_factor,
                 dynamic_pressure_pa=dynamic_pressure_pa,
+                roll_angle_deg=roll_angle_deg,
             )
         )
         payload_parts.append(
@@ -234,6 +254,7 @@ class XcvarioTcpAdapter:
 
     def _reader_loop(self, client_socket: socket.socket) -> None:
         buffer = bytearray()
+        flarm_state = self._flarm_passthrough.new_connection_state()
         try:
             while not self._stop_event.is_set():
                 if not self._is_current_client(client_socket):
@@ -248,23 +269,35 @@ class XcvarioTcpAdapter:
                     break
                 buffer.extend(chunk)
                 while True:
+                    if flarm_state.binary_mode:
+                        response = self._flarm_passthrough.handle_binary_buffer(buffer, flarm_state)
+                        if response:
+                            self._send_to_client(client_socket, response)
+                        if flarm_state.binary_mode:
+                            break
+
                     separator_index = _find_separator(buffer)
                     if separator_index < 0:
                         break
                     line = bytes(buffer[:separator_index]).decode("ascii", "ignore").strip()
                     del buffer[: separator_index + 1]
-                    self._handle_command(line)
+                    response = self._handle_command(line, flarm_state)
+                    if response:
+                        self._send_to_client(client_socket, response)
         finally:
             self._remove_client(client_socket)
             self._remove_reader_thread(current_thread())
 
-    def _handle_command(self, line: str) -> None:
+    def _handle_command(self, line: str, flarm_state) -> bytes:
+        response = self._flarm_passthrough.handle_text_line(line, flarm_state)
+        if response:
+            return response
         if not line.startswith("!g,") or len(line) < 5:
-            return
+            return b""
         command = line[3]
         value_text = _command_value_text(line[4:])
         if not value_text:
-            return
+            return b""
         if command == "q":
             self._handle_qnh_command(value_text)
         elif command in {"a", "h"}:
@@ -275,6 +308,7 @@ class XcvarioTcpAdapter:
             self._handle_bugs_command(value_text)
         elif command == "b":
             self._handle_ballast_command(value_text)
+        return b""
 
     def _handle_qnh_command(self, value_text: str) -> None:
         try:
@@ -348,6 +382,12 @@ class XcvarioTcpAdapter:
                 client_socket.sendall(payload)
             except OSError:
                 self._remove_client(client_socket)
+
+    def _send_to_client(self, client_socket: socket.socket, payload: bytes) -> None:
+        try:
+            client_socket.sendall(payload)
+        except OSError:
+            self._remove_client(client_socket)
 
     def _is_current_client(self, client_socket: socket.socket) -> bool:
         with self._lock:
@@ -429,6 +469,18 @@ def _ownship_with_wind_adjusted_ground_velocity(ownship: OwnshipState, wind: Win
         speed_kmh=ground_speed_kmh,
         track_deg=ground_track_deg,
     )
+
+
+def _circling_ahrs_roll_angle_deg(snapshot: SimulationSnapshot) -> float | None:
+    ownship = snapshot.ownship
+    if ownship.phase not in {FlightPhase.CIRCLING_LEFT, FlightPhase.CIRCLING_RIGHT}:
+        return None
+    center_deg = (CIRCLING_AHRS_ROLL_MIN_DEG + CIRCLING_AHRS_ROLL_MAX_DEG) / 2.0
+    amplitude_deg = (CIRCLING_AHRS_ROLL_MAX_DEG - CIRCLING_AHRS_ROLL_MIN_DEG) / 2.0
+    phase_rad = 2.0 * math.pi * float(snapshot.sim_time_s) / CIRCLING_AHRS_ROLL_PERIOD_S
+    roll_magnitude_deg = center_deg + amplitude_deg * math.sin(phase_rad)
+    turn_sign = -1.0 if ownship.phase == FlightPhase.CIRCLING_LEFT else 1.0
+    return turn_sign * roll_magnitude_deg
 
 
 def validate_oat_c(oat_c: float) -> float:

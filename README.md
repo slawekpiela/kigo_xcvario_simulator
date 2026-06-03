@@ -18,6 +18,7 @@ This directory contains the complete test simulator for KIGO:
 - `panel/`: static operator UI served locally on `Mac`
 - `examples/runtime.example.json`: baseline runtime config
 - `examples/xcsoar_profile_snippet.txt`: sample `XCSoar/KIGO` profile snippet
+- `examples/igc_logs/`: sample IGC logs exposed by the simulated FLARM logger when `../kigo_nav/logs` is empty
 
 ## Quick Start
 
@@ -60,6 +61,17 @@ Device QNH and device barometric altitude can be adjusted from the panel.  A
 QNH change is emitted in the primary-device protocol, while an altitude change
 is converted to the matching QNH for the current static pressure and then
 emitted the same way.
+The `XCvario` primary endpoint also emulates the IGC FLARM passthrough used for
+XCSoar task declarations and recorded-flight readout: `PFLAC` declaration/config
+commands are acknowledged and stored, while `$PFLAX` switches that connection to
+the FLARM binary logger protocol. Logger records are loaded from sibling
+`../kigo_nav/logs/*.igc` files when present; otherwise the simulator falls back
+to packaged sample flights in
+`kigo_xcvario_simulator/examples/igc_logs`.
+During `circling_left`/`circling_right`, `$PXCV` also includes synthetic AHRS
+roll angle in the XCVario roll field. The bank magnitude varies smoothly between
+`35` and `50` degrees; left turns are emitted as negative roll and right turns
+as positive roll.
 
 The `SxHAWK` telemetry stream follows the LXNAV/LX protocol parsed by the
 `LX`/LXNAV driver in `kigo_nav`: `GPRMC`, `GPGGA`, `LXWP0`, `LXWP1`, `LXWP2`

@@ -4,6 +4,20 @@ import time
 import unittest
 
 from kigo_xcvario_simulator.contracts import OwnshipState, SimulationSnapshot, WindState
+from kigo_xcvario_simulator.flarm_passthrough import (
+    MESSAGE_ACK,
+    MESSAGE_GET_IGC_DATA,
+    MESSAGE_GET_RECORD_INFO,
+    MESSAGE_NACK,
+    MESSAGE_PING,
+    MESSAGE_SELECT_RECORD,
+    FlarmPassthroughConnectionState,
+    FlarmPassthroughSimulator,
+    FlarmRecordedFlight,
+    _build_frame,
+    _pop_frame,
+)
+from kigo_xcvario_simulator.nmea import build_nmea_sentence
 from kigo_xcvario_simulator.nmea import nmea_checksum
 from kigo_xcvario_simulator.state import FlightPhase, HealthState, RuntimeState
 from kigo_xcvario_simulator.xcvario_adapter import XcvarioTcpAdapter
@@ -261,6 +275,34 @@ class XcvarioAdapterTests(unittest.TestCase):
 
         self.assertEqual(gga_altitudes[:2], [403.0, 405.0])
 
+    def test_circling_output_includes_smooth_ahrs_roll_angle(self):
+        adapter = XcvarioTcpAdapter(
+            bind_host="127.0.0.1",
+            port=0,
+            polar=get_xcvario_polar("DG 800B/15"),
+            gps_every_baro_frames=1,
+        )
+        adapter.start()
+        self.addCleanup(adapter.stop)
+
+        client = socket.create_connection(("127.0.0.1", adapter.bound_port), timeout=1.0)
+        self.addCleanup(client.close)
+        time.sleep(0.05)
+        circling_ownship = replace(_snapshot().ownship, phase=FlightPhase.CIRCLING_LEFT)
+
+        for sim_time_s in (0.0, 2.0, 4.0, 6.0):
+            adapter.publish_snapshot(replace(_snapshot(), ownship=circling_ownship, sim_time_s=sim_time_s))
+        payload = _recv_until(client, "$PXCV,", expected_count=4)
+        roll_angles = _pxcv_roll_angles(payload)
+
+        self.assertEqual(roll_angles, [-42.5, -50.0, -42.5, -35.0])
+        self.assertTrue(all(35.0 <= abs(roll_angle) <= 50.0 for roll_angle in roll_angles))
+
+        right_payload_snapshot = replace(_snapshot(), ownship=replace(circling_ownship, phase=FlightPhase.CIRCLING_RIGHT))
+        adapter.publish_snapshot(replace(right_payload_snapshot, sim_time_s=6.0))
+        right_payload = _recv_until(client, "$PXCV,", expected_count=1)
+        self.assertEqual(_pxcv_roll_angles(right_payload), [35.0])
+
     def test_position_and_baro_sentences_follow_xcvario_capture_cadence(self):
         adapter = XcvarioTcpAdapter(
             bind_host="127.0.0.1",
@@ -312,6 +354,95 @@ class XcvarioAdapterTests(unittest.TestCase):
 
         self.assertEqual(connect_count, 2)
 
+    def test_flarm_declaration_commands_are_accepted_on_xcvario_link(self):
+        adapter = XcvarioTcpAdapter(bind_host="127.0.0.1", port=0, polar=get_xcvario_polar("DG 800B/15"))
+        adapter.start()
+        self.addCleanup(adapter.stop)
+
+        client = socket.create_connection(("127.0.0.1", adapter.bound_port), timeout=1.0)
+        self.addCleanup(client.close)
+        time.sleep(0.05)
+
+        _send_nmea(client, "PFLAC,S,PILOT,SLAWEK")
+        _send_nmea(client, "PFLAC,S,GLIDERID,SP-001")
+        _send_nmea(client, "PFLAC,S,NEWTASK,Task")
+        _send_nmea(client, "PFLAC,S,ADDWP,0000000N,00000000E,T")
+        _send_nmea(client, "PFLAC,S,ADDWP,4983000N,01900202E,START")
+
+        payload = _recv_until(client, "$PFLAC,A,", expected_count=5)
+        declaration = adapter.flarm_declaration
+
+        self.assertIn("$PFLAC,A,PILOT,SLAWEK*", payload)
+        self.assertIn("$PFLAC,A,ADDWP,4983000N,01900202E,START*", payload)
+        self.assertEqual(declaration["pilot"], "SLAWEK")
+        self.assertEqual(declaration["aircraft_registration"], "SP-001")
+        self.assertEqual(declaration["task_name"], "Task")
+        self.assertEqual(
+            declaration["waypoints"],
+            ("0000000N,00000000E,T", "4983000N,01900202E,START"),
+        )
+
+    def test_flarm_binary_logger_readout_is_accepted_on_xcvario_link(self):
+        flarm_passthrough = FlarmPassthroughSimulator(
+            records=(
+                FlarmRecordedFlight(
+                    record_info="2026-05-08|12:00:00|00:15:00|SIM PILOT|SIM|Club",
+                    igc_text=(
+                        "AFLXSIMKIGO XCVario Simulator\r\n"
+                        "HFDTE080526\r\n"
+                        "HFPLTPILOTINCHARGE:SIM PILOT\r\n"
+                        "B1200004983000N01900202EA0040100401\r\n"
+                        "B1201004983100N01900500EA0045000450\r\n"
+                    ),
+                    source_name="synthetic-test.igc",
+                ),
+            )
+        )
+        adapter = XcvarioTcpAdapter(
+            bind_host="127.0.0.1",
+            port=0,
+            polar=get_xcvario_polar("DG 800B/15"),
+            flarm_passthrough=flarm_passthrough,
+        )
+        adapter.start()
+        self.addCleanup(adapter.stop)
+
+        client = socket.create_connection(("127.0.0.1", adapter.bound_port), timeout=1.0)
+        self.addCleanup(client.close)
+        time.sleep(0.05)
+
+        _send_nmea(client, "PFLAX")
+        request_state = FlarmPassthroughConnectionState()
+
+        ping = _binary_request(MESSAGE_PING, request_state)
+        client.sendall(ping)
+        ping_response = _recv_binary_frame(client)
+        self.assertEqual(ping_response[0], MESSAGE_ACK)
+        self.assertEqual(int.from_bytes(ping_response[2][:2], "little"), 0)
+
+        client.sendall(_binary_request(MESSAGE_SELECT_RECORD, request_state, b"\x00"))
+        select_response = _recv_binary_frame(client)
+        self.assertEqual(select_response[0], MESSAGE_ACK)
+
+        client.sendall(_binary_request(MESSAGE_GET_RECORD_INFO, request_state))
+        info_response = _recv_binary_frame(client)
+        self.assertEqual(info_response[0], MESSAGE_ACK)
+        self.assertIn(b"2026-05-08|12:00:00|00:15:00", info_response[2])
+
+        client.sendall(_binary_request(MESSAGE_SELECT_RECORD, request_state, b"\x01"))
+        end_of_list_response = _recv_binary_frame(client)
+        self.assertEqual(end_of_list_response[0], MESSAGE_NACK)
+
+        client.sendall(_binary_request(MESSAGE_SELECT_RECORD, request_state, b"\x00"))
+        self.assertEqual(_recv_binary_frame(client)[0], MESSAGE_ACK)
+
+        client.sendall(_binary_request(MESSAGE_GET_IGC_DATA, request_state))
+        igc_response = _recv_binary_frame(client)
+        self.assertEqual(igc_response[0], MESSAGE_ACK)
+        self.assertEqual(igc_response[2][2], 100)
+        self.assertIn(b"AFLXSIMKIGO XCVario Simulator", igc_response[2])
+        self.assertTrue(igc_response[2].endswith(b"\x1a"))
+
 
 def _recv_until(client: socket.socket, needle: str, *, expected_count: int) -> str:
     client.settimeout(1.0)
@@ -339,6 +470,35 @@ def _gprmc_fields(payload: str) -> list[str]:
         if line.startswith("$GPRMC,"):
             return line.split(",")
     raise AssertionError("GPRMC sentence not found.")
+
+
+def _pxcv_roll_angles(payload: str) -> list[float]:
+    return [
+        float(line.split(",")[10])
+        for line in payload.splitlines()
+        if line.startswith("$PXCV,") and line.split(",")[10]
+    ]
+
+
+def _send_nmea(client: socket.socket, body: str) -> None:
+    client.sendall(build_nmea_sentence(body).encode("ascii"))
+
+
+def _binary_request(message_type: int, state: FlarmPassthroughConnectionState, payload: bytes = b"") -> bytes:
+    return _build_frame(message_type, payload, state)
+
+
+def _recv_binary_frame(client: socket.socket) -> tuple[int, int, bytes]:
+    client.settimeout(1.0)
+    buffer = bytearray()
+    while True:
+        chunk = client.recv(8192)
+        if not chunk:
+            raise AssertionError("binary frame not found before connection closed")
+        buffer.extend(chunk)
+        frame = _pop_frame(buffer)
+        if frame is not None:
+            return frame
 
 
 if __name__ == "__main__":

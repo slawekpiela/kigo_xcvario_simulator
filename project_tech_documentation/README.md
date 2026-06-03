@@ -15,7 +15,38 @@ _To be filled as durable knowledge is discovered._
 
 ## Architecture And Data Flow
 
-_To be filled as durable knowledge is discovered._
+- Wind handling for ownship is split by vector type. `ScenarioOrchestrator.tick()` passes the current
+  `WindState` into `FlightModel.step()`, and the flight model advances latitude/longitude with the
+  wind-adjusted ground vector while keeping `OwnshipState.speed_kmh` and `track_deg` as the air
+  vector/heading used by vario/heading sentences.
+- XCVario/SxHAWK GPS output then derives `$GPRMC` speed/course over ground by applying the same
+  true-wind vector to the ownship air vector, while `$GPGGA` carries the already wind-drifted
+  position and `$HCHDM`/`$LXWP0` keep the air heading/airspeed-style values.
+- The XCVario adapter exposes airspeed to `kigo_nav` indirectly through dynamic pressure, not as an
+  explicit `$POV,S,<tas>` field. `xcvario_adapter.publish_snapshot()` computes dynamic pressure from
+  `OwnshipState.speed_kmh`; `nmea.build_pxcv()` and `nmea.build_pov()` emit it as `Q`. During the
+  initial `glider_launch` `ground_hold` segment, `presets.build_glider_launch_sequence()` sets
+  `target_speed_kmh=0.0` and `on_ground=True`, so the emitted dynamic pressure is `Q,0.0`; later
+  acceleration/climb segments emit positive `Q` as `speed_kmh` rises. If manual `glider_launch`
+  keeps `speed_kmh=0.0`, the model can leave `on_ground` while airspeed remains zero; GPS output may
+  then show wind-drift ground speed while air-data remains `Q,0.0`. Consumers expecting explicit
+  `$POV,S` will not receive it from this simulator unless `build_pov()` is extended.
+- Task declaration and recorded-flight readout through the `XCvario` endpoint are modeled as an
+  IGC FLARM passthrough, not as native XCVario driver features. XCSoar's XCVario driver handles
+  XCVario settings (`!g,...`, `!xcs/!xcv`), while XCSoar's FLARM driver owns declaration/logger
+  flows. `xcvario_adapter.XcvarioTcpAdapter` therefore delegates incoming `PFLAC` text commands and
+  `$PFLAX` binary logger frames to `flarm_passthrough.FlarmPassthroughSimulator`; ordinary
+  `$PXCV`/`$POV`/GPS/wind telemetry continues on the same TCP stream. The passthrough stores the
+  latest declaration fields/waypoints. Logger records are loaded from sibling `../kigo_nav/logs/*.igc`
+  when present; because that directory may be empty in a clean checkout, packaged fixtures live in
+  `kigo_xcvario_simulator/examples/igc_logs` and are included through `pyproject.toml` package data.
+  `FlarmPassthroughSimulator` derives FLARM record-list info from `HFDTE` and first/last `B` records,
+  including filename, date, start time, duration, pilot, competition ID and class.
+- `$PXCV` supports XCVario AHRS fields after dynamic pressure. `nmea.build_pxcv()` accepts an
+  optional `roll_angle_deg`; `xcvario_adapter.publish_snapshot()` fills it only while the ownship
+  phase is `circling_left` or `circling_right`. The simulated circling bank magnitude follows a
+  smooth sinusoid between `35` and `50` degrees over an `8 s` period, with negative roll for left
+  turns and positive roll for right turns. Pitch and acceleration fields remain empty.
 
 ## Build, Run, And Test Notes
 
@@ -27,7 +58,10 @@ _To be filled as durable knowledge is discovered._
 
 ## Debugging Notes And Gotchas
 
-_To be filled as durable knowledge is discovered._
+- A circling ground trace with wind should drift from the first simulated tick; the simulator does
+  not store or redraw historical trail points. If a displayed old trail immediately changes shape
+  after updating wind, suspect the consumer's trail rendering/wind-drift compensation rather than
+  historical position output from this simulator.
 
 ## Decisions And Assumptions
 
@@ -36,3 +70,10 @@ _To be filled as durable knowledge is discovered._
 ## Change Log Of Documentation Updates
 
 - 2026-05-29: Created project documentation discipline and initial technical memory file.
+- 2026-05-29: Documented ownship wind-vector flow and the circling-trail diagnostic gotcha.
+- 2026-06-01: Documented XCVario airspeed output as dynamic-pressure `Q` rather than explicit
+  `$POV,S`, including zero-speed `glider_launch` ground-hold / wind-drift behavior.
+- 2026-06-03: Documented XCvario-to-IGC-FLARM passthrough support for declaration and synthetic
+  recorded-flight download.
+- 2026-06-03: Documented synthetic XCVario AHRS roll output during circling.
+- 2026-06-03: Documented IGC logger sample loading from `../kigo_nav/logs` with packaged fixture fallback.

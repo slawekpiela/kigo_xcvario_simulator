@@ -163,6 +163,11 @@ class SimulatorRuntimeSession:
                     "client_connections": tuple(getattr(self.xcvario_adapter, "client_connections", ())),
                     "polar_name": self.runtime_config.xcvario.polar_name,
                     "active": primary_device == "xcvario",
+                    "flarm_passthrough": {
+                        "record_count": int(getattr(self.xcvario_adapter, "flarm_record_count", 0)),
+                        "record_names": tuple(getattr(self.xcvario_adapter, "flarm_record_names", ())),
+                        "declaration": getattr(self.xcvario_adapter, "flarm_declaration", {}),
+                    },
                 },
                 "sxhawk": {
                     "bound_port": getattr(self.sxhawk_adapter, "bound_port", self.runtime_config.xcvario.port),

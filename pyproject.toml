@@ -21,5 +21,7 @@ include = ["kigo_xcvario_simulator*"]
 kigo_xcvario_simulator = [
   "examples/*.json",
   "examples/*.txt",
+  "examples/igc_logs/*.igc",
+  "examples/igc_logs/*.md",
   "panel/frontend/*",
 ]

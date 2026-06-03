@@ -95,10 +95,12 @@ def build_pxcv(
     ballast_overload_factor: float = 1.0,
     flight_mode: int | None = None,
     dynamic_pressure_pa: float | None = None,
+    roll_angle_deg: float | None = None,
     valid_temperature: bool = True,
 ) -> str:
     resolved_flight_mode = _xcvario_flight_mode(ownship) if flight_mode is None else int(flight_mode)
     resolved_oat_c = float(oat_c) if valid_temperature else 0.0
+    resolved_roll_angle_deg = _optional_finite_float(roll_angle_deg)
     resolved_dynamic_pressure_pa = (
         dynamic_pressure_pa_for_speed(
             static_pressure_hpa=ownship.static_pressure_hpa,
@@ -120,7 +122,7 @@ def build_pxcv(
             f"{ownship.device_qnh_hpa:.1f}",
             f"{ownship.static_pressure_hpa:.1f}",
             f"{resolved_dynamic_pressure_pa:.1f}",
-            "",
+            "" if resolved_roll_angle_deg is None else f"{resolved_roll_angle_deg:.1f}",
             "",
             "",
             "",
@@ -347,6 +349,15 @@ def dynamic_pressure_pa_for_speed(*, static_pressure_hpa: float, speed_kmh: floa
     density_kg_m3 = static_pressure_pa / (DRY_AIR_GAS_CONSTANT_J_PER_KG_K * temperature_k)
     speed_ms = max(0.0, float(speed_kmh)) / 3.6
     return 0.5 * density_kg_m3 * speed_ms * speed_ms
+
+
+def _optional_finite_float(value: float | None) -> float | None:
+    if value is None:
+        return None
+    resolved_value = float(value)
+    if not math.isfinite(resolved_value):
+        return None
+    return resolved_value
 
 
 def _xcvario_flight_mode(ownship: OwnshipState) -> int:

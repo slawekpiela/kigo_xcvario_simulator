@@ -86,6 +86,12 @@ class NmeaBuilderTests(unittest.TestCase):
 
         self.assertIn(",0,1.000,1,18.0,", sentence)
 
+    def test_pxcv_builder_can_include_ahrs_roll_angle(self):
+        sentence = build_pxcv(_ownship(), roll_angle_deg=42.3)
+        body = "PXCV,2.4,0.00,0,1.000,0,18.0,1019.8,965.4,361.0,42.3,,,,"
+
+        self.assertEqual(sentence, f"${body}*{nmea_checksum(body):02X}\r\n")
+
     def test_pov_builder_matches_openvario_layout_and_remains_parser_compatible(self):
         sentence = build_pov(_ownship())
         body = "POV,P,965.4,Q,361.0,E,2.4,T,18.0"
