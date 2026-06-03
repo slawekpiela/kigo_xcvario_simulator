@@ -4,6 +4,7 @@ import unittest
 
 from kigo_xcvario_simulator.contracts import OwnshipState, SimulationSnapshot, TrafficContact
 from kigo_xcvario_simulator.flarm_adapter import FlarmTcpAdapter
+from kigo_xcvario_simulator.nmea import build_nmea_sentence
 from kigo_xcvario_simulator.state import FlightPhase, HealthState, RuntimeState
 
 
@@ -90,6 +91,51 @@ class FlarmAdapterTests(unittest.TestCase):
         self.assertIn("$PFLAA,", first_payload)
         self.assertIn("$PFLAU,", second_payload)
         self.assertIn("$PFLAA,", second_payload)
+
+    def test_flarm_declaration_commands_are_accepted_on_flarm_link(self):
+        adapter = FlarmTcpAdapter(bind_host="127.0.0.1", port=0)
+        adapter.start()
+        self.addCleanup(adapter.stop)
+
+        client = socket.create_connection(("127.0.0.1", adapter.bound_port), timeout=1.0)
+        self.addCleanup(client.close)
+        time.sleep(0.05)
+
+        _send_nmea(client, "PFLAC,S,PILOT,SLAWEK")
+        _send_nmea(client, "PFLAC,S,GLIDERID,SP-001")
+        _send_nmea(client, "PFLAC,S,NEWTASK,Task")
+        _send_nmea(client, "PFLAC,S,ADDWP,0000000N,00000000E,T")
+        _send_nmea(client, "PFLAC,S,ADDWP,4983000N,01900202E,START")
+
+        payload = _recv_until(client, "$PFLAC,A,", expected_count=5)
+        declaration = adapter.flarm_declaration
+
+        self.assertIn("$PFLAC,A,PILOT,SLAWEK*", payload)
+        self.assertIn("$PFLAC,A,ADDWP,4983000N,01900202E,START*", payload)
+        self.assertEqual(declaration["pilot"], "SLAWEK")
+        self.assertEqual(declaration["aircraft_registration"], "SP-001")
+        self.assertEqual(declaration["task_name"], "Task")
+        self.assertEqual(
+            declaration["waypoints"],
+            ("0000000N,00000000E,T", "4983000N,01900202E,START"),
+        )
+
+
+def _send_nmea(client: socket.socket, body: str) -> None:
+    client.sendall(build_nmea_sentence(body).encode("ascii"))
+
+
+def _recv_until(client: socket.socket, needle: str, *, expected_count: int) -> str:
+    client.settimeout(1.0)
+    chunks = []
+    payload = ""
+    while payload.count(needle) < expected_count:
+        chunk = client.recv(8192).decode("ascii")
+        if not chunk:
+            break
+        chunks.append(chunk)
+        payload = "".join(chunks)
+    return payload
 
 
 if __name__ == "__main__":

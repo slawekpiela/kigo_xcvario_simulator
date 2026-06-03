@@ -61,12 +61,12 @@ Device QNH and device barometric altitude can be adjusted from the panel.  A
 QNH change is emitted in the primary-device protocol, while an altitude change
 is converted to the matching QNH for the current static pressure and then
 emitted the same way.
-The `XCvario` primary endpoint also emulates the IGC FLARM passthrough used for
-XCSoar task declarations and recorded-flight readout: `PFLAC` declaration/config
-commands are acknowledged and stored, while `$PFLAX` switches that connection to
-the FLARM binary logger protocol. Logger records are loaded from sibling
-`../kigo_nav/logs/*.igc` files when present; otherwise the simulator falls back
-to packaged sample flights in
+Both the `XCvario` primary endpoint and the separate `FLARM` endpoint emulate
+the IGC FLARM declaration/logger protocol used by XCSoar: `PFLAC`
+declaration/config commands are acknowledged and stored, while `$PFLAX` switches
+that connection to the FLARM binary logger protocol. Logger records are loaded
+from sibling `../kigo_nav/logs/*.igc` files when present; otherwise the
+simulator falls back to packaged sample flights in
 `kigo_xcvario_simulator/examples/igc_logs`.
 During `circling_left`/`circling_right`, `$PXCV` also includes synthetic AHRS
 roll angle in the XCVario roll field. The bank magnitude varies smoothly between

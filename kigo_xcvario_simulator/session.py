@@ -182,6 +182,11 @@ class SimulatorRuntimeSession:
                     "client_connected": bool(getattr(self.flarm_adapter, "client_connected", False)),
                     "client_count": int(getattr(self.flarm_adapter, "client_count", 0)),
                     "client_connections": tuple(getattr(self.flarm_adapter, "client_connections", ())),
+                    "flarm_passthrough": {
+                        "record_count": int(getattr(self.flarm_adapter, "flarm_record_count", 0)),
+                        "record_names": tuple(getattr(self.flarm_adapter, "flarm_record_names", ())),
+                        "declaration": getattr(self.flarm_adapter, "flarm_declaration", {}),
+                    },
                 },
             },
         }

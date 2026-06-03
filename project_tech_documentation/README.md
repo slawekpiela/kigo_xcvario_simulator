@@ -31,12 +31,12 @@ _To be filled as durable knowledge is discovered._
   keeps `speed_kmh=0.0`, the model can leave `on_ground` while airspeed remains zero; GPS output may
   then show wind-drift ground speed while air-data remains `Q,0.0`. Consumers expecting explicit
   `$POV,S` will not receive it from this simulator unless `build_pov()` is extended.
-- Task declaration and recorded-flight readout through the `XCvario` endpoint are modeled as an
-  IGC FLARM passthrough, not as native XCVario driver features. XCSoar's XCVario driver handles
-  XCVario settings (`!g,...`, `!xcs/!xcv`), while XCSoar's FLARM driver owns declaration/logger
-  flows. `xcvario_adapter.XcvarioTcpAdapter` therefore delegates incoming `PFLAC` text commands and
-  `$PFLAX` binary logger frames to `flarm_passthrough.FlarmPassthroughSimulator`; ordinary
-  `$PXCV`/`$POV`/GPS/wind telemetry continues on the same TCP stream. The passthrough stores the
+- Task declaration and recorded-flight readout are modeled with
+  `flarm_passthrough.FlarmPassthroughSimulator`. Both `xcvario_adapter.XcvarioTcpAdapter` and
+  `flarm_adapter.FlarmTcpAdapter` delegate incoming `PFLAC` text commands and `$PFLAX` binary logger
+  frames to it, so declarations work whether the client targets the XCVario passthrough endpoint or
+  the separate FLARM endpoint. Ordinary `$PXCV`/`$POV`/GPS/wind telemetry continues on the XCVario
+  stream, and traffic `$PFLAU`/`$PFLAA` continues on the FLARM stream. The passthrough stores the
   latest declaration fields/waypoints. Logger records are loaded from sibling `../kigo_nav/logs/*.igc`
   when present; because that directory may be empty in a clean checkout, packaged fixtures live in
   `kigo_xcvario_simulator/examples/igc_logs` and are included through `pyproject.toml` package data.
@@ -77,3 +77,4 @@ _To be filled as durable knowledge is discovered._
   recorded-flight download.
 - 2026-06-03: Documented synthetic XCVario AHRS roll output during circling.
 - 2026-06-03: Documented IGC logger sample loading from `../kigo_nav/logs` with packaged fixture fallback.
+- 2026-06-03: Documented direct FLARM endpoint declaration/logger support in addition to XCVario passthrough.
