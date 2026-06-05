@@ -37,7 +37,7 @@ class FlightModelTests(unittest.TestCase):
         self.assertFalse(next_state.on_ground)
         self.assertEqual(next_state.phase, FlightPhase.STRAIGHT)
 
-    def test_straight_uses_configured_altitude_for_gps_and_baro_output(self):
+    def test_straight_ramps_to_configured_altitude_for_gps_and_baro_output(self):
         directive = FlightDirective(
             segment_id="straight_leg",
             phase=FlightPhase.STRAIGHT,
@@ -47,31 +47,49 @@ class FlightModelTests(unittest.TestCase):
             baro_altitude_m=850.0,
         )
 
+        preview = self.model.preview_directive(self.initial_state, directive)
         next_state = self.model.step(self.initial_state, directive, 1.0)
+        reached = self.model.step(next_state, directive, 300.0)
+        settled = self.model.step(reached, directive, 1.0)
 
-        self.assertAlmostEqual(next_state.gps_altitude_m, 850.0, places=4)
-        self.assertAlmostEqual(next_state.vertical_speed_ms, 0.0, places=4)
+        self.assertAlmostEqual(preview.gps_altitude_m, 401.0, places=4)
+        self.assertAlmostEqual(preview.vertical_speed_ms, 2.0, places=4)
+        self.assertAlmostEqual(next_state.gps_altitude_m, 403.0, places=4)
+        self.assertAlmostEqual(next_state.vertical_speed_ms, 2.0, places=4)
         self.assertAlmostEqual(
             next_state.static_pressure_hpa,
+            static_pressure_hpa_for_altitude(403.0, qnh_hpa=1013.25),
+            places=6,
+        )
+        self.assertAlmostEqual(reached.gps_altitude_m, 850.0, places=4)
+        self.assertAlmostEqual(settled.gps_altitude_m, 850.0, places=4)
+        self.assertAlmostEqual(settled.vertical_speed_ms, 0.0, places=4)
+        self.assertAlmostEqual(
+            settled.static_pressure_hpa,
             static_pressure_hpa_for_altitude(850.0, qnh_hpa=1013.25),
             places=6,
         )
 
-    def test_straight_climb_range_varies_smoothly_from_configured_altitude(self):
+    def test_straight_climb_range_ramps_to_configured_altitude_before_varying(self):
         directive = FlightDirective(
             segment_id="straight_leg",
             phase=FlightPhase.STRAIGHT,
             duration_s=20.0,
             target_heading_deg=90.0,
             target_speed_kmh=90.0,
-            baro_altitude_m=850.0,
+            baro_altitude_m=407.0,
             climb_min_ms=-1.0,
             climb_max_ms=3.0,
         )
 
         state = self.model.preview_directive(self.initial_state, directive)
 
-        self.assertAlmostEqual(state.gps_altitude_m, 850.0, places=4)
+        self.assertAlmostEqual(state.gps_altitude_m, 401.0, places=4)
+        self.assertAlmostEqual(state.vertical_speed_ms, 3.0, places=4)
+        for _ in range(20):
+            state = self.model.step(state, directive, 0.1)
+        self.assertAlmostEqual(state.gps_altitude_m, 407.0, places=4)
+
         samples = []
         altitudes = []
         for _ in range(100):
@@ -85,8 +103,8 @@ class FlightModelTests(unittest.TestCase):
         self.assertAlmostEqual(samples[48], 3.0, places=6)
         self.assertAlmostEqual(samples[96], -1.0, places=6)
         self.assertLess(max(deltas), 0.14)
-        self.assertLess(min(altitudes), 850.0)
-        self.assertGreater(max(altitudes), 850.0)
+        self.assertLess(min(altitudes), 407.0)
+        self.assertGreater(max(altitudes), 407.0)
 
     def test_baro_altitude_is_ignored_outside_straight_mode(self):
         directive = FlightDirective(

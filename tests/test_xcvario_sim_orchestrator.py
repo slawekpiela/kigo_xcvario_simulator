@@ -96,7 +96,7 @@ class ScenarioOrchestratorTests(unittest.TestCase):
         self.assertAlmostEqual(samples[48], 110.0, places=6)
         self.assertAlmostEqual(samples[96], 90.0, places=6)
 
-    def test_manual_straight_uses_configured_altitude_for_gps_and_pressure(self):
+    def test_manual_straight_ramps_to_configured_altitude_for_gps_and_pressure(self):
         immediate = self.orchestrator.set_manual_mode(
             ManualModeInput(
                 phase=FlightPhase.STRAIGHT,
@@ -112,12 +112,13 @@ class ScenarioOrchestratorTests(unittest.TestCase):
         self.assertEqual(immediate.ownship.phase, FlightPhase.STRAIGHT)
         self.assertAlmostEqual(immediate.ownship.track_deg, 90.0, places=6)
         self.assertAlmostEqual(immediate.ownship.speed_kmh, 100.0, places=6)
-        self.assertAlmostEqual(immediate.ownship.gps_altitude_m, 900.0, places=6)
-        self.assertAlmostEqual(snapshot.ownship.gps_altitude_m, 900.0, places=6)
-        self.assertAlmostEqual(snapshot.ownship.vertical_speed_ms, 0.0, places=6)
+        self.assertAlmostEqual(immediate.ownship.gps_altitude_m, 401.0, places=6)
+        self.assertAlmostEqual(immediate.ownship.vertical_speed_ms, 2.0, places=6)
+        self.assertAlmostEqual(snapshot.ownship.gps_altitude_m, 403.0, places=6)
+        self.assertAlmostEqual(snapshot.ownship.vertical_speed_ms, 2.0, places=6)
         self.assertAlmostEqual(
             snapshot.ownship.static_pressure_hpa,
-            static_pressure_hpa_for_altitude(900.0, qnh_hpa=_runtime_config().device_qnh_hpa),
+            static_pressure_hpa_for_altitude(403.0, qnh_hpa=_runtime_config().device_qnh_hpa),
             places=6,
         )
 

@@ -51,13 +51,13 @@ _To be filled as durable knowledge is discovered._
   phase is `circling_left` or `circling_right`. The simulated circling bank magnitude follows a
   smooth sinusoid between `35` and `50` degrees over an `8 s` period, with negative roll for left
   turns and positive roll for right turns. Pitch and acceleration fields remain empty.
-- Manual `straight` mode has two altitude behaviors. Without `climb_min_ms`/`climb_max_ms`, a
-  `FlightDirective.baro_altitude_m` pins GPS altitude and static pressure to the requested manual
-  altitude on every tick. When a climb range is present, `baro_altitude_m` is only the starting
-  altitude applied when the directive first becomes active; subsequent ticks update GPS altitude and
-  pressure from a smooth oscillating vertical speed between the configured climb min/max. The panel
-  sends the visible `Climb Min [m/s]` and `Climb Max [m/s]` fields for `straight`,
-  `circling_left`, and `circling_right`.
+- Manual `straight` mode treats `FlightDirective.baro_altitude_m` as a smooth target altitude, not
+  an immediate GPS/baro pin. The flight model ramps from the current altitude to that target,
+  clamped to home altitude, using the configured climb/sink side of `climb_min_ms`/`climb_max_ms`
+  when available or `2.0 m/s` as the fallback. After the target is reached, no climb range means
+  level flight at the target; a climb range resumes the smooth oscillating vertical speed between
+  the configured climb min/max. The panel sends the visible `Climb Min [m/s]` and
+  `Climb Max [m/s]` fields for `straight`, `circling_left`, and `circling_right`.
 
 ## Build, Run, And Test Notes
 
@@ -130,3 +130,5 @@ _To be filled as durable knowledge is discovered._
 - 2026-06-05: Documented LAN-mode panel default runtime URL behavior for stale VM runtime URLs.
 - 2026-06-05: Documented that panel Connect depends on an already-running runtime API and that the
   VM runtime now uses an enabled persistent user-systemd service instead of a transient unit.
+- 2026-06-05: Documented smooth manual `straight` altitude-target ramping instead of immediate
+  GPS/baro altitude jumps.
