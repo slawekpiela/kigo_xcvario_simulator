@@ -57,6 +57,9 @@ Wind is emitted on the same `XCvario` stream as `$WIMWV,<direction>,T,<speed>,K,
 matching the real device output for true wind in `km/h`.
 OAT defaults to `18.0 deg C` and is emitted in the `PXCV` and `POV` pressure
 sentences used by `kigo_nav`.
+The `XCvario` stream also emits `LXWP0` with the current vario value as a
+compatibility fallback for `kigo_nav` profiles that accidentally keep the `LX`
+driver on the primary port.
 Device QNH and device barometric altitude can be adjusted from the panel.  A
 QNH change is emitted in the primary-device protocol, while an altitude change
 is converted to the matching QNH for the current static pressure and then

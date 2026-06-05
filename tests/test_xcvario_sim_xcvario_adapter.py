@@ -81,6 +81,7 @@ class XcvarioAdapterTests(unittest.TestCase):
         self.assertIn("$PXCV,2.4,0.00,0,1.000,0,18.0,1019.8,965.4,361.0", payload)
         self.assertIn("$POV,P,965.4,Q,361.0,E,2.4,T,18.0*", payload)
         self.assertIn("$WIMWV,270.0,T,25.5,K,A*", payload)
+        self.assertIn("$LXWP0,Y,90.0,401.0,2.35", payload)
         self.assertEqual(received_qnh, [999.0])
         self.assertEqual(received_altitudes, [875.0])
 
@@ -324,6 +325,7 @@ class XcvarioAdapterTests(unittest.TestCase):
         self.assertEqual(payload.count("$PXCV,"), 5)
         self.assertEqual(payload.count("$POV,"), 5)
         self.assertEqual(payload.count("$WIMWV,"), 5)
+        self.assertEqual(payload.count("$LXWP0,"), 5)
         self.assertEqual(payload.count("$GPRMC,"), 3)
         self.assertEqual(payload.count("$GPGGA,"), 3)
 

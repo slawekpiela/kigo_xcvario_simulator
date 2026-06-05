@@ -12,7 +12,16 @@ from .contracts import OwnshipState, SimulationSnapshot, WindState
 from .baro import qnh_hpa_for_static_pressure, static_pressure_hpa_for_altitude
 from .flarm_passthrough import FlarmPassthroughSimulator
 from .flight_math import ground_velocity_from_true_wind
-from .nmea import build_gpgga, build_gprmc, build_hchdm, build_pov, build_pxcv, build_wimwv, dynamic_pressure_pa_for_speed
+from .nmea import (
+    build_gpgga,
+    build_gprmc,
+    build_hchdm,
+    build_lxwp0,
+    build_pov,
+    build_pxcv,
+    build_wimwv,
+    dynamic_pressure_pa_for_speed,
+)
 from .state import FlightPhase
 from .xcvario_polar import XcvarioPolar
 
@@ -185,6 +194,7 @@ class XcvarioTcpAdapter:
             )
         )
         payload_parts.append(build_wimwv(snapshot.wind))
+        payload_parts.append(build_lxwp0(snapshot.ownship, snapshot.wind))
         payload = "".join(payload_parts).encode("ascii")
         self._send(payload)
 

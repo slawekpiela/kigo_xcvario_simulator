@@ -31,6 +31,10 @@ _To be filled as durable knowledge is discovered._
   keeps `speed_kmh=0.0`, the model can leave `on_ground` while airspeed remains zero; GPS output may
   then show wind-drift ground speed while air-data remains `Q,0.0`. Consumers expecting explicit
   `$POV,S` will not receive it from this simulator unless `build_pov()` is extended.
+- `XcvarioTcpAdapter.publish_snapshot()` emits `$LXWP0` on the XCVario primary stream in addition to
+  `$PXCV`/`$POV`/`$WIMWV`. The XCVario driver in `kigo_nav` ignores `LXWP0`, but the LX driver reads
+  its vario field with `ProvideTotalEnergyVario()`. This keeps the `Vario` navbox alive when a
+  profile accidentally uses `DeviceA="LX"` against the XCvario endpoint.
 - Task declaration and recorded-flight readout are modeled with
   `flarm_passthrough.FlarmPassthroughSimulator`. Both `xcvario_adapter.XcvarioTcpAdapter` and
   `flarm_adapter.FlarmTcpAdapter` delegate incoming `PFLAC` text commands and `$PFLAX` binary logger
@@ -86,3 +90,4 @@ _To be filled as durable knowledge is discovered._
 - 2026-06-03: Documented IGC logger sample loading from `../kigo_nav/logs` with packaged fixture fallback.
 - 2026-06-03: Documented direct FLARM endpoint declaration/logger support in addition to XCVario passthrough.
 - 2026-06-03: Documented manual straight-mode climb/sink behavior using frontend climb min/max.
+- 2026-06-04: Documented XCVario-stream `LXWP0` compatibility fallback for `kigo_nav` vario navbox.
