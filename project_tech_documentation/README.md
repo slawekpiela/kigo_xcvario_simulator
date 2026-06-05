@@ -61,7 +61,29 @@ _To be filled as durable knowledge is discovered._
 
 ## Build, Run, And Test Notes
 
-_To be filled as durable knowledge is discovered._
+- The simulator panel is operator UI only; bridge actions are posted to the selected runtime API
+  (`/api/v1/bridges/*`) and execute from that runtime host. With the default panel URL
+  `http://172.16.119.135:8181`, bridge SSH and `systemd-run --user` happen on the VM, not on the
+  Mac browser host. The Pi bridge default target is `admin@192.168.0.114`, identity
+  `/home/slawek/.ssh/kigo_pi`, workdir `/home/admin/kigo_xcvario_simulator`, and it uses a reverse
+  SSH tunnel from the runtime host to Pi for ports `4353` and `4354`.
+- As of 2026-06-04, the active lab Pi address is `admin@192.168.0.106`; override stale panel/API
+  bridge targets that still point at `admin@192.168.0.114`.
+- The VM runtime is installed as an enabled user-systemd service at
+  `/home/slawek/.config/systemd/user/kigo-xcvario-runtime.service`, running
+  `/usr/bin/python3 -m kigo_xcvario_simulator.start_remote_runtime --config /home/slawek/kigo_xcvario_simulator/runtime.local.json`
+  from `/home/slawek/kigo_xcvario_simulator`. `Connect` in the panel can restart/start bridges only
+  after this runtime API is already reachable; it cannot bootstrap the runtime if the VM has no
+  `kigo-xcvario-runtime.service`. Do not rely on `/tmp/runtime.local.json` after VM restarts; it may
+  be missing and will put the service into an autorestart failure loop.
+- For iPhone access on the local LAN, serve the panel on the Mac with `--host 0.0.0.0` and use the
+  Mac LAN address, e.g. `http://192.168.0.107:8180/`. Because the iPhone cannot necessarily route to
+  the VM-only `172.16.119.135` network, expose the runtime API through a Mac SSH local forward such
+  as `0.0.0.0:8181 -> 127.0.0.1:8181` on the VM and set the panel Runtime URL to
+  `http://192.168.0.107:8181`. The VM runtime config must include the panel origin
+  `http://192.168.0.107:8180` in `control_api.cors_allowed_origins`. The panel derives the default
+  runtime URL from the page host when it is opened from a non-localhost address and replaces stale
+  stored `http://172.16.119.135:8181` values in that LAN mode.
 
 ## Important Files And Ownership
 
@@ -73,6 +95,14 @@ _To be filled as durable knowledge is discovered._
   not store or redraw historical trail points. If a displayed old trail immediately changes shape
   after updating wind, suspect the consumer's trail rendering/wind-drift compensation rather than
   historical position output from this simulator.
+- TCP-to-PTY bridge control uses transient user-systemd units:
+  `kigo-xcvario-pty-xcvario.service`, `kigo-xcvario-pty-flarm.service`, and for Pi
+  `kigo-xcvario-tunnel-pi.service`. Status JSON lives under `/tmp/kigo-sim/*.status.json`, while
+  bridge logs are appended in the remote workdir (`pty-xcvario-to-mac.log`,
+  `pty-flarm-to-mac.log`) and the Pi tunnel log is `/tmp/kigo-sim/kigo-xcvario-tunnel-pi.log` on
+  the runtime host. `systemctl --user is-active kigo-xcvario-tunnel-pi.service` can report
+  `active` while SSH is repeatedly timing out or restarting; inspect the tunnel log or
+  `systemctl --user status ...` restart counter before treating it as a healthy tunnel.
 
 ## Decisions And Assumptions
 
@@ -91,3 +121,12 @@ _To be filled as durable knowledge is discovered._
 - 2026-06-03: Documented direct FLARM endpoint declaration/logger support in addition to XCVario passthrough.
 - 2026-06-03: Documented manual straight-mode climb/sink behavior using frontend climb min/max.
 - 2026-06-04: Documented XCVario-stream `LXWP0` compatibility fallback for `kigo_nav` vario navbox.
+- 2026-06-03: Documented bridge-control execution host, user-systemd units, status/log locations,
+  and reverse-tunnel active-state gotcha.
+- 2026-06-04: Documented active lab Pi bridge address and transient VM runtime service using the
+  durable VM-local runtime config path.
+- 2026-06-05: Documented iPhone/LAN panel access via Mac LAN address, CORS origin, and Mac-to-VM
+  runtime API forwarding.
+- 2026-06-05: Documented LAN-mode panel default runtime URL behavior for stale VM runtime URLs.
+- 2026-06-05: Documented that panel Connect depends on an already-running runtime API and that the
+  VM runtime now uses an enabled persistent user-systemd service instead of a transient unit.

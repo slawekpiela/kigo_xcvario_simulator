@@ -13,7 +13,7 @@ const BRIDGE_DEFAULTS = {
   vmIdentity: "/Users/slawekpiela/.ssh/codex_debian_vm",
   vmSimulatorHost: "127.0.0.1",
   vmWorkdir: "/home/slawek/kigo_xcvario_simulator",
-  piBridgeTarget: "admin@192.168.0.114",
+  piBridgeTarget: "admin@192.168.0.106",
   piIdentity: "/home/slawek/.ssh/kigo_pi",
   piSimulatorHost: "127.0.0.1",
   piWorkdir: "/home/admin/kigo_xcvario_simulator",
@@ -87,9 +87,10 @@ const state = {
 
 function loadStoredSettings() {
   const storedRuntimeUrl = localStorage.getItem(STORAGE_RUNTIME_URL);
-  runtimeUrlInput.value = isLegacyRuntimeUrl(storedRuntimeUrl)
-    ? BRIDGE_DEFAULTS.vmRuntimeUrl
-    : storedRuntimeUrl || BRIDGE_DEFAULTS.vmRuntimeUrl;
+  const defaultRuntimeUrl = defaultRuntimeUrlForPanel();
+  runtimeUrlInput.value = isLegacyRuntimeUrl(storedRuntimeUrl) || isStaleRuntimeUrlForPanel(storedRuntimeUrl)
+    ? defaultRuntimeUrl
+    : storedRuntimeUrl || defaultRuntimeUrl;
   localStorage.removeItem("kigo.sim.runtimeToken");
   loadStoredInput(vmBridgeTargetInput, "vmBridgeTarget", BRIDGE_DEFAULTS.vmBridgeTarget);
   loadStoredInput(piBridgeTargetInput, "piBridgeTarget", BRIDGE_DEFAULTS.piBridgeTarget);
@@ -129,6 +130,38 @@ function isLegacyRuntimeUrl(rawValue) {
   try {
     const url = new URL(runtimeUrl);
     return ["127.0.0.1", "localhost", "::1"].includes(url.hostname) && url.port === "8181";
+  } catch (_error) {
+    return true;
+  }
+}
+
+function defaultRuntimeUrlForPanel() {
+  const lanRuntimeUrl = runtimeUrlFromPanelHost();
+  return lanRuntimeUrl || BRIDGE_DEFAULTS.vmRuntimeUrl;
+}
+
+function runtimeUrlFromPanelHost() {
+  try {
+    const url = new URL(window.location.origin);
+    if (["127.0.0.1", "localhost", "::1"].includes(url.hostname)) {
+      return "";
+    }
+    url.port = "8181";
+    return normalizeRuntimeUrl(url.toString());
+  } catch (_error) {
+    return "";
+  }
+}
+
+function isStaleRuntimeUrlForPanel(rawValue) {
+  const lanRuntimeUrl = runtimeUrlFromPanelHost();
+  const runtimeUrl = normalizeRuntimeUrl(rawValue);
+  if (!lanRuntimeUrl || !runtimeUrl) {
+    return false;
+  }
+  try {
+    const storedUrl = new URL(runtimeUrl);
+    return storedUrl.hostname === "172.16.119.135" && storedUrl.port === "8181";
   } catch (_error) {
     return true;
   }
