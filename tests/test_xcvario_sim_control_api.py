@@ -326,7 +326,7 @@ class ControlApiTests(unittest.TestCase):
         self.assertEqual(immediate_payload["snapshot"]["ownship"]["phase"], "straight")
         self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["speed_kmh"], 100.0, places=6)
         self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["gps_altitude_m"], 401.0, places=6)
-        self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["vertical_speed_ms"], 2.0, places=6)
+        self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["vertical_speed_ms"], 0.1, places=6)
 
         self.session.orchestrator.start()
         self.session.orchestrator.tick(1.0)
@@ -335,11 +335,11 @@ class ControlApiTests(unittest.TestCase):
         payload = json.loads(response.read().decode("utf-8"))
 
         self.assertEqual(payload["snapshot"]["ownship"]["phase"], "straight")
-        self.assertAlmostEqual(payload["snapshot"]["ownship"]["gps_altitude_m"], 403.0, places=6)
-        self.assertAlmostEqual(payload["snapshot"]["ownship"]["vertical_speed_ms"], 2.0, places=6)
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["gps_altitude_m"], 401.1, places=6)
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["vertical_speed_ms"], 0.1, places=6)
         self.assertAlmostEqual(
             payload["snapshot"]["ownship"]["static_pressure_hpa"],
-            static_pressure_hpa_for_altitude(403.0, qnh_hpa=1013.25),
+            static_pressure_hpa_for_altitude(401.1, qnh_hpa=1013.25),
             places=6,
         )
 
@@ -369,7 +369,7 @@ class ControlApiTests(unittest.TestCase):
 
         self.assertEqual(immediate_payload["snapshot"]["ownship"]["phase"], "straight")
         self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["gps_altitude_m"], 401.0, places=6)
-        self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["vertical_speed_ms"], 3.0, places=6)
+        self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["vertical_speed_ms"], 0.1, places=6)
 
         self.session.orchestrator.start()
         self.session.orchestrator.tick(1.0)
@@ -378,8 +378,8 @@ class ControlApiTests(unittest.TestCase):
         payload = json.loads(response.read().decode("utf-8"))
 
         self.assertEqual(payload["snapshot"]["ownship"]["phase"], "straight")
-        self.assertAlmostEqual(payload["snapshot"]["ownship"]["gps_altitude_m"], 404.0, places=6)
-        self.assertAlmostEqual(payload["snapshot"]["ownship"]["vertical_speed_ms"], 3.0, places=6)
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["gps_altitude_m"], 401.1, places=6)
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["vertical_speed_ms"], 0.1, places=6)
         self.assertAlmostEqual(
             payload["snapshot"]["ownship"]["static_pressure_hpa"],
             static_pressure_hpa_for_altitude(payload["snapshot"]["ownship"]["gps_altitude_m"], qnh_hpa=1013.25),

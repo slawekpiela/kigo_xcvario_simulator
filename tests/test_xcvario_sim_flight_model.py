@@ -44,29 +44,29 @@ class FlightModelTests(unittest.TestCase):
             duration_s=10.0,
             target_heading_deg=90.0,
             target_speed_kmh=90.0,
-            baro_altitude_m=850.0,
+            baro_altitude_m=401.3,
         )
 
         preview = self.model.preview_directive(self.initial_state, directive)
         next_state = self.model.step(self.initial_state, directive, 1.0)
-        reached = self.model.step(next_state, directive, 300.0)
+        reached = self.model.step(next_state, directive, 5.0)
         settled = self.model.step(reached, directive, 1.0)
 
         self.assertAlmostEqual(preview.gps_altitude_m, 401.0, places=4)
-        self.assertAlmostEqual(preview.vertical_speed_ms, 2.0, places=4)
-        self.assertAlmostEqual(next_state.gps_altitude_m, 403.0, places=4)
-        self.assertAlmostEqual(next_state.vertical_speed_ms, 2.0, places=4)
+        self.assertAlmostEqual(preview.vertical_speed_ms, 0.1, places=4)
+        self.assertAlmostEqual(next_state.gps_altitude_m, 401.1, places=4)
+        self.assertAlmostEqual(next_state.vertical_speed_ms, 0.1, places=4)
         self.assertAlmostEqual(
             next_state.static_pressure_hpa,
-            static_pressure_hpa_for_altitude(403.0, qnh_hpa=1013.25),
+            static_pressure_hpa_for_altitude(401.1, qnh_hpa=1013.25),
             places=6,
         )
-        self.assertAlmostEqual(reached.gps_altitude_m, 850.0, places=4)
-        self.assertAlmostEqual(settled.gps_altitude_m, 850.0, places=4)
+        self.assertAlmostEqual(reached.gps_altitude_m, 401.3, places=4)
+        self.assertAlmostEqual(settled.gps_altitude_m, 401.3, places=4)
         self.assertAlmostEqual(settled.vertical_speed_ms, 0.0, places=4)
         self.assertAlmostEqual(
             settled.static_pressure_hpa,
-            static_pressure_hpa_for_altitude(850.0, qnh_hpa=1013.25),
+            static_pressure_hpa_for_altitude(401.3, qnh_hpa=1013.25),
             places=6,
         )
 
@@ -85,9 +85,9 @@ class FlightModelTests(unittest.TestCase):
         state = self.model.preview_directive(self.initial_state, directive)
 
         self.assertAlmostEqual(state.gps_altitude_m, 401.0, places=4)
-        self.assertAlmostEqual(state.vertical_speed_ms, 3.0, places=4)
-        for _ in range(20):
-            state = self.model.step(state, directive, 0.1)
+        self.assertAlmostEqual(state.vertical_speed_ms, 0.1, places=4)
+        for _ in range(60):
+            state = self.model.step(state, directive, 1.0)
         self.assertAlmostEqual(state.gps_altitude_m, 407.0, places=4)
 
         samples = []

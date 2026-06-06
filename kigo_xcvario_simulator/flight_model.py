@@ -16,7 +16,7 @@ DEFAULT_HOME_TRACK_DEG = 90.0
 DEFAULT_CIRCLING_VARIATION_TICKS = 24
 DEFAULT_CIRCLING_SPEED_VARIATION_TICKS = 48
 DEFAULT_STRAIGHT_CLIMB_VARIATION_TICKS = 48
-DEFAULT_STRAIGHT_ALTITUDE_RAMP_MS = 2.0
+DEFAULT_STRAIGHT_ALTITUDE_RAMP_MS = 0.1
 DEFAULT_STRAIGHT_ALTITUDE_TARGET_TOLERANCE_M = 0.05
 DEFAULT_GLIDER_LAUNCH_VARIATION_TICKS = 12
 DEFAULT_GENERIC_VARIATION_TICKS = 8
@@ -379,9 +379,11 @@ class FlightModel:
         delta_m = target_altitude_m - current_altitude_m
         if abs(delta_m) <= DEFAULT_STRAIGHT_ALTITUDE_TARGET_TOLERANCE_M:
             self._straight_altitude_target_reached = True
+            if directive.climb_min_ms is not None or directive.climb_max_ms is not None:
+                return None
             return target_altitude_m, 0.0
 
-        vertical_speed_ms = self._straight_altitude_ramp_speed_ms(directive, delta_m)
+        vertical_speed_ms = self._straight_altitude_ramp_speed_ms(delta_m)
         if dt_s == 0.0:
             return current_altitude_m, vertical_speed_ms
 
@@ -397,19 +399,8 @@ class FlightModel:
         return max(self._home_altitude_m, float(directive.baro_altitude_m))
 
     @staticmethod
-    def _straight_altitude_ramp_speed_ms(directive: FlightDirective, delta_m: float) -> float:
-        fallback = DEFAULT_STRAIGHT_ALTITUDE_RAMP_MS
-        configured_values = [
-            float(value)
-            for value in (directive.climb_min_ms, directive.climb_max_ms)
-            if value is not None
-        ]
-        if delta_m > 0.0:
-            upward_values = [value for value in configured_values if value > 0.0]
-            return max(upward_values) if upward_values else fallback
-
-        downward_values = [value for value in configured_values if value < 0.0]
-        return min(downward_values) if downward_values else -fallback
+    def _straight_altitude_ramp_speed_ms(delta_m: float) -> float:
+        return DEFAULT_STRAIGHT_ALTITUDE_RAMP_MS if delta_m > 0.0 else -DEFAULT_STRAIGHT_ALTITUDE_RAMP_MS
 
     def _directive_changed(self, directive: FlightDirective) -> bool:
         return self._active_directive_key != self._variation_key(directive)

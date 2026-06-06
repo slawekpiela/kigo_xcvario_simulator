@@ -129,7 +129,8 @@ class SessionAndSchedulerTests(unittest.TestCase):
         self.assertFalse(snapshot.ownship.on_ground)
         self.assertAlmostEqual(snapshot.ownship.track_deg, 90.0, places=6)
         self.assertAlmostEqual(snapshot.ownship.speed_kmh, 111.0, places=6)
-        self.assertAlmostEqual(snapshot.ownship.gps_altitude_m, 402.0, places=6)
+        self.assertAlmostEqual(snapshot.ownship.gps_altitude_m, 401.1, places=6)
+        self.assertAlmostEqual(snapshot.ownship.vertical_speed_ms, 0.1, places=6)
 
     def test_primary_device_switch_changes_publisher_without_rebuilding_session(self):
         xcvario = _FakePublisher()

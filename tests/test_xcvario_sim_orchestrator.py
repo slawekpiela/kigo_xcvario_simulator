@@ -113,12 +113,12 @@ class ScenarioOrchestratorTests(unittest.TestCase):
         self.assertAlmostEqual(immediate.ownship.track_deg, 90.0, places=6)
         self.assertAlmostEqual(immediate.ownship.speed_kmh, 100.0, places=6)
         self.assertAlmostEqual(immediate.ownship.gps_altitude_m, 401.0, places=6)
-        self.assertAlmostEqual(immediate.ownship.vertical_speed_ms, 2.0, places=6)
-        self.assertAlmostEqual(snapshot.ownship.gps_altitude_m, 403.0, places=6)
-        self.assertAlmostEqual(snapshot.ownship.vertical_speed_ms, 2.0, places=6)
+        self.assertAlmostEqual(immediate.ownship.vertical_speed_ms, 0.1, places=6)
+        self.assertAlmostEqual(snapshot.ownship.gps_altitude_m, 401.1, places=6)
+        self.assertAlmostEqual(snapshot.ownship.vertical_speed_ms, 0.1, places=6)
         self.assertAlmostEqual(
             snapshot.ownship.static_pressure_hpa,
-            static_pressure_hpa_for_altitude(403.0, qnh_hpa=_runtime_config().device_qnh_hpa),
+            static_pressure_hpa_for_altitude(401.1, qnh_hpa=_runtime_config().device_qnh_hpa),
             places=6,
         )
 

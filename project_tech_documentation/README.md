@@ -53,10 +53,10 @@ _To be filled as durable knowledge is discovered._
   turns and positive roll for right turns. Pitch and acceleration fields remain empty.
 - Manual `straight` mode treats `FlightDirective.baro_altitude_m` as a smooth target altitude, not
   an immediate GPS/baro pin. The flight model ramps from the current altitude to that target,
-  clamped to home altitude, using the configured climb/sink side of `climb_min_ms`/`climb_max_ms`
-  when available or `2.0 m/s` as the fallback. After the target is reached, no climb range means
+  clamped to home altitude, at a fixed `0.1 m/s`. After the target is reached, no climb range means
   level flight at the target; a climb range resumes the smooth oscillating vertical speed between
-  the configured climb min/max. The panel sends the visible `Climb Min [m/s]` and
+  the configured climb min/max. `climb_min_ms`/`climb_max_ms` do not speed up the initial target
+  ramp. The panel sends the visible `Climb Min [m/s]` and
   `Climb Max [m/s]` fields for `straight`, `circling_left`, and `circling_right`.
 
 ## Build, Run, And Test Notes
@@ -132,3 +132,4 @@ _To be filled as durable knowledge is discovered._
   VM runtime now uses an enabled persistent user-systemd service instead of a transient unit.
 - 2026-06-05: Documented smooth manual `straight` altitude-target ramping instead of immediate
   GPS/baro altitude jumps.
+- 2026-06-06: Documented fixed `0.1 m/s` manual `straight` altitude-target ramp rate.
