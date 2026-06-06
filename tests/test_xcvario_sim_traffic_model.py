@@ -2,6 +2,7 @@ import unittest
 
 from kigo_xcvario_simulator.contracts import OwnshipState
 from kigo_xcvario_simulator.state import FlightPhase
+from kigo_xcvario_simulator.traffic_database import FLARM_TRAFFIC_AIRCRAFT, traffic_aircraft_for
 from kigo_xcvario_simulator.traffic_model import TrafficGenerator
 
 
@@ -59,6 +60,27 @@ class TrafficGeneratorTests(unittest.TestCase):
         self.assertLess(second_distance, first_distance)
         self.assertEqual(first[0].track_deg, 270.0)
         self.assertTrue(first[0].aircraft_id)
+
+    def test_contacts_use_real_flarmnet_aircraft_metadata(self):
+        generator = TrafficGenerator(seed=33)
+
+        contacts = generator.step(_ownship(), 1.0, contact_count=3)
+        expected = traffic_aircraft_for(33, 0)
+
+        self.assertEqual(contacts[0].aircraft_id, expected.device_id)
+        self.assertEqual(contacts[0].competition_id, expected.competition_id)
+        self.assertEqual(contacts[0].registration, expected.registration)
+        self.assertEqual(contacts[0].aircraft_model, expected.aircraft_model)
+
+    def test_curated_flarm_aircraft_have_competition_ids(self):
+        self.assertGreaterEqual(len(FLARM_TRAFFIC_AIRCRAFT), 8)
+        self.assertEqual(len({aircraft.device_id for aircraft in FLARM_TRAFFIC_AIRCRAFT}), len(FLARM_TRAFFIC_AIRCRAFT))
+        for aircraft in FLARM_TRAFFIC_AIRCRAFT:
+            with self.subTest(device_id=aircraft.device_id):
+                self.assertRegex(aircraft.device_id, r"^[0-9A-F]{6}$")
+                self.assertRegex(aircraft.competition_id, r"^[A-Z0-9]{1,4}$")
+                self.assertTrue(aircraft.registration.startswith("SP-"))
+                self.assertTrue(aircraft.aircraft_model)
 
     def test_negative_dt_is_rejected(self):
         generator = TrafficGenerator(seed=33)

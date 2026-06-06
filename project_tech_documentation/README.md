@@ -61,6 +61,13 @@ _To be filled as durable knowledge is discovered._
   initial target ramp. The panel leaves the visible `Climb Min [m/s]` and `Climb Max [m/s]` fields
   empty by default, but posts them for `straight`, `circling_left`, `circling_right`, and
   `glider_launch` when they contain operator-entered values.
+- FLARM traffic identity comes from `traffic_database.FLARM_TRAFFIC_AIRCRAFT`, a curated FLARMnet
+  DDB sample downloaded from `https://www.flarmnet.org/files/ddb.json` on 2026-06-06. Records were
+  filtered to identified/tracked `device_type="F"` devices with six-hex-digit IDs, Polish
+  registrations and non-empty alphanumeric competition IDs. `TrafficGenerator` assigns records
+  deterministically from the simulation seed and contact index. `$PFLAA`/`$PFLAU` still emit the
+  real FLARM device ID in `aircraft_id`; the control API and panel additionally expose
+  `competition_id`, `registration` and `aircraft_model`.
 
 ## Build, Run, And Test Notes
 
@@ -140,3 +147,4 @@ _To be filled as durable knowledge is discovered._
   post-target climb in `straight`.
 - 2026-06-06: Documented one-minute sinusoidal manual `straight` climb variation and panel posting
   of explicit `Climb Min/Max` values for `straight`.
+- 2026-06-06: Documented FLARMnet-backed traffic IDs and competition-sign metadata.

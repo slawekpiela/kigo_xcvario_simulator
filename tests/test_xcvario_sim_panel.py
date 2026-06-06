@@ -67,6 +67,9 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             'id="traffic-collision-input"',
             'id="ownship-grid"',
             'id="traffic-table-body"',
+            "<th>FLARM ID</th>",
+            "<th>CN</th>",
+            "<th>Registration</th>",
             'id="health-grid"',
         ):
             with self.subTest(snippet=snippet):

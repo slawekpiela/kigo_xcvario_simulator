@@ -48,6 +48,9 @@ class TrafficContact:
     climb_ms: float
     alarm_level: int = 0
     aircraft_id: str = ""
+    competition_id: str = ""
+    registration: str = ""
+    aircraft_model: str = ""
 
 
 @dataclass(frozen=True)

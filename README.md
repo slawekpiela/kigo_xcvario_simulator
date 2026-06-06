@@ -75,6 +75,11 @@ During `circling_left`/`circling_right`, `$PXCV` also includes synthetic AHRS
 roll angle in the XCVario roll field. The bank magnitude varies smoothly between
 `35` and `50` degrees; left turns are emitted as negative roll and right turns
 as positive roll.
+FLARM traffic contacts use a curated FLARMnet DDB sample downloaded on
+2026-06-06 from `https://www.flarmnet.org/files/ddb.json`; records are filtered
+to identified/tracked FLARM devices with Polish registrations and non-empty
+competition IDs. `$PFLAA`/`$PFLAU` emit the real six-hex-digit device ID, while
+the control API and panel also expose competition ID, registration and model.
 
 The `SxHAWK` telemetry stream follows the LXNAV/LX protocol parsed by the
 `LX`/LXNAV driver in `kigo_nav`: `GPRMC`, `GPGGA`, `LXWP0`, `LXWP1`, `LXWP2`
@@ -196,7 +201,7 @@ PTY such as `/tmp/kigo-sim/sxhawk`, and set `DeviceA="LX"` with
 8. Set `QNH [hPa]` or `Wysokosc [m]` in `Atmosphere` to adjust the simulated device altimeter; changing one recalculates the other from the current static pressure.
 9. Adjust traffic count if needed, and enable `collision course` when you want the first traffic contact to converge on the ownship.
 10. Use `Start / Resume`, `Pause`, `Reset` or `Apply Manual Mode`.
-11. Watch `Ownship`, `Traffic` and `Health` update from `GET /state` and `SSE`, including the emitted visible aircraft ID for each contact.
+11. Watch `Ownship`, `Traffic` and `Health` update from `GET /state` and `SSE`, including each emitted FLARM ID and competition ID.
 
 ## Test Commands
 

@@ -6,6 +6,7 @@ import math
 
 from .contracts import OwnshipState, TrafficContact
 from .flight_math import normalize_heading_deg
+from .traffic_database import traffic_aircraft_for
 from .variation import SeededRangeGenerator
 
 
@@ -79,6 +80,7 @@ class TrafficGenerator:
         relative_altitude_m = base_relative_altitude_m + climb_ms * 6.0
         alarm_level = 1 if abs(relative_altitude_m) < 150.0 and radius_m < 700.0 else 0
 
+        aircraft = traffic_aircraft_for(self._seed, index)
         return TrafficContact(
             contact_id=f"TFC-{index + 1:02d}",
             relative_north_m=relative_north_m,
@@ -87,7 +89,10 @@ class TrafficGenerator:
             track_deg=track_deg,
             climb_ms=climb_ms,
             alarm_level=alarm_level,
-            aircraft_id=self._aircraft_id(index),
+            aircraft_id=aircraft.device_id,
+            competition_id=aircraft.competition_id,
+            registration=aircraft.registration,
+            aircraft_model=aircraft.aircraft_model,
         )
 
     def _build_collision_contact(self, ownship: OwnshipState, index: int) -> TrafficContact:
@@ -121,6 +126,7 @@ class TrafficGenerator:
         else:
             alarm_level = 1
 
+        aircraft = traffic_aircraft_for(self._seed, index)
         return TrafficContact(
             contact_id=f"TFC-{index + 1:02d}",
             relative_north_m=relative_north_m,
@@ -129,7 +135,10 @@ class TrafficGenerator:
             track_deg=track_deg,
             climb_ms=climb_ms,
             alarm_level=alarm_level,
-            aircraft_id=self._aircraft_id(index),
+            aircraft_id=aircraft.device_id,
+            competition_id=aircraft.competition_id,
+            registration=aircraft.registration,
+            aircraft_model=aircraft.aircraft_model,
         )
 
     def _fraction(self, index: int, salt: str) -> float:
@@ -141,7 +150,3 @@ class TrafficGenerator:
             interpolation_ticks=1,
         )
         return generator.value_at(0)
-
-    def _aircraft_id(self, index: int) -> str:
-        value = ((self._seed & 0xFFFF) * 0x45D9 + (index + 1) * 0x1F1F) & 0xFFFFFF
-        return f"{value:06X}"

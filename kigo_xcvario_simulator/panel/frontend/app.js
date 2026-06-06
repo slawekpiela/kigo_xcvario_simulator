@@ -908,16 +908,18 @@ function renderTraffic(traffic) {
   if (!traffic || traffic.length === 0) {
     const row = document.createElement("tr");
     row.className = "empty-row";
-    row.innerHTML = '<td colspan="8">No traffic contacts published.</td>';
+    row.innerHTML = '<td colspan="10">No traffic contacts published.</td>';
     trafficTableBody.appendChild(row);
     return;
   }
   for (const contact of traffic) {
-    const visibleAircraftId = contact.aircraft_id || contact.contact_id;
+    const flarmId = contact.aircraft_id || contact.contact_id;
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${contact.contact_id}</td>
-      <td>${visibleAircraftId}</td>
+      <td>${flarmId}</td>
+      <td>${contact.competition_id || "-"}</td>
+      <td>${contact.registration || "-"}</td>
       <td>${formatNumber(contact.relative_north_m, 0)}</td>
       <td>${formatNumber(contact.relative_east_m, 0)}</td>
       <td>${formatNumber(contact.relative_altitude_m, 0)}</td>
