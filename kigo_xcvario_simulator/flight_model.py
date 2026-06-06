@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import datetime, timezone
+import math
 
 from .baro import altitude_m_for_static_pressure, simulation_timestamp_utc, static_pressure_hpa_for_altitude
 from .contracts import FlightDirective, OwnshipState, WindState
@@ -15,7 +16,7 @@ from .variation import SeededRangeGenerator
 DEFAULT_HOME_TRACK_DEG = 90.0
 DEFAULT_CIRCLING_VARIATION_TICKS = 24
 DEFAULT_CIRCLING_SPEED_VARIATION_TICKS = 48
-DEFAULT_STRAIGHT_CLIMB_VARIATION_TICKS = 48
+DEFAULT_STRAIGHT_CLIMB_CYCLE_S = 60.0
 DEFAULT_STRAIGHT_ALTITUDE_RAMP_MS = 0.1
 DEFAULT_STRAIGHT_ALTITUDE_TARGET_TOLERANCE_M = 0.05
 DEFAULT_GLIDER_LAUNCH_VARIATION_TICKS = 12
@@ -48,6 +49,7 @@ class FlightModel:
         self._elapsed_s = 0.0
         self._active_directive_key: tuple[object, ...] | None = None
         self._active_variation_tick_index = 0
+        self._active_variation_elapsed_s = 0.0
         self._active_speed_directive_key: tuple[object, ...] | None = None
         self._active_speed_variation_tick_index = 0
         self._active_straight_altitude_key: tuple[object, ...] | None = None
@@ -69,6 +71,7 @@ class FlightModel:
         self._seed = int(seed)
         self._active_directive_key = None
         self._active_variation_tick_index = 0
+        self._active_variation_elapsed_s = 0.0
         self._active_speed_directive_key = None
         self._active_speed_variation_tick_index = 0
         self._active_straight_altitude_key = None
@@ -81,6 +84,7 @@ class FlightModel:
         self._elapsed_s = 0.0
         self._active_directive_key = None
         self._active_variation_tick_index = 0
+        self._active_variation_elapsed_s = 0.0
         self._active_speed_directive_key = None
         self._active_speed_variation_tick_index = 0
         self._active_straight_altitude_key = None
@@ -118,7 +122,7 @@ class FlightModel:
         else:
             ramped_altitude = self._resolve_straight_altitude_ramp(state, directive, dt_s)
             if ramped_altitude is None:
-                vertical_speed_ms = self._resolve_vertical_speed_ms(directive)
+                vertical_speed_ms = self._resolve_vertical_speed_ms(directive, dt_s)
                 gps_altitude_m = state.gps_altitude_m + vertical_speed_ms * dt_s
             else:
                 gps_altitude_m, vertical_speed_ms = ramped_altitude
@@ -169,6 +173,7 @@ class FlightModel:
             self._elapsed_s,
             self._active_directive_key,
             self._active_variation_tick_index,
+            self._active_variation_elapsed_s,
             self._active_speed_directive_key,
             self._active_speed_variation_tick_index,
             self._active_straight_altitude_key,
@@ -181,6 +186,7 @@ class FlightModel:
                 self._elapsed_s,
                 self._active_directive_key,
                 self._active_variation_tick_index,
+                self._active_variation_elapsed_s,
                 self._active_speed_directive_key,
                 self._active_speed_variation_tick_index,
                 self._active_straight_altitude_key,
@@ -313,11 +319,12 @@ class FlightModel:
         self._active_speed_variation_tick_index += 1
         return value
 
-    def _resolve_vertical_speed_ms(self, directive: FlightDirective) -> float:
+    def _resolve_vertical_speed_ms(self, directive: FlightDirective, dt_s: float) -> float:
         key = self._variation_key(directive)
         if self._active_directive_key != key:
             self._active_directive_key = key
             self._active_variation_tick_index = 0
+            self._active_variation_elapsed_s = 0.0
 
         if directive.on_ground:
             return 0.0
@@ -328,13 +335,13 @@ class FlightModel:
             if maximum < minimum:
                 minimum, maximum = maximum, minimum
             if directive.phase == FlightPhase.STRAIGHT:
-                value = self._oscillating_value_at(
-                    self._active_variation_tick_index,
+                value = self._sinusoidal_value_at(
+                    self._active_variation_elapsed_s,
                     minimum=minimum,
                     maximum=maximum,
-                    half_cycle_ticks=DEFAULT_STRAIGHT_CLIMB_VARIATION_TICKS,
+                    cycle_s=DEFAULT_STRAIGHT_CLIMB_CYCLE_S,
                 )
-                self._active_variation_tick_index += 1
+                self._active_variation_elapsed_s += dt_s
                 return value
             generator = SeededRangeGenerator(
                 seed=self._seed,
@@ -371,6 +378,7 @@ class FlightModel:
         if self._active_directive_key != key:
             self._active_directive_key = key
             self._active_variation_tick_index = 0
+            self._active_variation_elapsed_s = 0.0
 
         if self._straight_altitude_target_reached:
             return None
@@ -463,6 +471,23 @@ class FlightModel:
 
         eased = FlightModel._smoothstep(blend)
         return minimum + (maximum - minimum) * eased
+
+    @staticmethod
+    def _sinusoidal_value_at(
+        elapsed_s: float,
+        *,
+        minimum: float,
+        maximum: float,
+        cycle_s: float,
+    ) -> float:
+        if maximum == minimum:
+            return minimum
+
+        cycle = max(0.001, float(cycle_s))
+        midpoint = (minimum + maximum) / 2.0
+        amplitude = (maximum - minimum) / 2.0
+        phase_rad = (2.0 * math.pi * float(elapsed_s)) / cycle
+        return midpoint - amplitude * math.cos(phase_rad)
 
     @staticmethod
     def _smoothstep(value: float) -> float:

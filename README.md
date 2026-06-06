@@ -189,7 +189,7 @@ PTY such as `/tmp/kigo-sim/sxhawk`, and set `DeviceA="LX"` with
 1. Connect the panel.
 2. Choose a `Manual Mode` phase; `on_ground` is the default after an `XCvario` client connect/reconnect.
 3. Set `Flight Altitude [m]` when using `straight`; the model ramps smoothly from the current altitude to that target at `0.1 m/s` instead of jumping.
-4. The panel does not send `Climb Min/Max [m/s]` for `straight`, so stale values in those fields will not affect the altitude ramp.
+4. Set `Climb Min/Max [m/s]` for `straight` when you want the post-ramp vario, and therefore trail colour, to follow a sinusoid between those values over a `60 s` cycle.
 5. Set circling speed min/max in `Manual Mode` when using `circling_left` or `circling_right`.
 6. Set wind direction and speed; the runtime sends them to `kigo_nav` as `WIMWV`.
 7. Set OAT when you need a non-default outside air temperature in the `PXCV`/`POV` stream.

@@ -55,10 +55,12 @@ _To be filled as durable knowledge is discovered._
   an immediate GPS/baro pin. The flight model ramps from the current altitude to that target,
   clamped to home altitude, at a fixed `0.1 m/s`. After the target is reached, no climb range means
   level flight at the target; a climb range resumes the smooth oscillating vertical speed between
-  the configured climb min/max. `climb_min_ms`/`climb_max_ms` do not speed up the initial target
-  ramp. The panel leaves the visible `Climb Min [m/s]` and `Climb Max [m/s]` fields empty by
-  default and does not send them for `straight` even if they contain stale values; those fields are
-  only posted for `circling_left`, `circling_right`, and `glider_launch`.
+  the configured climb min/max as a sinusoid with a full `60 s` cycle. The sinusoid starts at the
+  configured minimum, reaches the midpoint at `15 s`, the maximum at `30 s`, the midpoint at
+  `45 s`, and returns to the minimum at `60 s`. `climb_min_ms`/`climb_max_ms` do not speed up the
+  initial target ramp. The panel leaves the visible `Climb Min [m/s]` and `Climb Max [m/s]` fields
+  empty by default, but posts them for `straight`, `circling_left`, `circling_right`, and
+  `glider_launch` when they contain operator-entered values.
 
 ## Build, Run, And Test Notes
 
@@ -136,4 +138,5 @@ _To be filled as durable knowledge is discovered._
 - 2026-06-06: Documented fixed `0.1 m/s` manual `straight` altitude-target ramp rate.
 - 2026-06-06: Documented empty default manual climb fields in the panel to avoid accidental
   post-target climb in `straight`.
-- 2026-06-06: Documented that the panel no longer posts stale manual climb fields for `straight`.
+- 2026-06-06: Documented one-minute sinusoidal manual `straight` climb variation and panel posting
+  of explicit `Climb Min/Max` values for `straight`.
