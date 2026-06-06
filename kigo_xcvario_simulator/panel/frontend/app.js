@@ -1077,7 +1077,7 @@ applyManualButton.addEventListener("click", () => {
   if (phase === "straight") {
     numericFields.push(["wysokosc", numericValue(manualBaroAltitudeInput)]);
   }
-  if (phase === "straight" || phase === "circling_left" || phase === "circling_right") {
+  if (phase === "circling_left" || phase === "circling_right") {
     numericFields.push(
       ["climb_min_ms", numericValue(manualClimbMinInput)],
       ["climb_max_ms", numericValue(manualClimbMaxInput)],

@@ -37,6 +37,8 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             'id="manual-baro-altitude-input"',
             'id="manual-heading-input" type="number" step="0.1" value="135"',
             'id="manual-speed-input" type="number" step="0.1" value="95"',
+            'id="manual-climb-min-input" type="number" step="0.1"',
+            'id="manual-climb-max-input" type="number" step="0.1"',
             "Flight Altitude [m]",
             "<h2>Atmosphere</h2>",
             'id="wind-direction-input"',
@@ -89,6 +91,8 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             'id="vm-bridge-identity-input"',
             'id="vm-bridge-simulator-host-input"',
             'id="vm-bridge-workdir-input"',
+            'id="manual-climb-min-input" type="number" step="0.1" value=',
+            'id="manual-climb-max-input" type="number" step="0.1" value=',
         ):
             with self.subTest(removed_snippet=removed_snippet):
                 self.assertNotIn(removed_snippet, html)
@@ -150,7 +154,6 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             '["speed_kmh", numericValue(manualSpeedInput)]',
             'if (phase === "straight")',
             '["wysokosc", numericValue(manualBaroAltitudeInput)]',
-            'if (phase === "straight" || phase === "circling_left" || phase === "circling_right")',
             'if (phase === "circling_left" || phase === "circling_right")',
             '["speed_min_kmh", numericValue(circlingSpeedMinInput)]',
             '["speed_max_kmh", numericValue(circlingSpeedMaxInput)]',
@@ -208,6 +211,7 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             "localStorage.setItem(STORAGE_THEME",
             "themeToggleInput",
             '"/api/v1/simulation/manual-mode", payload, { syncControls: true }',
+            'if (phase === "straight" || phase === "circling_left" || phase === "circling_right")',
         ):
             with self.subTest(removed_snippet=removed_snippet):
                 self.assertNotIn(removed_snippet, script)
