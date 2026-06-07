@@ -75,11 +75,13 @@ During `circling_left`/`circling_right`, `$PXCV` also includes synthetic AHRS
 roll angle in the XCVario roll field. The bank magnitude varies smoothly between
 `35` and `50` degrees; left turns are emitted as negative roll and right turns
 as positive roll.
-FLARM traffic contacts use a curated FLARMnet DDB sample downloaded on
-2026-06-06 from `https://www.flarmnet.org/files/ddb.json`; records are filtered
-to identified/tracked FLARM devices with Polish registrations and non-empty
-competition IDs. `$PFLAA`/`$PFLAU` emit the real six-hex-digit device ID, while
-the control API and panel also expose competition ID, registration and model.
+FLARM traffic contacts start with the configured lab IDs `DDA857`, `DDA85A`
+and `DDA85C`, followed by 23 authentic FLARMnet-backed devices with competition
+signs. Additional contacts orbit the ownship on 3, 6, 10, 20 and 30 km rings
+with varied relative altitudes, climb rates and track behaviors. Every 10
+seconds one of the three lab contacts rotates onto a head-on collision-course
+movement. `$PFLAA`/`$PFLAU` emit the six-hex-digit device ID, while the control
+API and panel also expose competition ID, registration and model labels.
 
 The `SxHAWK` telemetry stream follows the LXNAV/LX protocol parsed by the
 `LX`/LXNAV driver in `kigo_nav`: `GPRMC`, `GPGGA`, `LXWP0`, `LXWP1`, `LXWP2`

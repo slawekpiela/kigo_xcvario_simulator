@@ -1,9 +1,14 @@
+import math
 import unittest
 
 from kigo_xcvario_simulator.contracts import OwnshipState
 from kigo_xcvario_simulator.state import FlightPhase
-from kigo_xcvario_simulator.traffic_database import FLARM_TRAFFIC_AIRCRAFT, traffic_aircraft_for
-from kigo_xcvario_simulator.traffic_model import TrafficGenerator
+from kigo_xcvario_simulator.traffic_database import (
+    FLARM_TRAFFIC_AIRCRAFT,
+    LAB_TRAFFIC_AIRCRAFT_COUNT,
+    traffic_aircraft_for,
+)
+from kigo_xcvario_simulator.traffic_model import RING_DISTANCES_M, TrafficGenerator
 
 
 def _ownship() -> OwnshipState:
@@ -61,7 +66,7 @@ class TrafficGeneratorTests(unittest.TestCase):
         self.assertEqual(first[0].track_deg, 270.0)
         self.assertTrue(first[0].aircraft_id)
 
-    def test_contacts_use_real_flarmnet_aircraft_metadata(self):
+    def test_contacts_use_configured_flarm_aircraft_metadata(self):
         generator = TrafficGenerator(seed=33)
 
         contacts = generator.step(_ownship(), 1.0, contact_count=3)
@@ -72,8 +77,12 @@ class TrafficGeneratorTests(unittest.TestCase):
         self.assertEqual(contacts[0].registration, expected.registration)
         self.assertEqual(contacts[0].aircraft_model, expected.aircraft_model)
 
-    def test_curated_flarm_aircraft_have_competition_ids(self):
-        self.assertGreaterEqual(len(FLARM_TRAFFIC_AIRCRAFT), 8)
+    def test_configured_flarm_aircraft_are_requested_lab_ids(self):
+        self.assertEqual(
+            [aircraft.device_id for aircraft in FLARM_TRAFFIC_AIRCRAFT[:LAB_TRAFFIC_AIRCRAFT_COUNT]],
+            ["DDA857", "DDA85A", "DDA85C"],
+        )
+        self.assertEqual(len(FLARM_TRAFFIC_AIRCRAFT), 26)
         self.assertEqual(len({aircraft.device_id for aircraft in FLARM_TRAFFIC_AIRCRAFT}), len(FLARM_TRAFFIC_AIRCRAFT))
         for aircraft in FLARM_TRAFFIC_AIRCRAFT:
             with self.subTest(device_id=aircraft.device_id):
@@ -81,6 +90,40 @@ class TrafficGeneratorTests(unittest.TestCase):
                 self.assertRegex(aircraft.competition_id, r"^[A-Z0-9]{1,4}$")
                 self.assertTrue(aircraft.registration.startswith("SP-"))
                 self.assertTrue(aircraft.aircraft_model)
+
+    def test_additional_contacts_use_requested_distance_rings(self):
+        generator = TrafficGenerator(seed=33)
+
+        contacts = generator.step(_ownship(), 1.0, contact_count=len(FLARM_TRAFFIC_AIRCRAFT))
+
+        for index, contact in enumerate(contacts[LAB_TRAFFIC_AIRCRAFT_COUNT:], start=LAB_TRAFFIC_AIRCRAFT_COUNT):
+            with self.subTest(index=index):
+                distance_m = math.hypot(contact.relative_north_m, contact.relative_east_m)
+                expected_distance_m = RING_DISTANCES_M[(index - LAB_TRAFFIC_AIRCRAFT_COUNT) % len(RING_DISTANCES_M)]
+                self.assertAlmostEqual(distance_m, expected_distance_m, delta=1.0)
+
+    def test_additional_contacts_have_varied_altitudes_and_behaviors(self):
+        generator = TrafficGenerator(seed=33)
+
+        contacts = generator.step(_ownship(), 1.0, contact_count=len(FLARM_TRAFFIC_AIRCRAFT))
+        added_contacts = contacts[LAB_TRAFFIC_AIRCRAFT_COUNT:]
+
+        self.assertLess(min(contact.relative_altitude_m for contact in added_contacts), -800.0)
+        self.assertGreater(max(contact.relative_altitude_m for contact in added_contacts), 1000.0)
+        self.assertLess(min(contact.climb_ms for contact in added_contacts), -1.0)
+        self.assertGreater(max(contact.climb_ms for contact in added_contacts), 1.0)
+
+    def test_lab_contacts_rotate_collision_course_every_ten_seconds(self):
+        generator = TrafficGenerator(seed=33)
+
+        first = generator.step(_ownship(), 1.0, contact_count=3)
+        second = generator.step(_ownship(), 10.0, contact_count=3)
+
+        self.assertEqual(first[0].aircraft_id, "DDA857")
+        self.assertEqual(first[0].track_deg, 270.0)
+        self.assertEqual(second[1].aircraft_id, "DDA85A")
+        self.assertEqual(second[1].track_deg, 270.0)
+        self.assertAlmostEqual(math.hypot(second[0].relative_north_m, second[0].relative_east_m), 3000.0, delta=1.0)
 
     def test_negative_dt_is_rejected(self):
         generator = TrafficGenerator(seed=33)

@@ -61,24 +61,28 @@ _To be filled as durable knowledge is discovered._
   initial target ramp. The panel leaves the visible `Climb Min [m/s]` and `Climb Max [m/s]` fields
   empty by default, but posts them for `straight`, `circling_left`, `circling_right`, and
   `glider_launch` when they contain operator-entered values.
-- FLARM traffic identity comes from `traffic_database.FLARM_TRAFFIC_AIRCRAFT`, a curated FLARMnet
-  DDB sample downloaded from `https://www.flarmnet.org/files/ddb.json` on 2026-06-06. Records were
-  filtered to identified/tracked `device_type="F"` devices with six-hex-digit IDs, Polish
-  registrations and non-empty alphanumeric competition IDs. `TrafficGenerator` assigns records
-  deterministically from the simulation seed and contact index. `$PFLAA`/`$PFLAU` still emit the
-  real FLARM device ID in `aircraft_id`; the control API and panel additionally expose
+- FLARM traffic identity comes from `traffic_database.FLARM_TRAFFIC_AIRCRAFT`: the first three
+  records are the lab-requested IDs `DDA857`, `DDA85A` and `DDA85C`, followed by 23 authentic
+  FLARMnet-backed records with non-empty competition IDs. `traffic_aircraft_for()` maps by contact
+  index so those first three IDs remain stable regardless of the simulation seed. Additional
+  contacts use fixed 3, 6, 10, 20 and 30 km rings around the ownship GPS position with varied
+  track/climb/relative-altitude behavior. Every 10 seconds `TrafficGenerator` rotates one of the
+  three lab IDs through a head-on collision-course movement. `$PFLAA`/`$PFLAU` emit the configured
+  FLARM device ID in `aircraft_id`; the control API and panel additionally expose
   `competition_id`, `registration` and `aircraft_model`.
 
 ## Build, Run, And Test Notes
 
 - The simulator panel is operator UI only; bridge actions are posted to the selected runtime API
   (`/api/v1/bridges/*`) and execute from that runtime host. With the default panel URL
-  `http://172.16.119.135:8181`, bridge SSH and `systemd-run --user` happen on the VM, not on the
+  `http://172.16.119.137:8181`, bridge SSH and `systemd-run --user` happen on the VM, not on the
   Mac browser host. The Pi bridge default target is `admin@192.168.0.114`, identity
   `/home/slawek/.ssh/kigo_pi`, workdir `/home/admin/kigo_xcvario_simulator`, and it uses a reverse
   SSH tunnel from the runtime host to Pi for ports `4353` and `4354`.
 - As of 2026-06-04, the active lab Pi address is `admin@192.168.0.106`; override stale panel/API
   bridge targets that still point at `admin@192.168.0.114`.
+- As of 2026-06-07, the active VM runtime address is `172.16.119.137`; override stale panel/API
+  bridge targets or SSH forwards that still point at `172.16.119.135`.
 - The VM runtime is installed as an enabled user-systemd service at
   `/home/slawek/.config/systemd/user/kigo-xcvario-runtime.service`, running
   `/usr/bin/python3 -m kigo_xcvario_simulator.start_remote_runtime --config /home/slawek/kigo_xcvario_simulator/runtime.local.json`
@@ -88,7 +92,7 @@ _To be filled as durable knowledge is discovered._
   be missing and will put the service into an autorestart failure loop.
 - For iPhone access on the local LAN, serve the panel on the Mac with `--host 0.0.0.0` and use the
   Mac LAN address, e.g. `http://192.168.0.107:8180/`. Because the iPhone cannot necessarily route to
-  the VM-only `172.16.119.135` network, expose the runtime API through a Mac SSH local forward such
+  the VM-only `172.16.119.0/24` network, expose the runtime API through a Mac SSH local forward such
   as `0.0.0.0:8181 -> 127.0.0.1:8181` on the VM and set the panel Runtime URL to
   `http://192.168.0.107:8181`. The VM runtime config must include the panel origin
   `http://192.168.0.107:8180` in `control_api.cors_allowed_origins`. The panel derives the default
@@ -148,3 +152,6 @@ _To be filled as durable knowledge is discovered._
 - 2026-06-06: Documented one-minute sinusoidal manual `straight` climb variation and panel posting
   of explicit `Climb Min/Max` values for `straight`.
 - 2026-06-06: Documented FLARMnet-backed traffic IDs and competition-sign metadata.
+- 2026-06-06: Documented the reduced three-ID lab FLARM traffic database.
+- 2026-06-07: Documented 26-contact FLARM traffic rings, rotating lab-ID collision course, and
+  current VM runtime address `172.16.119.137`.

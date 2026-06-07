@@ -54,7 +54,7 @@ class SimulatorEndToEndSmokeTests(unittest.TestCase):
         self.addCleanup(flarm_client.close)
         time.sleep(0.05)
 
-        self._post_json("/api/v1/simulation/traffic", {"enabled": True, "contact_count": 2})
+        self._post_json("/api/v1/simulation/traffic", {"enabled": True, "contact_count": 3})
         self._post_json("/api/v1/simulation/wind", {"direction_deg": 270.0, "speed_kmh": 25.5})
         self._post_json("/api/v1/simulation/oat", {"oat_c": 7.5})
         self._post_json("/api/v1/simulation/preset", {"preset_id": "full_flight", "seed": 42, "autostart": True})
@@ -77,6 +77,9 @@ class SimulatorEndToEndSmokeTests(unittest.TestCase):
         self.assertIn(",T,7.5*", xc_payload)
         self.assertIn("$WIMWV,270.0,T,25.5,K,A*", xc_payload)
         self.assertIn("$PFLAU,", flarm_payload)
+        self.assertIn("DDA857", flarm_payload)
+        self.assertIn("DDA85A", flarm_payload)
+        self.assertIn("DDA85C", flarm_payload)
 
     def test_manual_override_updates_state_without_reset(self):
         xc_client = socket.create_connection(("127.0.0.1", self.session.xcvario_adapter.bound_port), timeout=2.0)
