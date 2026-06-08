@@ -156,15 +156,49 @@ function runtimeUrlFromPanelHost() {
 function isStaleRuntimeUrlForPanel(rawValue) {
   const lanRuntimeUrl = runtimeUrlFromPanelHost();
   const runtimeUrl = normalizeRuntimeUrl(rawValue);
-  if (!lanRuntimeUrl || !runtimeUrl) {
+  if (!runtimeUrl) {
     return false;
   }
   try {
     const storedUrl = new URL(runtimeUrl);
-    return storedUrl.hostname === "172.16.119.135" && storedUrl.port === "8181";
+    if (isKnownStaleRuntimeUrl(storedUrl)) {
+      return true;
+    }
+    if (!lanRuntimeUrl) {
+      return false;
+    }
+    const panelUrl = new URL(lanRuntimeUrl);
+    if (storedUrl.hostname === panelUrl.hostname && storedUrl.port === panelUrl.port) {
+      return false;
+    }
+    return (
+      (storedUrl.hostname === "172.16.119.135" && storedUrl.port === "8181") ||
+      (storedUrl.port === "8181" &&
+        isPrivateNetworkHost(storedUrl.hostname) &&
+        isPrivateNetworkHost(panelUrl.hostname))
+    );
   } catch (_error) {
     return true;
   }
+}
+
+function isKnownStaleRuntimeUrl(url) {
+  return (
+    url.port === "8181" &&
+    (url.hostname === "172.16.119.135" || url.hostname === "172.20.10.4")
+  );
+}
+
+function isPrivateNetworkHost(hostname) {
+  const parts = String(hostname || "").split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return false;
+  }
+  return (
+    parts[0] === 10 ||
+    (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
+    (parts[0] === 192 && parts[1] === 168)
+  );
 }
 
 function syncRuntimeSettingsFromInputs() {
@@ -328,6 +362,8 @@ function runtimeUrlCandidates(rawRuntimeUrl) {
   if (isLikelyPanelUrl(primary)) {
     appendUnique(candidates, correctedControlApiUrl);
   }
+  appendUnique(candidates, runtimeUrlFromPanelHost());
+  appendUnique(candidates, defaultRuntimeUrlForPanel());
   if (!primary) {
     appendUnique(candidates, "http://127.0.0.1:8181");
   }
@@ -529,30 +565,33 @@ async function requestBridge(action) {
 }
 
 function buildBridgePayload() {
+  const vmNode = bridgeNodeFromTarget(
+    "vm",
+    vmBridgeTargetInput.value,
+    BRIDGE_DEFAULTS.vmIdentity,
+    BRIDGE_DEFAULTS.vmSimulatorHost,
+    BRIDGE_DEFAULTS.vmWorkdir,
+  );
+  const piNode = bridgeNodeFromTarget(
+    "pi",
+    piBridgeTargetInput.value,
+    BRIDGE_DEFAULTS.piIdentity,
+    BRIDGE_DEFAULTS.piSimulatorHost,
+    BRIDGE_DEFAULTS.piWorkdir,
+    true,
+  );
+  const nodes = [vmNode];
+  if (piNode.ssh_target) {
+    nodes.push(piNode);
+  }
   const payload = {
     primary_port: BRIDGE_DEFAULTS.primaryPort,
     flarm_port: BRIDGE_DEFAULTS.flarmPort,
     ready_timeout_s: BRIDGE_DEFAULTS.readyTimeoutS,
-    nodes: [
-      bridgeNodeFromTarget(
-        "vm",
-        vmBridgeTargetInput.value,
-        BRIDGE_DEFAULTS.vmIdentity,
-        BRIDGE_DEFAULTS.vmSimulatorHost,
-        BRIDGE_DEFAULTS.vmWorkdir,
-      ),
-      bridgeNodeFromTarget(
-        "pi",
-        piBridgeTargetInput.value,
-        BRIDGE_DEFAULTS.piIdentity,
-        BRIDGE_DEFAULTS.piSimulatorHost,
-        BRIDGE_DEFAULTS.piWorkdir,
-        true,
-      ),
-    ].filter((node) => node.ssh_target && node.simulator_host && node.workdir),
+    nodes: nodes.filter((node) => node.ssh_target && node.simulator_host && node.workdir),
   };
-  if (payload.nodes.length < 2) {
-    throw new Error("VM and PI bridge targets are required.");
+  if (!payload.nodes.some((node) => node.id === "vm")) {
+    throw new Error("VM bridge target is required.");
   }
   return payload;
 }
@@ -908,23 +947,27 @@ function renderTraffic(traffic) {
   if (!traffic || traffic.length === 0) {
     const row = document.createElement("tr");
     row.className = "empty-row";
-    row.innerHTML = '<td colspan="10">No traffic contacts published.</td>';
+    row.innerHTML = '<td colspan="12">No traffic contacts published.</td>';
     trafficTableBody.appendChild(row);
     return;
   }
   for (const contact of traffic) {
     const flarmId = contact.aircraft_id || contact.contact_id;
+    const callSign = contact.competition_id || contact.registration || "-";
+    const distanceM = Math.hypot(Number(contact.relative_north_m), Number(contact.relative_east_m));
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${contact.contact_id}</td>
       <td>${flarmId}</td>
-      <td>${contact.competition_id || "-"}</td>
+      <td>${callSign}</td>
       <td>${contact.registration || "-"}</td>
+      <td>${formatNumber(distanceM, 0)}</td>
       <td>${formatNumber(contact.relative_north_m, 0)}</td>
       <td>${formatNumber(contact.relative_east_m, 0)}</td>
       <td>${formatNumber(contact.relative_altitude_m, 0)}</td>
       <td>${formatNumber(contact.track_deg, 0)}</td>
       <td>${formatNumber(contact.climb_ms, 1)}</td>
+      <td>${formatNumber(contact.speed_ms, 1)}</td>
       <td>${contact.alarm_level}</td>
     `;
     trafficTableBody.appendChild(row);

@@ -51,25 +51,33 @@ _To be filled as durable knowledge is discovered._
   phase is `circling_left` or `circling_right`. The simulated circling bank magnitude follows a
   smooth sinusoid between `35` and `50` degrees over an `8 s` period, with negative roll for left
   turns and positive roll for right turns. Pitch and acceleration fields remain empty.
-- Manual `straight` mode treats `FlightDirective.baro_altitude_m` as a smooth target altitude, not
-  an immediate GPS/baro pin. The flight model ramps from the current altitude to that target,
-  clamped to home altitude, at a fixed `0.1 m/s`. After the target is reached, no climb range means
-  level flight at the target; a climb range resumes the smooth oscillating vertical speed between
-  the configured climb min/max as a sinusoid with a full `60 s` cycle. The sinusoid starts at the
-  configured minimum, reaches the midpoint at `15 s`, the maximum at `30 s`, the midpoint at
-  `45 s`, and returns to the minimum at `60 s`. `climb_min_ms`/`climb_max_ms` do not speed up the
-  initial target ramp. The panel leaves the visible `Climb Min [m/s]` and `Climb Max [m/s]` fields
-  empty by default, but posts them for `straight`, `circling_left`, `circling_right`, and
-  `glider_launch` when they contain operator-entered values.
-- FLARM traffic identity comes from `traffic_database.FLARM_TRAFFIC_AIRCRAFT`: the first three
-  records are the lab-requested IDs `DDA857`, `DDA85A` and `DDA85C`, followed by 23 authentic
-  FLARMnet-backed records with non-empty competition IDs. `traffic_aircraft_for()` maps by contact
-  index so those first three IDs remain stable regardless of the simulation seed. Additional
-  contacts use fixed 3, 6, 10, 20 and 30 km rings around the ownship GPS position with varied
-  track/climb/relative-altitude behavior. Every 10 seconds `TrafficGenerator` rotates one of the
-  three lab IDs through a head-on collision-course movement. `$PFLAA`/`$PFLAU` emit the configured
-  FLARM device ID in `aircraft_id`; the control API and panel additionally expose
-  `competition_id`, `registration` and `aircraft_model`.
+- Manual `straight` mode treats `FlightDirective.baro_altitude_m` as an immediate GPS/baro altitude
+  target, clamped to home altitude, so the panel `Flight Altitude [m]` field has an instant visible
+  effect after `Apply Manual Mode`. With no climb range, the ownship remains level at that altitude;
+  with `climb_min_ms`/`climb_max_ms`, the first target application pins the altitude and subsequent
+  ticks use a smooth oscillating vertical speed between the configured min/max as a sinusoid with a
+  full `60 s` cycle. The sinusoid starts at the configured minimum, reaches the midpoint at `15 s`,
+  the maximum at `30 s`, the midpoint at `45 s`, and returns to the minimum at `60 s`. The panel
+  leaves the visible `Climb Min [m/s]` and `Climb Max [m/s]` fields empty by default, but posts them
+  for `straight`, `circling_left`, `circling_right`, and `glider_launch` when they contain
+  operator-entered values.
+- FLARM traffic identity comes from `traffic_database.FLARM_TRAFFIC_AIRCRAFT`: the first six
+  records are decoded FLARMNet IDs `DDA857`, `DDA85A`, `DDA85C`, `DDA86A`, `DDA88F` and `DDA896`,
+  followed by 23 authentic FLARMnet-backed records with non-empty competition IDs.
+  `traffic_aircraft_for()` maps by contact index so those first six IDs remain stable regardless of
+  the simulation seed. The six decoded records use metadata `MF`/`D-6676`/`LS-4`,
+  `L1`/`D-3450`/`Discus 2`, `TH`/`D-4449`/`Hornet`, `1A`/`D-3358`/`LS-4`,
+  empty-callsign/`DKERO`/`DG-800`, and `TH`/`D-5799`/`ASK-13`. `TrafficGenerator` keeps all
+  generated contacts within 40 km of the ownship GPS position. Contacts `0` and `1` circle, while
+  contacts `2+` fly deterministic linear back-and-forth tracks with varied altitude, climb, speed
+  and course. `ScenarioOrchestrator` defaults traffic to enabled with all 29 contacts, and the
+  control API uses the same full count when `/api/v1/simulation/traffic` enables traffic without an
+  explicit `contact_count`.
+  `$PFLAA`/`$PFLAU` emit the configured FLARM device ID in `aircraft_id`; the control API and panel
+  additionally expose `competition_id`, `registration`, `aircraft_model` and `speed_ms`. The panel
+  traffic table labels `aircraft_id` as `ID`, labels `competition_id` as `CALL SIGN` with
+  registration fallback, computes horizontal distance from relative north/east offsets, and shows
+  `climb_ms` as the vertical movement value.
 
 ## Build, Run, And Test Notes
 
@@ -81,6 +89,10 @@ _To be filled as durable knowledge is discovered._
   SSH tunnel from the runtime host to Pi for ports `4353` and `4354`.
 - As of 2026-06-04, the active lab Pi address is `admin@192.168.0.106`; override stale panel/API
   bridge targets that still point at `admin@192.168.0.114`.
+- The panel can run bridge control in VM-only mode when the Pi is powered off: leave the Pi bridge
+  target empty so bridge API requests include only the VM node. A filled Pi target is treated as an
+  explicit request to start/status that Pi and will make bridge readiness fail while the Pi is
+  offline.
 - As of 2026-06-07, the active VM runtime address is `172.16.119.137`; override stale panel/API
   bridge targets or SSH forwards that still point at `172.16.119.135`.
 - The VM runtime is installed as an enabled user-systemd service at
@@ -96,8 +108,12 @@ _To be filled as durable knowledge is discovered._
   as `0.0.0.0:8181 -> 127.0.0.1:8181` on the VM and set the panel Runtime URL to
   `http://192.168.0.107:8181`. The VM runtime config must include the panel origin
   `http://192.168.0.107:8180` in `control_api.cors_allowed_origins`. The panel derives the default
-  runtime URL from the page host when it is opened from a non-localhost address and replaces stale
-  stored `http://172.16.119.135:8181` values in that LAN mode.
+  runtime URL from the page host when it is opened from a non-localhost address, replaces stored
+  private `:8181` URLs from a different private host in that LAN mode, and tries the page host on
+  port `8181` plus the default runtime URL as connect fallbacks. This recovers stale self-forward URLs such as
+  `http://172.20.10.4:8181` after the Mac LAN address changes. `http://172.20.10.4:8181` is also
+  treated as a known stale runtime URL when the panel is opened from localhost, so reload falls back
+  to the active VM runtime URL.
 
 ## Important Files And Ownership
 
@@ -145,8 +161,9 @@ _To be filled as durable knowledge is discovered._
 - 2026-06-05: Documented that panel Connect depends on an already-running runtime API and that the
   VM runtime now uses an enabled persistent user-systemd service instead of a transient unit.
 - 2026-06-05: Documented smooth manual `straight` altitude-target ramping instead of immediate
-  GPS/baro altitude jumps.
-- 2026-06-06: Documented fixed `0.1 m/s` manual `straight` altitude-target ramp rate.
+  GPS/baro altitude jumps. Superseded on 2026-06-08.
+- 2026-06-06: Documented fixed `0.1 m/s` manual `straight` altitude-target ramp rate. Superseded on
+  2026-06-08.
 - 2026-06-06: Documented empty default manual climb fields in the panel to avoid accidental
   post-target climb in `straight`.
 - 2026-06-06: Documented one-minute sinusoidal manual `straight` climb variation and panel posting
@@ -155,3 +172,15 @@ _To be filled as durable knowledge is discovered._
 - 2026-06-06: Documented the reduced three-ID lab FLARM traffic database.
 - 2026-06-07: Documented 26-contact FLARM traffic rings, rotating lab-ID collision course, and
   current VM runtime address `172.16.119.137`.
+- 2026-06-08: Documented default all-contact FLARM traffic generation within 40 km, two circling
+  contacts, linear movement for the remaining contacts, real metadata for the first six IDs, and
+  speed output.
+- 2026-06-08: Documented the full six decoded FLARMNet IDs in the simulator traffic set and the
+  resulting 29-contact default.
+- 2026-06-08: Documented VM-only bridge control by leaving the Pi bridge target empty while the Pi is
+  powered off.
+- 2026-06-08: Documented traffic-table ID, call sign, distance and vertical movement columns.
+- 2026-06-08: Documented LAN-mode runtime URL recovery from stale private self-forward hosts.
+- 2026-06-08: Documented localhost-mode recovery from the stale `172.20.10.4:8181` runtime URL.
+- 2026-06-08: Documented default-runtime connect fallback for stale runtime URL entries.
+- 2026-06-08: Documented immediate manual `straight` altitude application from the panel.

@@ -75,13 +75,14 @@ During `circling_left`/`circling_right`, `$PXCV` also includes synthetic AHRS
 roll angle in the XCVario roll field. The bank magnitude varies smoothly between
 `35` and `50` degrees; left turns are emitted as negative roll and right turns
 as positive roll.
-FLARM traffic contacts start with the configured lab IDs `DDA857`, `DDA85A`
-and `DDA85C`, followed by 23 authentic FLARMnet-backed devices with competition
-signs. Additional contacts orbit the ownship on 3, 6, 10, 20 and 30 km rings
-with varied relative altitudes, climb rates and track behaviors. Every 10
-seconds one of the three lab contacts rotates onto a head-on collision-course
-movement. `$PFLAA`/`$PFLAU` emit the six-hex-digit device ID, while the control
-API and panel also expose competition ID, registration and model labels.
+FLARM traffic contacts start with six decoded FLARMNet IDs: `DDA857`,
+`DDA85A`, `DDA85C`, `DDA86A`, `DDA88F` and `DDA896`, followed by 23
+authentic FLARMnet-backed devices with competition signs. The runtime and panel
+default to publishing all 29 contacts. Contacts stay within 40 km of the
+ownship; the first two circle, while the remaining contacts fly linear
+back-and-forth tracks with varied altitude, climb rate, speed and course.
+`$PFLAA`/`$PFLAU` emit the six-hex-digit device ID, while the control API and
+panel also expose competition ID, registration, model labels and speed.
 
 The `SxHAWK` telemetry stream follows the LXNAV/LX protocol parsed by the
 `LX`/LXNAV driver in `kigo_nav`: `GPRMC`, `GPGGA`, `LXWP0`, `LXWP1`, `LXWP2`
@@ -195,13 +196,13 @@ PTY such as `/tmp/kigo-sim/sxhawk`, and set `DeviceA="LX"` with
 
 1. Connect the panel.
 2. Choose a `Manual Mode` phase; `on_ground` is the default after an `XCvario` client connect/reconnect.
-3. Set `Flight Altitude [m]` when using `straight`; the model ramps smoothly from the current altitude to that target at `0.1 m/s` instead of jumping.
-4. Set `Climb Min/Max [m/s]` for `straight` when you want the post-ramp vario, and therefore trail colour, to follow a sinusoid between those values over a `60 s` cycle.
+3. Set `Flight Altitude [m]` when using `straight`; the model applies that GPS/baro altitude immediately so the change is visible right after `Apply Manual Mode`.
+4. Set `Climb Min/Max [m/s]` for `straight` when you want the post-target vario, and therefore trail colour, to follow a sinusoid between those values over a `60 s` cycle.
 5. Set circling speed min/max in `Manual Mode` when using `circling_left` or `circling_right`.
 6. Set wind direction and speed; the runtime sends them to `kigo_nav` as `WIMWV`.
 7. Set OAT when you need a non-default outside air temperature in the `PXCV`/`POV` stream.
 8. Set `QNH [hPa]` or `Wysokosc [m]` in `Atmosphere` to adjust the simulated device altimeter; changing one recalculates the other from the current static pressure.
-9. Adjust traffic count if needed, and enable `collision course` when you want the first traffic contact to converge on the ownship.
+9. Keep the default 29 traffic contacts for the full FLARM set, lower the count if needed, and enable `collision course` when you want the first traffic contact to converge on the ownship.
 10. Use `Start / Resume`, `Pause`, `Reset` or `Apply Manual Mode`.
 11. Watch `Ownship`, `Traffic` and `Health` update from `GET /state` and `SSE`, including each emitted FLARM ID and competition ID.
 

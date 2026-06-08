@@ -12,6 +12,7 @@ from kigo_xcvario_simulator.baro import qnh_hpa_for_static_pressure, static_pres
 from kigo_xcvario_simulator.contracts import ManualModeInput, PresetRequest
 from kigo_xcvario_simulator.orchestrator import ScenarioOrchestrator
 from kigo_xcvario_simulator.state import FlightPhase, HealthState, RuntimeState
+from kigo_xcvario_simulator.traffic_database import FLARM_TRAFFIC_AIRCRAFT
 
 
 def _runtime_config() -> SimulatorRuntimeConfig:
@@ -96,7 +97,7 @@ class ScenarioOrchestratorTests(unittest.TestCase):
         self.assertAlmostEqual(samples[48], 110.0, places=6)
         self.assertAlmostEqual(samples[96], 90.0, places=6)
 
-    def test_manual_straight_ramps_to_configured_altitude_for_gps_and_pressure(self):
+    def test_manual_straight_sets_configured_altitude_for_gps_and_pressure(self):
         immediate = self.orchestrator.set_manual_mode(
             ManualModeInput(
                 phase=FlightPhase.STRAIGHT,
@@ -112,13 +113,13 @@ class ScenarioOrchestratorTests(unittest.TestCase):
         self.assertEqual(immediate.ownship.phase, FlightPhase.STRAIGHT)
         self.assertAlmostEqual(immediate.ownship.track_deg, 90.0, places=6)
         self.assertAlmostEqual(immediate.ownship.speed_kmh, 100.0, places=6)
-        self.assertAlmostEqual(immediate.ownship.gps_altitude_m, 401.0, places=6)
-        self.assertAlmostEqual(immediate.ownship.vertical_speed_ms, 0.1, places=6)
-        self.assertAlmostEqual(snapshot.ownship.gps_altitude_m, 401.1, places=6)
-        self.assertAlmostEqual(snapshot.ownship.vertical_speed_ms, 0.1, places=6)
+        self.assertAlmostEqual(immediate.ownship.gps_altitude_m, 900.0, places=6)
+        self.assertAlmostEqual(immediate.ownship.vertical_speed_ms, 0.0, places=6)
+        self.assertAlmostEqual(snapshot.ownship.gps_altitude_m, 900.0, places=6)
+        self.assertAlmostEqual(snapshot.ownship.vertical_speed_ms, 0.0, places=6)
         self.assertAlmostEqual(
             snapshot.ownship.static_pressure_hpa,
-            static_pressure_hpa_for_altitude(401.1, qnh_hpa=_runtime_config().device_qnh_hpa),
+            static_pressure_hpa_for_altitude(900.0, qnh_hpa=_runtime_config().device_qnh_hpa),
             places=6,
         )
 
@@ -282,6 +283,14 @@ class ScenarioOrchestratorTests(unittest.TestCase):
         self.assertEqual(snapshot.ownship.phase, FlightPhase.STRAIGHT)
         self.assertTrue(snapshot.traffic[0].aircraft_id)
         self.assertEqual(self.orchestrator.get_traffic_config().collision_course, True)
+
+    def test_default_traffic_config_populates_all_contacts(self):
+        self.orchestrator.load_preset(PresetRequest(preset_id="straight", seed=5, autostart=True))
+
+        snapshot = self.orchestrator.tick(1.0)
+
+        self.assertEqual(len(snapshot.traffic), len(FLARM_TRAFFIC_AIRCRAFT))
+        self.assertEqual(self.orchestrator.get_traffic_config().contact_count, len(FLARM_TRAFFIC_AIRCRAFT))
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 FLARMNET_DDB_SOURCE_URL = "https://www.flarmnet.org/files/ddb.json"
 FLARMNET_DDB_SOURCE_DATE = "2026-06-06"
-LAB_TRAFFIC_AIRCRAFT_COUNT = 3
+LAB_TRAFFIC_AIRCRAFT_COUNT = 6
 
 
 @dataclass(frozen=True)
@@ -18,11 +18,14 @@ class FlarmTrafficAircraft:
     aircraft_model: str
 
 
-# Lab traffic IDs requested for the FLARM stream.
+# FLARMnet-backed traffic IDs requested for the FLARM stream.
 FLARM_TRAFFIC_AIRCRAFT: tuple[FlarmTrafficAircraft, ...] = (
-    FlarmTrafficAircraft(device_id="DDA857", competition_id="T1", registration="SP-DDA857", aircraft_model="Configured traffic 1"),
-    FlarmTrafficAircraft(device_id="DDA85A", competition_id="T2", registration="SP-DDA85A", aircraft_model="Configured traffic 2"),
-    FlarmTrafficAircraft(device_id="DDA85C", competition_id="T3", registration="SP-DDA85C", aircraft_model="Configured traffic 3"),
+    FlarmTrafficAircraft(device_id="DDA857", competition_id="MF", registration="D-6676", aircraft_model="LS-4"),
+    FlarmTrafficAircraft(device_id="DDA85A", competition_id="L1", registration="D-3450", aircraft_model="Discus 2"),
+    FlarmTrafficAircraft(device_id="DDA85C", competition_id="TH", registration="D-4449", aircraft_model="Hornet"),
+    FlarmTrafficAircraft(device_id="DDA86A", competition_id="1A", registration="D-3358", aircraft_model="LS-4"),
+    FlarmTrafficAircraft(device_id="DDA88F", competition_id="", registration="DKERO", aircraft_model="DG-800"),
+    FlarmTrafficAircraft(device_id="DDA896", competition_id="TH", registration="D-5799", aircraft_model="ASK-13"),
     FlarmTrafficAircraft(device_id="1804AA", competition_id="27", registration="SP-2585", aircraft_model="Jantar 2B"),
     FlarmTrafficAircraft(device_id="32F759", competition_id="X11", registration="SP-4322", aircraft_model="ASW20FL"),
     FlarmTrafficAircraft(device_id="48D009", competition_id="ZR", registration="SP-4008", aircraft_model="LS-7 WL"),
@@ -47,6 +50,8 @@ FLARM_TRAFFIC_AIRCRAFT: tuple[FlarmTrafficAircraft, ...] = (
     FlarmTrafficAircraft(device_id="DD4FF5", competition_id="JAY", registration="SP-3931", aircraft_model="ASW-19"),
     FlarmTrafficAircraft(device_id="DD500B", competition_id="DL", registration="SP-3452", aircraft_model="Jantar Std. 3"),
 )
+
+DEFAULT_TRAFFIC_CONTACT_COUNT = len(FLARM_TRAFFIC_AIRCRAFT)
 
 
 def traffic_aircraft_for(seed: int, index: int) -> FlarmTrafficAircraft:

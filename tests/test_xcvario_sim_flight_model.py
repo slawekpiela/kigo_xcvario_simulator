@@ -37,7 +37,7 @@ class FlightModelTests(unittest.TestCase):
         self.assertFalse(next_state.on_ground)
         self.assertEqual(next_state.phase, FlightPhase.STRAIGHT)
 
-    def test_straight_ramps_to_configured_altitude_for_gps_and_baro_output(self):
+    def test_straight_sets_configured_altitude_for_gps_and_baro_output(self):
         directive = FlightDirective(
             segment_id="straight_leg",
             phase=FlightPhase.STRAIGHT,
@@ -52,13 +52,13 @@ class FlightModelTests(unittest.TestCase):
         reached = self.model.step(next_state, directive, 5.0)
         settled = self.model.step(reached, directive, 1.0)
 
-        self.assertAlmostEqual(preview.gps_altitude_m, 401.0, places=4)
-        self.assertAlmostEqual(preview.vertical_speed_ms, 0.1, places=4)
-        self.assertAlmostEqual(next_state.gps_altitude_m, 401.1, places=4)
-        self.assertAlmostEqual(next_state.vertical_speed_ms, 0.1, places=4)
+        self.assertAlmostEqual(preview.gps_altitude_m, 401.3, places=4)
+        self.assertAlmostEqual(preview.vertical_speed_ms, 0.0, places=4)
+        self.assertAlmostEqual(next_state.gps_altitude_m, 401.3, places=4)
+        self.assertAlmostEqual(next_state.vertical_speed_ms, 0.0, places=4)
         self.assertAlmostEqual(
             next_state.static_pressure_hpa,
-            static_pressure_hpa_for_altitude(401.1, qnh_hpa=1013.25),
+            static_pressure_hpa_for_altitude(401.3, qnh_hpa=1013.25),
             places=6,
         )
         self.assertAlmostEqual(reached.gps_altitude_m, 401.3, places=4)
@@ -70,15 +70,7 @@ class FlightModelTests(unittest.TestCase):
             places=6,
         )
 
-    def test_straight_climb_range_uses_one_minute_sinusoid_after_altitude_ramp(self):
-        setup_directive = FlightDirective(
-            segment_id="straight_setup",
-            phase=FlightPhase.STRAIGHT,
-            duration_s=None,
-            target_heading_deg=90.0,
-            target_speed_kmh=90.0,
-            baro_altitude_m=500.0,
-        )
+    def test_straight_climb_range_uses_one_minute_sinusoid_after_altitude_target(self):
         directive = FlightDirective(
             segment_id="straight_leg",
             phase=FlightPhase.STRAIGHT,
@@ -90,11 +82,10 @@ class FlightModelTests(unittest.TestCase):
             climb_max_ms=5.0,
         )
 
-        state = self.model.step(self.initial_state, setup_directive, 990.0)
-        state = self.model.preview_directive(state, directive)
+        state = self.model.step(self.initial_state, directive, 1.0)
 
         self.assertAlmostEqual(state.gps_altitude_m, 500.0, places=4)
-        self.assertAlmostEqual(state.vertical_speed_ms, -5.0, places=4)
+        self.assertAlmostEqual(state.vertical_speed_ms, 0.0, places=4)
 
         samples = []
         altitudes = []

@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 from .bridge_control import BridgeControl
 from .contracts import ManualModeInput, PresetRequest, SimulationSnapshot
 from .state import HealthState, FlightPhase
+from .traffic_database import DEFAULT_TRAFFIC_CONTACT_COUNT
 
 
 class ControlApiServer:
@@ -185,7 +186,7 @@ class ControlApiServer:
                     payload = self._read_json_body()
                     controller.session.set_traffic_config(
                         bool(payload.get("enabled", True)),
-                        int(payload.get("contact_count", 0)),
+                        int(payload.get("contact_count", DEFAULT_TRAFFIC_CONTACT_COUNT)),
                         bool(payload.get("collision_course", False)),
                     )
                     self.send_response(204)

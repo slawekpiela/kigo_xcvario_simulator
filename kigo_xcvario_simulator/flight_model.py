@@ -17,8 +17,6 @@ DEFAULT_HOME_TRACK_DEG = 90.0
 DEFAULT_CIRCLING_VARIATION_TICKS = 24
 DEFAULT_CIRCLING_SPEED_VARIATION_TICKS = 48
 DEFAULT_STRAIGHT_CLIMB_CYCLE_S = 60.0
-DEFAULT_STRAIGHT_ALTITUDE_RAMP_MS = 0.1
-DEFAULT_STRAIGHT_ALTITUDE_TARGET_TOLERANCE_M = 0.05
 DEFAULT_GLIDER_LAUNCH_VARIATION_TICKS = 12
 DEFAULT_GENERIC_VARIATION_TICKS = 8
 
@@ -120,12 +118,12 @@ class FlightModel:
             vertical_speed_ms = 0.0
             on_ground = True
         else:
-            ramped_altitude = self._resolve_straight_altitude_ramp(state, directive, dt_s)
-            if ramped_altitude is None:
+            straight_altitude = self._resolve_straight_altitude_target(directive)
+            if straight_altitude is None:
                 vertical_speed_ms = self._resolve_vertical_speed_ms(directive, dt_s)
                 gps_altitude_m = state.gps_altitude_m + vertical_speed_ms * dt_s
             else:
-                gps_altitude_m, vertical_speed_ms = ramped_altitude
+                gps_altitude_m, vertical_speed_ms = straight_altitude
 
             if gps_altitude_m < self._home_altitude_m:
                 gps_altitude_m = self._home_altitude_m
@@ -359,11 +357,9 @@ class FlightModel:
 
         return 0.0
 
-    def _resolve_straight_altitude_ramp(
+    def _resolve_straight_altitude_target(
         self,
-        state: OwnshipState,
         directive: FlightDirective,
-        dt_s: float,
     ) -> tuple[float, float] | None:
         target_altitude_m = self._straight_altitude_target_m(directive)
         if target_altitude_m is None:
@@ -380,35 +376,18 @@ class FlightModel:
             self._active_variation_tick_index = 0
             self._active_variation_elapsed_s = 0.0
 
-        if self._straight_altitude_target_reached:
+        if self._straight_altitude_target_reached and (
+            directive.climb_min_ms is not None or directive.climb_max_ms is not None
+        ):
             return None
 
-        current_altitude_m = float(state.gps_altitude_m)
-        delta_m = target_altitude_m - current_altitude_m
-        if abs(delta_m) <= DEFAULT_STRAIGHT_ALTITUDE_TARGET_TOLERANCE_M:
-            self._straight_altitude_target_reached = True
-            if directive.climb_min_ms is not None or directive.climb_max_ms is not None:
-                return None
-            return target_altitude_m, 0.0
-
-        vertical_speed_ms = self._straight_altitude_ramp_speed_ms(delta_m)
-        if dt_s == 0.0:
-            return current_altitude_m, vertical_speed_ms
-
-        altitude_step_m = vertical_speed_ms * dt_s
-        if abs(altitude_step_m) >= abs(delta_m):
-            self._straight_altitude_target_reached = True
-            return target_altitude_m, delta_m / dt_s
-        return current_altitude_m + altitude_step_m, vertical_speed_ms
+        self._straight_altitude_target_reached = True
+        return target_altitude_m, 0.0
 
     def _straight_altitude_target_m(self, directive: FlightDirective) -> float | None:
         if directive.phase != FlightPhase.STRAIGHT or directive.baro_altitude_m is None:
             return None
         return max(self._home_altitude_m, float(directive.baro_altitude_m))
-
-    @staticmethod
-    def _straight_altitude_ramp_speed_ms(delta_m: float) -> float:
-        return DEFAULT_STRAIGHT_ALTITUDE_RAMP_MS if delta_m > 0.0 else -DEFAULT_STRAIGHT_ALTITUDE_RAMP_MS
 
     def _directive_changed(self, directive: FlightDirective) -> bool:
         return self._active_directive_key != self._variation_key(directive)

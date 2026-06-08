@@ -200,6 +200,7 @@ class NmeaBuilderTests(unittest.TestCase):
                 track_deg=90.0,
                 climb_ms=1.5,
                 alarm_level=1,
+                speed_ms=31.4,
                 aircraft_id="A1B2C3",
             ),
         )
@@ -209,7 +210,7 @@ class NmeaBuilderTests(unittest.TestCase):
 
         self.assertTrue(pflau.startswith("$PFLAU,1,1,2,1,1,"))
         self.assertIn("A1B2C3", pflau)
-        self.assertTrue(pflaa.startswith("$PFLAA,1,123,-45,67,2,A1B2C3,90,0,0,1.5,1*"))
+        self.assertTrue(pflaa.startswith("$PFLAA,1,123,-45,67,2,A1B2C3,90,0,31.4,1.5,1*"))
         self.assertTrue(pflau.endswith("\r\n"))
         self.assertTrue(pflaa.endswith("\r\n"))
 

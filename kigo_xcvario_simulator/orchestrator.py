@@ -39,6 +39,7 @@ from .presets import (
     build_glider_launch_sequence,
 )
 from .state import FlightPhase, HealthState, RuntimeState
+from .traffic_database import DEFAULT_TRAFFIC_CONTACT_COUNT
 from .traffic_model import TrafficGenerator
 
 
@@ -60,7 +61,7 @@ class ScenarioOrchestrator:
         self._health = HealthState.READY
         self._seed = runtime_config.seed
         self._manual_generation = 0
-        self._traffic_config = TrafficConfig(enabled=False, contact_count=0)
+        self._traffic_config = TrafficConfig(enabled=True, contact_count=DEFAULT_TRAFFIC_CONTACT_COUNT)
         self._traffic = ()
         self._wind = WindState()
         self._flight_model = flight_model or FlightModel(

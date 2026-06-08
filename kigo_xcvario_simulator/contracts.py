@@ -47,6 +47,7 @@ class TrafficContact:
     track_deg: float
     climb_ms: float
     alarm_level: int = 0
+    speed_ms: float = 0.0
     aircraft_id: str = ""
     competition_id: str = ""
     registration: str = ""

@@ -319,7 +319,7 @@ def build_pflaa(contact: TrafficContact) -> str:
             identifier,
             str(int(round(contact.track_deg))),
             "0",
-            "0",
+            f"{max(0.0, float(contact.speed_ms)):.1f}",
             f"{contact.climb_ms:.1f}",
             "1",
         ]

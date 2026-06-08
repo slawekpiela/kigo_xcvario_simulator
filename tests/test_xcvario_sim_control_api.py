@@ -13,6 +13,7 @@ from kigo_xcvario_simulator.config import (
 )
 from kigo_xcvario_simulator.control_api import ControlApiServer
 from kigo_xcvario_simulator.session import SimulatorRuntimeSession
+from kigo_xcvario_simulator.traffic_database import FLARM_TRAFFIC_AIRCRAFT
 
 
 class _FakePublisher:
@@ -142,6 +143,23 @@ class ControlApiTests(unittest.TestCase):
         self.assertEqual(payload["snapshot"]["preset_id"], "straight")
         self.assertEqual(payload["runtime"]["traffic_config"]["contact_count"], 2)
         self.assertEqual(payload["runtime"]["traffic_config"]["collision_course"], True)
+
+    def test_traffic_endpoint_defaults_to_all_contacts_when_count_is_missing(self):
+        self.connection.request(
+            "POST",
+            "/api/v1/simulation/traffic",
+            body=json.dumps({"enabled": True}),
+            headers={"Content-Type": "application/json"},
+        )
+        response = self.connection.getresponse()
+        response.read()
+        self.assertEqual(response.status, 204)
+
+        self.connection.request("GET", "/api/v1/simulation/state")
+        response = self.connection.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(payload["runtime"]["traffic_config"]["contact_count"], len(FLARM_TRAFFIC_AIRCRAFT))
 
     def test_wind_endpoint_updates_snapshot_and_runtime_metadata(self):
         self.connection.request(
@@ -325,8 +343,8 @@ class ControlApiTests(unittest.TestCase):
 
         self.assertEqual(immediate_payload["snapshot"]["ownship"]["phase"], "straight")
         self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["speed_kmh"], 100.0, places=6)
-        self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["gps_altitude_m"], 401.0, places=6)
-        self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["vertical_speed_ms"], 0.1, places=6)
+        self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["gps_altitude_m"], 875.0, places=6)
+        self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["vertical_speed_ms"], 0.0, places=6)
 
         self.session.orchestrator.start()
         self.session.orchestrator.tick(1.0)
@@ -335,11 +353,11 @@ class ControlApiTests(unittest.TestCase):
         payload = json.loads(response.read().decode("utf-8"))
 
         self.assertEqual(payload["snapshot"]["ownship"]["phase"], "straight")
-        self.assertAlmostEqual(payload["snapshot"]["ownship"]["gps_altitude_m"], 401.1, places=6)
-        self.assertAlmostEqual(payload["snapshot"]["ownship"]["vertical_speed_ms"], 0.1, places=6)
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["gps_altitude_m"], 875.0, places=6)
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["vertical_speed_ms"], 0.0, places=6)
         self.assertAlmostEqual(
             payload["snapshot"]["ownship"]["static_pressure_hpa"],
-            static_pressure_hpa_for_altitude(401.1, qnh_hpa=1013.25),
+            static_pressure_hpa_for_altitude(875.0, qnh_hpa=1013.25),
             places=6,
         )
 
@@ -368,8 +386,8 @@ class ControlApiTests(unittest.TestCase):
         immediate_payload = json.loads(response.read().decode("utf-8"))
 
         self.assertEqual(immediate_payload["snapshot"]["ownship"]["phase"], "straight")
-        self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["gps_altitude_m"], 401.0, places=6)
-        self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["vertical_speed_ms"], 0.1, places=6)
+        self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["gps_altitude_m"], 875.0, places=6)
+        self.assertAlmostEqual(immediate_payload["snapshot"]["ownship"]["vertical_speed_ms"], 0.0, places=6)
 
         self.session.orchestrator.start()
         self.session.orchestrator.tick(1.0)
@@ -378,8 +396,22 @@ class ControlApiTests(unittest.TestCase):
         payload = json.loads(response.read().decode("utf-8"))
 
         self.assertEqual(payload["snapshot"]["ownship"]["phase"], "straight")
-        self.assertAlmostEqual(payload["snapshot"]["ownship"]["gps_altitude_m"], 401.1, places=6)
-        self.assertAlmostEqual(payload["snapshot"]["ownship"]["vertical_speed_ms"], 0.1, places=6)
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["gps_altitude_m"], 875.0, places=6)
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["vertical_speed_ms"], 0.0, places=6)
+        self.assertAlmostEqual(
+            payload["snapshot"]["ownship"]["static_pressure_hpa"],
+            static_pressure_hpa_for_altitude(payload["snapshot"]["ownship"]["gps_altitude_m"], qnh_hpa=1013.25),
+            places=6,
+        )
+
+        self.session.orchestrator.tick(1.0)
+        self.connection.request("GET", "/api/v1/simulation/state")
+        response = self.connection.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(payload["snapshot"]["ownship"]["phase"], "straight")
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["gps_altitude_m"], 874.0, places=6)
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["vertical_speed_ms"], -1.0, places=6)
         self.assertAlmostEqual(
             payload["snapshot"]["ownship"]["static_pressure_hpa"],
             static_pressure_hpa_for_altitude(payload["snapshot"]["ownship"]["gps_altitude_m"], qnh_hpa=1013.25),
