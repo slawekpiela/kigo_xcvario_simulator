@@ -1,5 +1,18 @@
 # Project Agent Instructions
 
+## Central System Context
+
+- Before any `kigo_xcvario_simulator` work, read the canonical system instructions at
+  `/Users/slawekpiela/PycharmProjects/system/AGENTS.md`.
+- Also read the central infrastructure and project profile files:
+  `/Users/slawekpiela/PycharmProjects/system/.agents/infrastructure/ACCESS.md`,
+  `/Users/slawekpiela/PycharmProjects/system/.agents/infrastructure/PERMISSIONS.md`,
+  and
+  `/Users/slawekpiela/PycharmProjects/system/.agents/project-awareness/projects/kigo_xcvario_simulator.md`.
+- Treat the central system files as mandatory startup context. Project-local
+  instructions in this file remain the authority for `kigo_xcvario_simulator`-specific
+  rules.
+
 ## Documentation Discipline
 
 These rules are mandatory for every coding or code-analysis task in this project.
