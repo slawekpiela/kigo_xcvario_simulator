@@ -1,5 +1,15 @@
 # Project Agent Instructions
 
+## Caveman Mode
+
+- Use caveman mode by default: short, direct, practical.
+- Report only essentials: error cause, changed scope, verification result,
+  dependency, blocker, or user-relevant risk.
+- Do not narrate routine steps, infrastructure connection attempts, or obvious
+  mechanics.
+- Prefer the simplest working fix that matches the existing codebase. Do not add
+  abstraction or process unless it solves a concrete problem.
+
 ## Central System Context
 
 - Before any `kigo_xcvario_simulator` work, read the canonical system instructions at
