@@ -13,12 +13,17 @@ Then open [http://127.0.0.1:8180/](http://127.0.0.1:8180/).
 ## What The Panel Does
 
 - stores the runtime URL in local browser storage,
+- stores an optional start-airport ICAO code and sends it during `Connect`,
 - loads the latest state from `GET /api/v1/simulation/state`,
 - subscribes to `GET /api/v1/events`,
 - sends operator commands for primary device selection, lifecycle, manual mode, wind, OAT and traffic,
 - opens a snapshot chart for Raspberry Pi CPU temperature and CPU usage from `logs/CPU_temperature`,
 - renders read-only ownship, traffic and health status,
 - exposes traffic count, visible aircraft IDs and an optional collision-course mode for contact `1`.
+
+When the start-airport ICAO field is filled, the runtime searches local OpenAIP
+`*_apt.json` files, writes the resolved coordinate to `.cache/airport_icao_cache.json`,
+and resets the ownship to that airport on the ground.
 
 ## Expected Runtime Config
 

@@ -1,7 +1,10 @@
 import http.client
 import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 
+from kigo_xcvario_simulator.airport_lookup import AirportLookup
 from kigo_xcvario_simulator.baro import qnh_hpa_for_static_pressure, static_pressure_hpa_for_altitude
 from kigo_xcvario_simulator.config import (
     ControlApiConfig,
@@ -265,6 +268,51 @@ class ControlApiTests(unittest.TestCase):
         self.assertFalse(payload["runtime"]["adapters"]["xcvario"]["active"])
         self.assertTrue(self.session.xcvario_adapter.stopped)
         self.assertTrue(self.session.sxhawk_adapter.started)
+
+    def test_start_airport_endpoint_places_ownship_from_cached_icao_lookup(self):
+        with TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "openaip"
+            data_dir.mkdir()
+            (data_dir / "us_apt.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "name": "MINDEN TAHOE AIRPORT",
+                            "icaoCode": "KMEV",
+                            "geometry": {"type": "Point", "coordinates": [-119.751, 39.0003]},
+                            "elevation": {"value": 1439, "unit": 0},
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            cache_path = Path(temp_dir) / "airport-cache.json"
+            self.session._airport_lookup = AirportLookup(data_dirs=(data_dir,), cache_path=cache_path)
+
+            self.connection.request(
+                "POST",
+                "/api/v1/simulation/start-airport",
+                body=json.dumps({"icao": "kmev"}),
+                headers={"Content-Type": "application/json"},
+            )
+            response = self.connection.getresponse()
+            payload = json.loads(response.read().decode("utf-8"))
+
+            self.assertEqual(response.status, 200)
+            self.assertEqual(payload["airport"]["icao"], "KMEV")
+            self.assertTrue(cache_path.exists())
+
+            self.connection.request("GET", "/api/v1/simulation/state")
+            response = self.connection.getresponse()
+            payload = json.loads(response.read().decode("utf-8"))
+
+            ownship = payload["snapshot"]["ownship"]
+            self.assertAlmostEqual(ownship["latitude_deg"], 39.0003, places=6)
+            self.assertAlmostEqual(ownship["longitude_deg"], -119.751, places=6)
+            self.assertAlmostEqual(ownship["gps_altitude_m"], 1439.0, places=6)
+            self.assertTrue(ownship["on_ground"])
+            self.assertAlmostEqual(ownship["speed_kmh"], 0.0, places=6)
+            self.assertEqual(payload["runtime"]["start_airport"]["icao"], "KMEV")
 
     def test_preset_endpoint_accepts_on_ground(self):
         self.connection.request(

@@ -238,6 +238,20 @@ class ControlApiServer:
                     self._write_cors_headers()
                     self.end_headers()
                     return True
+                if path == "/api/v1/simulation/start-airport":
+                    payload = self._read_json_body()
+                    airport = controller.session.set_start_airport_icao(
+                        payload.get("icao", payload.get("airport_icao", payload.get("start_airport_icao"))),
+                        heading_deg=_optional_float(payload.get("heading_deg")),
+                    )
+                    self._write_json(
+                        200,
+                        {
+                            "airport": _to_jsonable(airport),
+                            "snapshot": _to_jsonable(controller.session.get_snapshot()),
+                        },
+                    )
+                    return True
                 if path.startswith("/api/v1/bridges/"):
                     payload = self._read_json_body()
                     action = path.rsplit("/", 1)[-1]

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from threading import Lock
 
-from .config import SimulatorRuntimeConfig, normalize_primary_device
+from .airport_lookup import AirportLookup, AirportPosition
+from .config import HomePosition, SimulatorRuntimeConfig, normalize_primary_device
 from .contracts import ManualModeInput, PresetRequest, SimulationSnapshot
 from .flarm_adapter import FlarmTcpAdapter
 from .orchestrator import ScenarioOrchestrator
@@ -25,9 +27,12 @@ class SimulatorRuntimeSession:
         sxhawk_adapter=None,
         flarm_adapter=None,
         scheduler: TelemetryScheduler | None = None,
+        airport_lookup: AirportLookup | None = None,
     ) -> None:
         self.runtime_config = runtime_config
         self.orchestrator = orchestrator or ScenarioOrchestrator(runtime_config)
+        self._airport_lookup = airport_lookup or AirportLookup()
+        self._start_airport: AirportPosition | None = None
         self._primary_lock = Lock()
         self._primary_device = normalize_primary_device(runtime_config.primary_device)
         xcvario_polar = get_xcvario_polar(runtime_config.xcvario.polar_name)
@@ -131,6 +136,7 @@ class SimulatorRuntimeSession:
             "started": self._started,
             "seed": snapshot.seed,
             "primary_device": primary_device,
+            "start_airport": asdict(self._start_airport) if self._start_airport is not None else None,
             "scheduler": {
                 "tick_count": self.scheduler.tick_count,
                 "last_jitter_s": self.scheduler.last_jitter_s,
@@ -245,6 +251,24 @@ class SimulatorRuntimeSession:
 
     def set_device_altitude_m(self, altitude_m: float) -> SimulationSnapshot:
         return self.orchestrator.set_device_altitude_m(altitude_m)
+
+    def set_start_airport_icao(
+        self,
+        icao: object,
+        *,
+        heading_deg: float | None = None,
+    ) -> AirportPosition:
+        airport = self._airport_lookup.find_by_icao(icao)
+        self._start_airport = airport
+        self.orchestrator.set_home_position(
+            HomePosition(
+                latitude_deg=airport.latitude_deg,
+                longitude_deg=airport.longitude_deg,
+                gps_altitude_m=airport.gps_altitude_m,
+            ),
+            heading_deg=heading_deg,
+        )
+        return airport
 
     def set_primary_device(self, primary_device: str) -> SimulationSnapshot:
         resolved_device = normalize_primary_device(primary_device)

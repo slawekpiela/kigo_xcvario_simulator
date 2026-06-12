@@ -1,4 +1,5 @@
 const STORAGE_RUNTIME_URL = "kigo.sim.runtimeUrl";
+const STORAGE_START_AIRPORT_ICAO = "kigo.sim.startAirportIcao";
 const STORAGE_BRIDGE_PREFIX = "kigo.sim.bridge.";
 const BARO_K1 = 0.190263;
 const BARO_K2 = 8.417286e-5;
@@ -24,6 +25,7 @@ const connectButton = document.getElementById("connect-button");
 const disconnectButton = document.getElementById("disconnect-button");
 const refreshButton = document.getElementById("refresh-button");
 const deviceSelect = document.getElementById("device-select");
+const startAirportIcaoInput = document.getElementById("start-airport-icao-input");
 const applyDeviceButton = document.getElementById("apply-device-button");
 const connectionStatus = document.getElementById("connection-status");
 const statusMessage = document.getElementById("status-message");
@@ -91,6 +93,7 @@ function loadStoredSettings() {
   runtimeUrlInput.value = isLegacyRuntimeUrl(storedRuntimeUrl) || isStaleRuntimeUrlForPanel(storedRuntimeUrl)
     ? defaultRuntimeUrl
     : storedRuntimeUrl || defaultRuntimeUrl;
+  startAirportIcaoInput.value = normalizeStartAirportIcao(localStorage.getItem(STORAGE_START_AIRPORT_ICAO));
   localStorage.removeItem("kigo.sim.runtimeToken");
   loadStoredInput(vmBridgeTargetInput, "vmBridgeTarget", BRIDGE_DEFAULTS.vmBridgeTarget);
   loadStoredInput(piBridgeTargetInput, "piBridgeTarget", BRIDGE_DEFAULTS.piBridgeTarget);
@@ -98,6 +101,7 @@ function loadStoredSettings() {
 
 function persistSettings() {
   localStorage.setItem(STORAGE_RUNTIME_URL, runtimeUrlInput.value.trim());
+  localStorage.setItem(STORAGE_START_AIRPORT_ICAO, normalizeStartAirportIcao(startAirportIcaoInput.value));
   persistInput(vmBridgeTargetInput, "vmBridgeTarget");
   persistInput(piBridgeTargetInput, "piBridgeTarget");
 }
@@ -105,6 +109,10 @@ function persistSettings() {
 function normalizeRuntimeUrl(rawValue) {
   const trimmed = String(rawValue || "").trim();
   return trimmed.replace(/\/+$/, "");
+}
+
+function normalizeStartAirportIcao(rawValue) {
+  return String(rawValue || "").trim().toUpperCase();
 }
 
 function loadStoredInput(node, key, defaultValue) {
@@ -294,7 +302,11 @@ async function connectPanel() {
       state.connected = true;
       persistSettings();
       showApiError("");
-      setStatus("ok", `Panel API connected to ${state.runtimeUrl}. Resetting to EPBA...`);
+      const startAirportIcao = normalizeStartAirportIcao(startAirportIcaoInput.value);
+      setStatus(
+        "ok",
+        `Panel API connected to ${state.runtimeUrl}. Resetting to ${startAirportIcao || "runtime home"}...`,
+      );
       await resetRuntimeToHomeOnConnect();
       setStatus("ok", `Panel API connected to ${state.runtimeUrl}. Restarting bridges...`);
       await restartBridgesAfterConnect();
@@ -310,9 +322,21 @@ async function connectPanel() {
 }
 
 async function resetRuntimeToHomeOnConnect() {
-  await requestJson("/api/v1/simulation/reset", {
-    method: "POST",
-  });
+  const startAirportIcao = normalizeStartAirportIcao(startAirportIcaoInput.value);
+  if (startAirportIcao) {
+    startAirportIcaoInput.value = startAirportIcao;
+    localStorage.setItem(STORAGE_START_AIRPORT_ICAO, startAirportIcao);
+    await requestJson("/api/v1/simulation/start-airport", {
+      method: "POST",
+      body: JSON.stringify({
+        icao: startAirportIcao,
+      }),
+    });
+  } else {
+    await requestJson("/api/v1/simulation/reset", {
+      method: "POST",
+    });
+  }
   await requestJson("/api/v1/simulation/manual-mode", {
     method: "POST",
     body: JSON.stringify({
@@ -1064,6 +1088,10 @@ disconnectButton.addEventListener("click", () => {
 
 refreshButton.addEventListener("click", () => {
   void fetchState({ syncControls: true }).catch((error) => showApiError(String(error.message || error)));
+});
+
+startAirportIcaoInput.addEventListener("input", () => {
+  startAirportIcaoInput.value = normalizeStartAirportIcao(startAirportIcaoInput.value);
 });
 
 bridgeStartButton.addEventListener("click", () => {

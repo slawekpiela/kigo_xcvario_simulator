@@ -8,7 +8,7 @@ import math
 from threading import RLock
 
 from .baro import qnh_hpa_for_static_pressure
-from .config import SimulatorRuntimeConfig
+from .config import HomePosition, SimulatorRuntimeConfig
 from .contracts import (
     FlightDirective,
     ManualModeInput,
@@ -54,12 +54,12 @@ class ScenarioOrchestrator:
         traffic_generator: TrafficGenerator | None = None,
         start_utc: datetime | None = None,
     ) -> None:
-        self._config = runtime_config
         self._lock = RLock()
         self._start_utc = self._normalize_utc(start_utc or datetime.now(timezone.utc))
         self._runtime_state = RuntimeState.STOPPED
         self._health = HealthState.READY
         self._seed = runtime_config.seed
+        self._home_position = runtime_config.home_position
         self._manual_generation = 0
         self._traffic_config = TrafficConfig(enabled=True, contact_count=DEFAULT_TRAFFIC_CONTACT_COUNT)
         self._traffic = ()
@@ -157,6 +157,43 @@ class ScenarioOrchestrator:
             self._preset_plan = None
             self._preset_segment_index = 0
             self._preset_segment_elapsed_s = 0.0
+            self._apply_manual_directive_preview()
+            self._health = HealthState.READY
+            return self._snapshot()
+
+    def set_home_position(
+        self,
+        home_position: HomePosition,
+        *,
+        heading_deg: float | None = None,
+    ) -> SimulationSnapshot:
+        with self._lock:
+            self._home_position = home_position
+            self._flight_model.set_home_position(
+                latitude_deg=home_position.latitude_deg,
+                longitude_deg=home_position.longitude_deg,
+                gps_altitude_m=home_position.gps_altitude_m,
+            )
+            self._sim_time_s = 0.0
+            self._preset_plan = None
+            self._preset_segment_index = 0
+            self._preset_segment_elapsed_s = 0.0
+            self._manual_plan = None
+            self._manual_segment_index = 0
+            self._manual_segment_elapsed_s = 0.0
+            self._manual_generation += 1
+            self._ownship = self._flight_model.reset()
+            self._ownship = self._flight_model.apply_device_qnh_to_state(self._ownship)
+            self._traffic = ()
+            self._manual_directive = FlightDirective(
+                segment_id=f"manual_{self._manual_generation}_on_ground",
+                phase=FlightPhase.GLIDER_LAUNCH,
+                duration_s=None,
+                target_heading_deg=heading_deg if heading_deg is not None else DEFAULT_HEADING_DEG,
+                target_speed_kmh=0.0,
+                sink_ms=0.0,
+                on_ground=True,
+            )
             self._apply_manual_directive_preview()
             self._health = HealthState.READY
             return self._snapshot()
@@ -452,7 +489,7 @@ class ScenarioOrchestrator:
         self._preset_segment_elapsed_s = 0.0
 
     def _glider_launch_exit_altitude_m(self) -> float:
-        return self._config.home_position.gps_altitude_m + DEFAULT_GLIDER_LAUNCH_EXIT_ALTITUDE_AGL_M
+        return self._home_position.gps_altitude_m + DEFAULT_GLIDER_LAUNCH_EXIT_ALTITUDE_AGL_M
 
     def _active_plan_has_timing(self) -> bool:
         return self._manual_plan is not None or self._preset_plan is not None

@@ -78,6 +78,11 @@ class FlightModel:
     def set_device_qnh_hpa(self, qnh_hpa: float) -> None:
         self._device_qnh_hpa = float(qnh_hpa)
 
+    def set_home_position(self, *, latitude_deg: float, longitude_deg: float, gps_altitude_m: float) -> None:
+        self._home_latitude_deg = float(latitude_deg)
+        self._home_longitude_deg = float(longitude_deg)
+        self._home_altitude_m = float(gps_altitude_m)
+
     def reset(self) -> OwnshipState:
         self._elapsed_s = 0.0
         self._active_directive_key = None
