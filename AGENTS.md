@@ -1,5 +1,10 @@
 # Project Agent Instructions
 
+## Global Agent Rules
+
+- Before any work in this project, read and obey `/Users/slawekpiela/.codex/AGENTS.md`.
+- `/Users/slawekpiela/.codex/AGENTS.md` is the source of truth for cross-project rules. Project-local rules only add more specific constraints.
+
 ## Caveman Mode
 
 - Use caveman mode by default: short, direct, practical.
