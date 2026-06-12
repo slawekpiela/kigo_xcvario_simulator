@@ -114,6 +114,10 @@ _To be filled as durable knowledge is discovered._
   `http://172.20.10.4:8181` after the Mac LAN address changes. `http://172.20.10.4:8181` is also
   treated as a known stale runtime URL when the panel is opened from localhost, so reload falls back
   to the active VM runtime URL.
+- On 2026-06-12 the Mac LAN panel/API address was `192.168.0.135`; add
+  `http://192.168.0.135:8180` to the VM runtime `control_api.cors_allowed_origins` when serving the
+  panel from that address. A healthy `curl` to `:8181` is not enough for browser access; verify CORS
+  with an `OPTIONS` request carrying `Origin: http://<mac-lan-ip>:8180`.
 
 ## Important Files And Ownership
 
@@ -133,6 +137,18 @@ _To be filled as durable knowledge is discovered._
   the runtime host. `systemctl --user is-active kigo-xcvario-tunnel-pi.service` can report
   `active` while SSH is repeatedly timing out or restarting; inspect the tunnel log or
   `systemctl --user status ...` restart counter before treating it as a healthy tunnel.
+- If XCSoar reports `GPS waiting for fix` while the control API says the runtime is `running`, check
+  the `snapshot.ownship.timestamp_utc`, `runtime.scheduler.last_error`, and bridge byte counters. On
+  2026-06-12 the runtime API stayed live with a stale 2026-06-11 snapshot after the telemetry
+  scheduler thread crashed on `ValueError: Invalid QNH/altitude combination for pressure conversion`.
+  The VM bridge could be `active/tcp` but `primary_bytes_tcp_to_pty` stayed at zero until the runtime
+  service was restarted. Recovery was: restart `kigo-xcvario-runtime.service`, re-apply manual mode,
+  restart the VM bridge, then verify `$GPRMC`/`$GPGGA` output with `nc 127.0.0.1 4353` on the VM.
+- As of 2026-06-12, `admin@192.168.0.111` is not a usable Pi bridge target for this lab setup: from
+  the VM it presents a changed host key relative to `/home/slawek/.ssh/known_hosts`, and with a clean
+  temporary known-hosts file it still rejects `/home/slawek/.ssh/kigo_pi`. Do not clear the stale
+  known-hosts entry as a bridge fix unless the device identity and authorized key are verified first.
+  `192.168.0.106`, `192.168.0.108`, and `192.168.0.113` timed out for SSH in the same check.
 
 ## Decisions And Assumptions
 
@@ -184,3 +200,5 @@ _To be filled as durable knowledge is discovered._
 - 2026-06-08: Documented localhost-mode recovery from the stale `172.20.10.4:8181` runtime URL.
 - 2026-06-08: Documented default-runtime connect fallback for stale runtime URL entries.
 - 2026-06-08: Documented immediate manual `straight` altitude application from the panel.
+- 2026-06-12: Documented stale-live runtime diagnosis, CORS update for Mac LAN `192.168.0.135`, and
+  the current unusable `admin@192.168.0.111` Pi bridge target symptoms.
