@@ -23,7 +23,8 @@ Then open [http://127.0.0.1:8180/](http://127.0.0.1:8180/).
 
 When the start-airport ICAO field is filled, the runtime searches local OpenAIP
 `*_apt.json` files, writes the resolved coordinate to `.cache/airport_icao_cache.json`,
-and resets the ownship to that airport on the ground.
+and resets the ownship to that airport on the ground. The built-in known
+positions include `FWCT` for Worcester, South Africa.
 
 ## Expected Runtime Config
 

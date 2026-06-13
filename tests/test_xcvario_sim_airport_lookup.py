@@ -7,6 +7,19 @@ from kigo_xcvario_simulator.airport_lookup import AirportLookup
 
 
 class AirportLookupTests(unittest.TestCase):
+    def test_known_fwct_worcester_position_is_available_without_openaip_data(self):
+        with TemporaryDirectory() as temp_dir:
+            cache_path = Path(temp_dir) / "airport-cache.json"
+            lookup = AirportLookup(data_dirs=(Path(temp_dir) / "missing",), cache_path=cache_path)
+
+            airport = lookup.find_by_icao("fwct")
+
+            self.assertEqual(airport.icao, "FWCT")
+            self.assertEqual(airport.name, "Worcester")
+            self.assertAlmostEqual(airport.latitude_deg, -33.663, places=6)
+            self.assertAlmostEqual(airport.longitude_deg, 19.415, places=6)
+            self.assertAlmostEqual(airport.gps_altitude_m, 205.0, places=6)
+
     def test_lookup_caches_airport_position_after_first_file_search(self):
         with TemporaryDirectory() as temp_dir:
             data_dir = Path(temp_dir) / "openaip"

@@ -21,6 +21,17 @@ class AirportPosition:
     gps_altitude_m: float
 
 
+_KNOWN_AIRPORT_POSITIONS = {
+    "FWCT": AirportPosition(
+        icao="FWCT",
+        name="Worcester",
+        latitude_deg=-33.663,
+        longitude_deg=19.415,
+        gps_altitude_m=205.0,
+    ),
+}
+
+
 class AirportLookup:
     def __init__(
         self,
@@ -37,6 +48,10 @@ class AirportLookup:
         cached = cache.get(icao)
         if isinstance(cached, Mapping):
             return _airport_from_mapping(icao, cached)
+
+        known = _KNOWN_AIRPORT_POSITIONS.get(icao)
+        if known is not None:
+            return known
 
         airport = self._search_data_dirs(icao)
         cache[icao] = asdict(airport)

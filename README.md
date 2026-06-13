@@ -105,7 +105,8 @@ Open [http://127.0.0.1:8180/](http://127.0.0.1:8180/), enter:
 
 - runtime URL, for example `http://192.168.0.50:8181`,
 - optional `ICAO of the start airport`; when set, `Connect` looks up the local OpenAIP airport data,
-  caches the coordinate under `.cache/airport_icao_cache.json`, and places the glider there on the ground,
+  caches the coordinate under `.cache/airport_icao_cache.json`, and places the glider there on the ground.
+  The built-in known positions include `FWCT` for Worcester, South Africa.
 - choose `XCvario` or `SxHAWK` as the active primary device when needed.
 
 ### 4. Configure XCSoar/KIGO Test Profile

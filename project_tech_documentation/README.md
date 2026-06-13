@@ -81,10 +81,12 @@ _To be filled as durable knowledge is discovered._
 - Start-airport placement is session-local. The panel `Connection` section stores the optional
   `ICAO of the start airport` field in local browser storage and posts it to
   `/api/v1/simulation/start-airport` during `Connect`. `AirportLookup` searches local OpenAIP
-  `*_apt.json` files, preferring sibling `Kigo/appdata/openaip` from the runtime working tree, then
-  caches resolved ICAO coordinates in `.cache/airport_icao_cache.json`. `SimulatorRuntimeSession`
-  applies the resolved coordinate through `ScenarioOrchestrator.set_home_position()`, which updates
-  the in-memory `FlightModel` home, clears active plans/traffic, and places the ownship on the ground
+  `*_apt.json` files, preferring sibling `Kigo/appdata/openaip` from the runtime working tree, after
+  checking built-in known positions. `FWCT` is a built-in alias for Worcester, South Africa, using the
+  local OpenAIP `FAWC` coordinate `-33.663, 19.415` and elevation `205 m`. OpenAIP lookups cache
+  resolved ICAO coordinates in `.cache/airport_icao_cache.json`. `SimulatorRuntimeSession` applies
+  the resolved coordinate through `ScenarioOrchestrator.set_home_position()`, which updates the
+  in-memory `FlightModel` home, clears active plans/traffic, and places the ownship on the ground
   without modifying `runtime.local.json`; a runtime restart returns to the configured home position.
 
 ## Build, Run, And Test Notes
@@ -211,3 +213,4 @@ _To be filled as durable knowledge is discovered._
 - 2026-06-12: Documented stale-live runtime diagnosis, CORS update for Mac LAN `192.168.0.135`, and
   the current unusable `admin@192.168.0.111` Pi bridge target symptoms.
 - 2026-06-12: Documented session-local start-airport ICAO placement and `.cache/airport_icao_cache.json`.
+- 2026-06-13: Documented the built-in `FWCT` Worcester start-position alias.
