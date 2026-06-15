@@ -195,6 +195,12 @@ For SxHAWK, switch the runtime to `primary_device="sxhawk"`, expose a matching
 PTY such as `/tmp/kigo-sim/sxhawk`, and set `DeviceA="LX"` with
 `PortPath="/tmp/kigo-sim/sxhawk"`.
 
+When the Pi is outside the LAN but reachable through Tailscale, keep the
+runtime on the VM and use the VM SSH alias `kigo-pi-tail` as the `PI Bridge
+Target`. The VM alias reaches the Tailscale host `kigo-pi` and the bridge API
+starts the reverse tunnel so the Pi PTYs still connect to the runtime's local
+`127.0.0.1:4353` and `127.0.0.1:4354`.
+
 ## Manual Flow
 
 1. Connect the panel.

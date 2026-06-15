@@ -128,6 +128,21 @@ _To be filled as durable knowledge is discovered._
   `http://192.168.0.135:8180` to the VM runtime `control_api.cors_allowed_origins` when serving the
   panel from that address. A healthy `curl` to `:8181` is not enough for browser access; verify CORS
   with an `OPTIONS` request carrying `Origin: http://<mac-lan-ip>:8180`.
+- As of 2026-06-15, the active Pi is reachable from `codex-vm` through Tailscale as
+  `kigo-pi` / `100.115.17.10`, hostname `ssdkigo1`. `codex-vm` cannot use system Tailscale without
+  sudo, so it runs a rootless user service
+  `/home/slawek/.config/systemd/user/tailscaled-userspace.service` with
+  `tailscaled --tun=userspace-networking --socks5-server=127.0.0.1:1055` and socket
+  `/home/slawek/.local/run/tailscale/tailscaled.sock`. VM SSH config alias `kigo-pi-tail` uses
+  `ProxyCommand /home/slawek/.local/bin/tailscale --socket=/home/slawek/.local/run/tailscale/tailscaled.sock nc %h %p`
+  plus identity `/home/slawek/.ssh/kigo_pi`; use `kigo-pi-tail` as the panel/API `PI Bridge Target`
+  for outside-LAN Pi bridge control. On 2026-06-15, restarting bridges through
+  `http://127.0.0.1:8181/api/v1/bridges/restart` with VM target `localhost` and Pi target
+  `kigo-pi-tail` produced ready VM and Pi bridges, active Pi tunnel, and non-zero
+  `primary_bytes_tcp_to_pty` / `flarm_bytes_tcp_to_pty`. Stop the VM Tailscale userspace service
+  with `systemctl --user stop tailscaled-userspace.service`; stop bridge units through
+  `/api/v1/bridges/stop` or manually stop `kigo-xcvario-tunnel-pi.service`,
+  `kigo-xcvario-pty-xcvario.service` and `kigo-xcvario-pty-flarm.service`.
 
 ## Important Files And Ownership
 
@@ -214,3 +229,5 @@ _To be filled as durable knowledge is discovered._
   the current unusable `admin@192.168.0.111` Pi bridge target symptoms.
 - 2026-06-12: Documented session-local start-airport ICAO placement and `.cache/airport_icao_cache.json`.
 - 2026-06-13: Documented the built-in `FWCT` Worcester start-position alias.
+- 2026-06-15: Documented rootless Tailscale access from `codex-vm` to the active Pi and the
+  `kigo-pi-tail` bridge target.
