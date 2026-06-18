@@ -9,10 +9,10 @@ from kigo_xcvario_simulator.traffic_database import (
     traffic_aircraft_for,
 )
 from kigo_xcvario_simulator.traffic_model import (
-    CLIMBING_ORBIT_CONTACT_COUNT,
     MAX_TRAFFIC_RADIUS_M,
     MIN_TRAFFIC_RADIUS_M,
     ORBIT_PERIOD_RANGE_S,
+    TRAFFIC_CLIMB_RANGE_MS,
     TRAFFIC_SPEED_RANGE_MS,
     TrafficGenerator,
 )
@@ -138,20 +138,21 @@ class TrafficGeneratorTests(unittest.TestCase):
 
         self.assertLess(min(contact.relative_altitude_m for contact in contacts), -800.0)
         self.assertGreater(max(contact.relative_altitude_m for contact in contacts), 1000.0)
-        self.assertLess(min(contact.climb_ms for contact in contacts), -1.0)
-        self.assertGreater(max(contact.climb_ms for contact in contacts), 1.0)
+        self.assertGreater(max(contact.climb_ms for contact in contacts), 3.0)
 
-    def test_some_contacts_orbit_for_at_least_two_minutes_with_climb(self):
+    def test_all_default_contacts_orbit_with_requested_climb_range(self):
         generator = TrafficGenerator(seed=33)
 
         first = generator.step(_ownship(), 1.0, contact_count=len(FLARM_TRAFFIC_AIRCRAFT))
         second = generator.step(_ownship(), 120.0, contact_count=len(FLARM_TRAFFIC_AIRCRAFT))
 
         self.assertGreaterEqual(ORBIT_PERIOD_RANGE_S[0], 120.0)
-        for index in range(CLIMBING_ORBIT_CONTACT_COUNT):
+        for index in range(len(FLARM_TRAFFIC_AIRCRAFT)):
             with self.subTest(index=index):
-                self.assertGreater(first[index].climb_ms, 0.0)
-                self.assertGreater(second[index].climb_ms, 0.0)
+                self.assertGreaterEqual(first[index].climb_ms, TRAFFIC_CLIMB_RANGE_MS[0])
+                self.assertLessEqual(first[index].climb_ms, TRAFFIC_CLIMB_RANGE_MS[1])
+                self.assertGreaterEqual(second[index].climb_ms, TRAFFIC_CLIMB_RANGE_MS[0])
+                self.assertLessEqual(second[index].climb_ms, TRAFFIC_CLIMB_RANGE_MS[1])
                 self.assertNotAlmostEqual(first[index].relative_north_m, second[index].relative_north_m, delta=0.1)
                 self.assertNotAlmostEqual(first[index].relative_east_m, second[index].relative_east_m, delta=0.1)
 

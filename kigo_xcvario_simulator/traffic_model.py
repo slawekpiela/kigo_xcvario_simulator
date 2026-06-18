@@ -15,10 +15,9 @@ MAX_TRAFFIC_RADIUS_M = 30000.0
 TRAFFIC_RADIUS_MARGIN_M = 100.0
 ORBIT_PERIOD_RANGE_S = (300.0, 900.0)
 TRAFFIC_SPEED_RANGE_MS = (0.5, 5.0)
-CLIMBING_ORBIT_CONTACT_COUNT = 4
+TRAFFIC_CLIMB_RANGE_MS = (0.51, 4.0)
 COLLISION_INITIAL_DISTANCE_M = 3000.0
 ALTITUDE_BANDS_M = (-900.0, -620.0, -330.0, -120.0, 180.0, 470.0, 820.0, 1180.0)
-ORBIT_BEHAVIOR_COUNT = 5
 
 
 class TrafficGenerator:
@@ -98,8 +97,7 @@ class TrafficGenerator:
         relative_north_m = center_north_m + math.cos(orbit_angle_rad) * turn_radius_m
         relative_east_m = center_east_m + math.sin(orbit_angle_rad) * turn_radius_m
         track_deg = normalize_heading_deg(orbit_angle_deg + 90.0 * turn_direction)
-        behavior_index = index % ORBIT_BEHAVIOR_COUNT
-        climb_ms = self._orbit_climb_ms(index, behavior_index)
+        climb_ms = self._orbit_climb_ms(index)
 
         base_relative_altitude_m = ALTITUDE_BANDS_M[index % len(ALTITUDE_BANDS_M)]
         altitude_wave_m = math.sin(math.radians(orbit_angle_deg + index * 37.0)) * 55.0
@@ -164,30 +162,17 @@ class TrafficGenerator:
             TRAFFIC_SPEED_RANGE_MS[1] - TRAFFIC_SPEED_RANGE_MS[0]
         )
 
-    def _orbit_climb_ms(self, index: int, behavior_index: int) -> float:
-        if index < CLIMBING_ORBIT_CONTACT_COUNT:
-            return 0.5 + self._fraction(index, "climbing_orbit_climb") * 1.7
-        return self._climb_for_behavior(index, behavior_index)
+    def _orbit_climb_ms(self, index: int) -> float:
+        return SeededRangeGenerator(
+            seed=self._seed,
+            minimum=TRAFFIC_CLIMB_RANGE_MS[0],
+            maximum=TRAFFIC_CLIMB_RANGE_MS[1],
+            salt=f"traffic:{index}:orbit:climb",
+            interpolation_ticks=5,
+        ).value_at(self._tick_index)
 
     def _collision_cycle_elapsed_s(self) -> float:
         return self._sim_time_s % AUTO_COLLISION_INTERVAL_S
-
-    def _climb_for_behavior(self, index: int, behavior_index: int) -> float:
-        climb_ranges = (
-            (-0.5, 0.9),
-            (-1.4, 0.1),
-            (-0.2, 1.7),
-            (-2.1, -0.2),
-            (0.2, 2.4),
-        )
-        minimum, maximum = climb_ranges[behavior_index]
-        return SeededRangeGenerator(
-            seed=self._seed,
-            minimum=minimum,
-            maximum=maximum,
-            salt=f"traffic:{index}:behavior:{behavior_index}:climb",
-            interpolation_ticks=5,
-        ).value_at(self._tick_index)
 
     def _contact(
         self,
