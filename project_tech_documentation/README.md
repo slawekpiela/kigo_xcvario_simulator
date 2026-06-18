@@ -160,6 +160,13 @@ _To be filled as durable knowledge is discovered._
   a normal APK cannot expose a virtual serial device to another APK without root or explicit app
   integration. The bridge service is not exported; `install_bridge.sh` opens `MainActivity`, and the
   activity starts the foreground service.
+- On the tested Android 11 Samsung device, `kigo.nav` loads the active profile from
+  `/sdcard/Android/media/kigo.nav/XCSoarData/kigo_default.top`; matching-looking profiles under
+  `/sdcard/Android/data/kigo.nav/files/XCSoarData` can be stale. A connection error after activating
+  the APK bridge may be caused by the active profile still using `PortPath="/tmp/kigo-sim/xcvario"`
+  and `Port3Path="/tmp/kigo-sim/flarm"`. Switch `PortType`/`Port3Type` to `tcp_client`, set
+  `PortIPAddress`/`Port3IPAddress` to `127.0.0.1`, clear `PortPath`/`Port3Path`, and keep TCP ports
+  `4353`/`4354`, then force-stop/restart Kigo.
 
 ## Important Files And Ownership
 
@@ -255,3 +262,5 @@ _To be filled as durable knowledge is discovered._
 - 2026-06-18: Documented the Android phone USB bridge APK and its `adb reverse` TCP data path.
 - 2026-06-18: Documented that Android bridge activation starts through `MainActivity`, not an
   exported service.
+- 2026-06-18: Documented Android Kigo active profile location under `Android/media` and the
+  serial-to-TCP profile fix needed for the USB bridge.

@@ -88,3 +88,27 @@ Port2TCPPort="4354"
 
 For SxHAWK, keep port `4353` but use the matching LX/LXNAV device driver in
 Kigo/Nav.
+
+## Troubleshooting
+
+If Kigo/Nav still reports a connection error, check the active Android profile.
+On Android 11 devices observed here, Kigo loads:
+
+```text
+/sdcard/Android/media/kigo.nav/XCSoarData/kigo_default.top
+```
+
+Older copies under `/sdcard/Android/data/kigo.nav/files/XCSoarData` can be
+stale. The active profile must use `tcp_client` with empty serial paths:
+
+```text
+PortType="tcp_client"
+PortIPAddress="127.0.0.1"
+PortPath=""
+PortTCPPort="4353"
+
+Port3Type="tcp_client"
+Port3IPAddress="127.0.0.1"
+Port3Path=""
+Port3TCPPort="4354"
+```
