@@ -104,11 +104,13 @@ python3 -m kigo_xcvario_simulator.panel.start_frontend --host 127.0.0.1 --port 8
 Open [http://127.0.0.1:8180/](http://127.0.0.1:8180/), enter:
 
 - runtime URL, for example `http://192.168.0.50:8181`,
-- optional `ICAO of the start airport`; the field accepts either a four-character ICAO code or a
-  start-place query such as `Minden Tahoe` / `Minden USA`. When set, `Connect` looks up local
-  OpenAIP airport data, caches the coordinate under `.cache/airport_icao_cache.json`, and places the
-  glider there on the ground. Built-in known positions include `FWCT` for Worcester, South Africa,
-  and `KMEV` / `Minden Tahoe`.
+- optional `Start airport or place`; the field accepts either a four-character ICAO code or a
+  free-text place/country query such as `Minden Tahoe USA`. ICAO values use local OpenAIP airport
+  data; non-ICAO values use the configured online geocoder to resolve latitude/longitude, cache the
+  result under `.cache/airport_icao_cache.json`, and place the glider there on the ground. Online
+  geocoder results do not include terrain elevation, so they start at `0 m` GPS altitude.
+  The default geocoder URL can be changed with `KIGO_GEOCODER_SEARCH_URL`, and its User-Agent with
+  `KIGO_GEOCODER_USER_AGENT`.
 - choose `XCvario` or `SxHAWK` as the active primary device when needed.
 
 ### 4. Configure XCSoar/KIGO Test Profile

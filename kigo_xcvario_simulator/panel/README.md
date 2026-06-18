@@ -13,7 +13,7 @@ Then open [http://127.0.0.1:8180/](http://127.0.0.1:8180/).
 ## What The Panel Does
 
 - stores the runtime URL in local browser storage,
-- stores an optional start-airport ICAO code or start-place query and sends it during `Connect`,
+- stores an optional start-airport ICAO code or free-text start-place query and sends it during `Connect`,
 - loads the latest state from `GET /api/v1/simulation/state`,
 - subscribes to `GET /api/v1/events`,
 - sends operator commands for primary device selection, lifecycle, manual mode, wind, OAT and traffic,
@@ -22,11 +22,14 @@ Then open [http://127.0.0.1:8180/](http://127.0.0.1:8180/).
 - exposes traffic count, visible aircraft IDs and an optional collision-course mode for contact `1`.
 
 When the start-airport field is filled, the runtime accepts either a
-four-character ICAO code or a start-place query such as `Minden Tahoe` /
-`Minden USA`. It searches local OpenAIP `*_apt.json` files, writes the resolved
-coordinate to `.cache/airport_icao_cache.json`, and resets the ownship to that
-airport on the ground. The built-in known positions include `FWCT` for
-Worcester, South Africa, and `KMEV` / `Minden Tahoe`.
+four-character ICAO code or a free-text place/country query such as
+`Minden Tahoe USA`. ICAO values search local OpenAIP `*_apt.json` files.
+Non-ICAO values use the configured online geocoder to resolve latitude/longitude.
+Resolved coordinates are cached in `.cache/airport_icao_cache.json`, and the
+ownship is reset there on the ground. Online geocoder results do not include
+terrain elevation, so they start at `0 m` GPS altitude. The default geocoder URL
+can be changed with `KIGO_GEOCODER_SEARCH_URL`, and its User-Agent with
+`KIGO_GEOCODER_USER_AGENT`.
 
 ## Expected Runtime Config
 

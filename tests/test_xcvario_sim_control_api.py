@@ -40,6 +40,20 @@ class _FakePublisher:
         self.oat_c = float(oat_c)
 
 
+class _JsonResponse:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, _exc_type, _exc, _traceback):
+        return None
+
+    def read(self):
+        return json.dumps(self._payload).encode("utf-8")
+
+
 class _FakeBridgeControl:
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict[str, object]]] = []
@@ -320,6 +334,15 @@ class ControlApiTests(unittest.TestCase):
             self.session._airport_lookup = AirportLookup(
                 data_dirs=(Path(temp_dir) / "missing",),
                 cache_path=cache_path,
+                urlopen_func=lambda _request, timeout: _JsonResponse(
+                    [
+                        {
+                            "display_name": "Minden-Tahoe Airport, Douglas County, Nevada, United States",
+                            "lat": "39.0003",
+                            "lon": "-119.751",
+                        }
+                    ]
+                ),
             )
 
             self.connection.request(
@@ -332,7 +355,7 @@ class ControlApiTests(unittest.TestCase):
             payload = json.loads(response.read().decode("utf-8"))
 
         self.assertEqual(response.status, 200)
-        self.assertEqual(payload["airport"]["icao"], "KMEV")
+        self.assertEqual(payload["airport"]["icao"], "GEOCODE")
         self.assertAlmostEqual(payload["snapshot"]["ownship"]["latitude_deg"], 39.0003, places=6)
         self.assertAlmostEqual(payload["snapshot"]["ownship"]["longitude_deg"], -119.751, places=6)
 

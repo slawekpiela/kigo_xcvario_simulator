@@ -1,4 +1,4 @@
-"""Local start-location lookup backed by cached OpenAIP data."""
+"""Start-location lookup backed by local airport data and online geocoding."""
 
 from __future__ import annotations
 
@@ -7,11 +7,20 @@ import json
 import os
 from pathlib import Path
 import re
-from typing import Iterable, Mapping
+from typing import Callable, Iterable, Mapping
 import unicodedata
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 
 DEFAULT_CACHE_PATH = Path(".cache") / "airport_icao_cache.json"
+DEFAULT_GEOCODER_SEARCH_URL = "https://nominatim.openstreetmap.org/search"
+DEFAULT_GEOCODER_USER_AGENT = (
+    "kigo-xcvario-simulator/1.0 "
+    "(https://github.com/slawekpiela/kigo_xcvario_simulator)"
+)
+DEFAULT_GEOCODER_TIMEOUT_S = 5.0
 
 
 @dataclass(frozen=True)
@@ -40,21 +49,6 @@ _KNOWN_AIRPORT_POSITIONS = {
     ),
 }
 
-_KNOWN_LOCATION_ICAO_ALIASES = {
-    "minden tahoe": "KMEV",
-    "minden tahoe airport": "KMEV",
-    "minden us": "KMEV",
-    "minden usa": "KMEV",
-    "minden united states": "KMEV",
-    "minden united states of america": "KMEV",
-    "minden nevada": "KMEV",
-    "minden nv": "KMEV",
-    "minden nevada us": "KMEV",
-    "minden nevada usa": "KMEV",
-    "worcester south africa": "FWCT",
-    "worcester za": "FWCT",
-}
-
 
 class AirportLookup:
     def __init__(
@@ -62,15 +56,24 @@ class AirportLookup:
         *,
         data_dirs: Iterable[Path | str] | None = None,
         cache_path: Path | str | None = None,
+        geocoder_search_url: str | None = None,
+        geocoder_timeout_s: float = DEFAULT_GEOCODER_TIMEOUT_S,
+        urlopen_func: Callable[..., object] | None = None,
     ) -> None:
         self._data_dirs = tuple(Path(path) for path in data_dirs) if data_dirs is not None else _default_data_dirs()
         self._cache_path = Path(os.environ.get("KIGO_AIRPORT_CACHE_PATH", cache_path or DEFAULT_CACHE_PATH))
+        self._geocoder_search_url = os.environ.get(
+            "KIGO_GEOCODER_SEARCH_URL",
+            geocoder_search_url or DEFAULT_GEOCODER_SEARCH_URL,
+        )
+        self._geocoder_timeout_s = float(os.environ.get("KIGO_GEOCODER_TIMEOUT_S", geocoder_timeout_s))
+        self._urlopen = urlopen_func or urlopen
 
     def find(self, raw_query: object) -> AirportPosition:
         query = str(raw_query or "").strip()
         if _looks_like_icao(query):
             return self.find_by_icao(query)
-        return self.find_by_place_country(query)
+        return self.find_by_free_text_location(query)
 
     def find_by_icao(self, raw_icao: object) -> AirportPosition:
         icao = _normalize_icao(raw_icao)
@@ -90,27 +93,19 @@ class AirportLookup:
         self._write_cache(cache)
         return airport
 
-    def find_by_place_country(self, raw_query: object) -> AirportPosition:
+    def find_by_free_text_location(self, raw_query: object) -> AirportPosition:
         query = str(raw_query or "").strip()
         normalized_query = _normalize_search_text(query)
         if not normalized_query:
-            raise ValueError("start location must be an ICAO code or place and country.")
+            raise ValueError("start location must be an ICAO code or free-text place query.")
 
-        cache_key = f"location:{normalized_query}"
+        cache_key = f"geocode:{normalized_query}"
         cache = self._read_cache()
         cached = cache.get(cache_key)
         if isinstance(cached, Mapping):
             return _airport_from_mapping(cache_key, cached)
 
-        alias_icao = _KNOWN_LOCATION_ICAO_ALIASES.get(normalized_query)
-        if alias_icao is not None:
-            airport = self.find_by_icao(alias_icao)
-            cache[cache_key] = asdict(airport)
-            self._write_cache(cache)
-            return airport
-
-        place, country_code = _split_place_country(normalized_query)
-        airport = self._search_place_data_dirs(place, country_code, query)
+        airport = self._geocode_free_text_location(query, normalized_query)
         cache[cache_key] = asdict(airport)
         self._write_cache(cache)
         return airport
@@ -126,19 +121,52 @@ class AirportLookup:
         searched = ", ".join(str(path) for path in self._data_dirs)
         raise ValueError(f"airport ICAO {icao!r} not found in local OpenAIP data: {searched}")
 
-    def _search_place_data_dirs(self, place: str, country_code: str, raw_query: str) -> AirportPosition:
-        best: tuple[int, AirportPosition] | None = None
-        for data_dir in self._data_dirs:
-            if not data_dir.is_dir():
-                continue
-            for json_path in _candidate_place_files(data_dir, country_code):
-                for score, airport in _find_place_matches_in_file(json_path, place, country_code):
-                    if best is None or score > best[0]:
-                        best = (score, airport)
-        if best is not None:
-            return best[1]
-        searched = ", ".join(str(path) for path in self._data_dirs)
-        raise ValueError(f"start location {raw_query!r} not found in local OpenAIP data: {searched}")
+    def _geocode_free_text_location(self, query: str, normalized_query: str) -> AirportPosition:
+        params = {
+            "q": query,
+            "format": "jsonv2",
+            "limit": "1",
+            "addressdetails": "1",
+        }
+        country_code = _country_code_from_query(normalized_query)
+        if country_code is not None:
+            params["countrycodes"] = country_code.lower()
+        url = f"{self._geocoder_search_url}?{urlencode(params)}"
+        request = Request(
+            url,
+            headers={
+                "Accept": "application/json",
+                "Accept-Language": "en",
+                "User-Agent": os.environ.get("KIGO_GEOCODER_USER_AGENT", DEFAULT_GEOCODER_USER_AGENT),
+            },
+        )
+        try:
+            with self._urlopen(request, timeout=self._geocoder_timeout_s) as response:
+                records = json.load(response)
+        except HTTPError as exc:
+            raise ValueError(f"internet geocoding failed for {query!r}: HTTP {exc.code}") from exc
+        except (URLError, TimeoutError, OSError) as exc:
+            raise ValueError(f"internet geocoding failed for {query!r}: {exc}") from exc
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"internet geocoding failed for {query!r}: invalid JSON response") from exc
+
+        if not isinstance(records, list) or not records:
+            raise ValueError(f"internet geocoding found no result for {query!r}")
+        record = records[0]
+        if not isinstance(record, Mapping):
+            raise ValueError(f"internet geocoding returned an invalid result for {query!r}")
+        try:
+            latitude_deg = float(record["lat"])
+            longitude_deg = float(record["lon"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(f"internet geocoding returned invalid coordinates for {query!r}") from exc
+        return AirportPosition(
+            icao="GEOCODE",
+            name=str(record.get("display_name") or record.get("name") or query),
+            latitude_deg=latitude_deg,
+            longitude_deg=longitude_deg,
+            gps_altitude_m=0.0,
+        )
 
     def _read_cache(self) -> dict[str, object]:
         try:
@@ -185,13 +213,6 @@ def _candidate_files(data_dir: Path, icao: str) -> tuple[Path, ...]:
     return (preferred, *(path for path in files if path != preferred))
 
 
-def _candidate_place_files(data_dir: Path, country_code: str) -> tuple[Path, ...]:
-    preferred = data_dir / f"{country_code.lower()}_apt.json"
-    if preferred.is_file():
-        return (preferred,)
-    return tuple(sorted(data_dir.glob("*_apt.json")))
-
-
 def _find_in_file(json_path: Path, icao: str) -> AirportPosition | None:
     try:
         records = json.loads(json_path.read_text(encoding="utf-8"))
@@ -206,27 +227,6 @@ def _find_in_file(json_path: Path, icao: str) -> AirportPosition | None:
             continue
         return _airport_from_openaip_record(icao, record)
     return None
-
-
-def _find_place_matches_in_file(json_path: Path, place: str, country_code: str) -> list[tuple[int, AirportPosition]]:
-    try:
-        records = json.loads(json_path.read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
-    if not isinstance(records, list):
-        return []
-    matches: list[tuple[int, AirportPosition]] = []
-    for record in records:
-        if not isinstance(record, Mapping):
-            continue
-        if str(record.get("country", "")).strip().upper() != country_code:
-            continue
-        score = _score_place_record(record, place)
-        if score <= 0:
-            continue
-        identifier = str(record.get("icaoCode") or record.get("altIdentifier") or place).strip().upper()
-        matches.append((score, _airport_from_openaip_record(identifier, record)))
-    return matches
 
 
 def _airport_from_openaip_record(icao: str, record: Mapping[str, object]) -> AirportPosition:
@@ -280,42 +280,11 @@ def _normalize_search_text(raw_value: object) -> str:
     return " ".join(text.split())
 
 
-def _split_place_country(normalized_query: str) -> tuple[str, str]:
+def _country_code_from_query(normalized_query: str) -> str | None:
     for country_name, country_code in sorted(_COUNTRY_ALIASES.items(), key=lambda item: len(item[0]), reverse=True):
-        suffix = f" {country_name}"
-        if normalized_query.endswith(suffix):
-            place = normalized_query[: -len(suffix)].strip()
-            if place:
-                return place, country_code
-    tokens = normalized_query.split()
-    if len(tokens) >= 2 and len(tokens[-1]) == 2 and tokens[-1].isalpha():
-        return " ".join(tokens[:-1]), tokens[-1].upper()
-    raise ValueError("start location must be an ICAO code or place and country, e.g. 'KMEV' or 'Minden USA'.")
-
-
-def _score_place_record(record: Mapping[str, object], place: str) -> int:
-    name = _normalize_search_text(record.get("name"))
-    if not name:
-        return 0
-    place_tokens = place.split()
-    name_tokens = set(name.split())
-    if name == place:
-        score = 100
-    elif name.startswith(f"{place} "):
-        score = 90
-    elif place in name:
-        score = 80
-    elif all(token in name_tokens for token in place_tokens):
-        score = 60
-    else:
-        return 0
-    if record.get("icaoCode"):
-        score += 10
-    if record.get("private") is True:
-        score -= 5
-    if record.get("type") == 7:
-        score -= 20
-    return score
+        if normalized_query == country_name or normalized_query.endswith(f" {country_name}"):
+            return country_code
+    return None
 
 
 _COUNTRY_ALIASES = {

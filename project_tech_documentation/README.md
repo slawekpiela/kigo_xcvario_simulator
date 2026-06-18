@@ -79,14 +79,17 @@ _To be filled as durable knowledge is discovered._
   registration fallback, computes horizontal distance from relative north/east offsets, and shows
   `climb_ms` as the vertical movement value.
 - Start-airport placement is session-local. The panel `Connection` section stores the optional
-  `ICAO of the start airport` field in local browser storage and posts it to
-  `/api/v1/simulation/start-airport` during `Connect`; despite the label, the value may be either a
-  four-character ICAO code or a start-place query such as `Minden Tahoe` / `Minden USA`. `AirportLookup`
-  searches local OpenAIP `*_apt.json` files, preferring sibling `Kigo/appdata/openaip` from the runtime
-  working tree. Place/country queries are normalized, filtered by OpenAIP `country`, and matched against
-  airport names; built-in aliases cover `FWCT` for Worcester, South Africa, and `KMEV` / `Minden Tahoe`.
-  OpenAIP lookups cache resolved ICAO or `location:<normalized-query>` coordinates in
-  `.cache/airport_icao_cache.json`. `SimulatorRuntimeSession` applies the resolved coordinate through
+  `Start airport or place` field in local browser storage and posts it to
+  `/api/v1/simulation/start-airport` during `Connect`. Four-character ICAO values use
+  `AirportLookup.find_by_icao()`, which searches local OpenAIP `*_apt.json` files, preferring sibling
+  `Kigo/appdata/openaip` from the runtime working tree, with built-in fallback positions for `FWCT`
+  and `KMEV`. Non-ICAO values use the configured Nominatim-compatible online geocoder endpoint
+  (`KIGO_GEOCODER_SEARCH_URL`, default `https://nominatim.openstreetmap.org/search`) with
+  `format=jsonv2`, `limit=1`, a custom User-Agent (`KIGO_GEOCODER_USER_AGENT` override), and optional
+  `countrycodes` inferred from the free-text suffix. Geocoded results are cached as
+  `geocode:<normalized-query>` in `.cache/airport_icao_cache.json`; because the geocoder returns
+  latitude/longitude but not terrain elevation, `gps_altitude_m` is `0.0` for online results.
+  `SimulatorRuntimeSession` applies the resolved coordinate through
   `ScenarioOrchestrator.set_home_position()`, which updates the in-memory `FlightModel` home, clears
   active plans/traffic, and places the ownship on the ground without modifying `runtime.local.json`; a
   runtime restart returns to the configured home position.
@@ -233,5 +236,5 @@ _To be filled as durable knowledge is discovered._
 - 2026-06-13: Documented the built-in `FWCT` Worcester start-position alias.
 - 2026-06-15: Documented rootless Tailscale access from `codex-vm` to the active Pi and the
   `kigo-pi-tail` bridge target.
-- 2026-06-18: Documented start-airport lookup accepting ICAO, `Minden Tahoe`, and place/country
-  queries backed by local OpenAIP data.
+- 2026-06-18: Documented start-airport lookup accepting ICAO through local OpenAIP and non-ICAO
+  free-text place/country queries through a configurable online geocoder.
