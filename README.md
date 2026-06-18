@@ -226,3 +226,34 @@ starts the reverse tunnel so the Pi PTYs still connect to the runtime's local
 ```bash
 python3 -m unittest discover -s tests -p 'test_xcvario_sim_*.py'
 ```
+
+## Android Phone USB Bridge APK
+
+For a phone connected to the Mac over USB debugging, this repository includes a
+separate helper APK under [android_bridge](android_bridge). The APK listens on
+the phone at `127.0.0.1:4353` and `127.0.0.1:4354`, then connects upstream to
+`127.0.0.1:44353` and `127.0.0.1:44354`; `adb reverse` maps those upstream
+ports back to the simulator TCP ports on the Mac.
+
+Build and install:
+
+```bash
+./android_bridge/install_bridge.sh
+```
+
+Configure Kigo/Nav on the phone as TCP clients:
+
+```text
+DeviceA="XCVario"
+PortType="tcp_client"
+PortIPAddress="127.0.0.1"
+PortTCPPort="4353"
+
+DeviceB="FLARM"
+Port2Type="tcp_client"
+Port2IPAddress="127.0.0.1"
+Port2TCPPort="4354"
+```
+
+This bridge is TCP-only. A normal Android APK cannot expose a virtual serial
+device to another APK without additional app support or root access.

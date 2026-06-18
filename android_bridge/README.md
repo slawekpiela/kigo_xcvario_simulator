@@ -1,0 +1,88 @@
+# Kigo Android Bridge APK
+
+Small Android helper APK for feeding the simulator into Kigo/Nav on a phone
+connected to the Mac with USB debugging.
+
+## Data Path
+
+```text
+Kigo/Nav on Android
+  tcp_client 127.0.0.1:4353 / 4354
+        |
+Android Bridge APK
+  listens on 127.0.0.1:4353 / 4354
+  connects to 127.0.0.1:44353 / 44354
+        |
+adb reverse
+  device tcp:44353 -> Mac tcp:4353
+  device tcp:44354 -> Mac tcp:4354
+        |
+Kigo XCVario simulator on the Mac
+```
+
+The APK is a local TCP bridge. It does not emulate an Android serial device;
+Android does not let a normal APK expose a virtual serial port to another APK.
+
+## Build
+
+The project intentionally avoids Gradle because this repository already has no
+Android build system. It uses the local Android SDK tools directly:
+
+```bash
+./android_bridge/build_apk.sh
+```
+
+Requirements:
+
+- Android SDK under `ANDROID_HOME`, `ANDROID_SDK_ROOT`, or
+  `$HOME/Library/Android/sdk`,
+- JDK/JBR under `JAVA_HOME`, Android Studio, or PyCharm.
+
+The signed debug APK is written to:
+
+```text
+android_bridge/build/kigo-android-bridge.apk
+```
+
+## Install And Start
+
+Start the simulator so the Mac has local TCP listeners on `4353` and `4354`,
+then connect the phone over USB with Android debugging enabled:
+
+```bash
+./android_bridge/install_bridge.sh
+```
+
+That script:
+
+- builds the APK,
+- installs it with `adb install -r`,
+- creates the required `adb reverse` mappings,
+- starts the foreground bridge service,
+- opens the bridge screen.
+
+If the simulator runs on a VM instead of the Mac, first expose the VM simulator
+ports on the Mac as local `4353` and `4354` before running the install script.
+
+## Kigo/Nav Device Settings
+
+Primary device:
+
+```text
+DeviceA="XCVario"
+PortType="tcp_client"
+PortIPAddress="127.0.0.1"
+PortTCPPort="4353"
+```
+
+FLARM:
+
+```text
+DeviceB="FLARM"
+Port2Type="tcp_client"
+Port2IPAddress="127.0.0.1"
+Port2TCPPort="4354"
+```
+
+For SxHAWK, keep port `4353` but use the matching LX/LXNAV device driver in
+Kigo/Nav.

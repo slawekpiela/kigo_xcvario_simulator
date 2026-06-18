@@ -149,6 +149,16 @@ _To be filled as durable knowledge is discovered._
   with `systemctl --user stop tailscaled-userspace.service`; stop bridge units through
   `/api/v1/bridges/stop` or manually stop `kigo-xcvario-tunnel-pi.service`,
   `kigo-xcvario-pty-xcvario.service` and `kigo-xcvario-pty-flarm.service`.
+- The Android phone USB bridge lives under `android_bridge/` and is intentionally separate from the
+  Python simulator package. It builds a debug-signed APK with local Android SDK tools, no Gradle:
+  `./android_bridge/build_apk.sh`. The script uses `ANDROID_HOME`/`ANDROID_SDK_ROOT` or
+  `$HOME/Library/Android/sdk`, and `JAVA_HOME` or the bundled JBR from Android Studio/PyCharm.
+  Runtime data flow is Kigo/Nav on Android connecting to `127.0.0.1:4353`/`4354`, the APK forwarding
+  those sockets to Android-local upstream
+  `127.0.0.1:44353`/`44354`, and `adb reverse tcp:44353 tcp:4353` plus
+  `adb reverse tcp:44354 tcp:4354` carrying the streams back to the Mac simulator. This is TCP-only;
+  a normal APK cannot expose a virtual serial device to another APK without root or explicit app
+  integration.
 
 ## Important Files And Ownership
 
@@ -241,3 +251,4 @@ _To be filled as durable knowledge is discovered._
   free-text place/country queries through a configurable online geocoder.
 - 2026-06-18: Documented default FLARM traffic orbiting within 100 km at `0.5` to `5.0 m/s`
   tangential speed.
+- 2026-06-18: Documented the Android phone USB bridge APK and its `adb reverse` TCP data path.
