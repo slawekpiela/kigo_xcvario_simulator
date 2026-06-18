@@ -10,16 +10,14 @@ from .traffic_database import traffic_aircraft_for
 from .variation import SeededRangeGenerator
 
 AUTO_COLLISION_INTERVAL_S = 10.0
-CIRCLING_CONTACT_COUNT = 2
-MAX_TRAFFIC_RADIUS_M = 40000.0
+MAX_TRAFFIC_RADIUS_M = 100000.0
 TRAFFIC_RADIUS_MARGIN_M = 1200.0
-CIRCLING_CENTER_DISTANCES_M = (7000.0, 12500.0)
-CIRCLING_RADII_M = (900.0, 1300.0)
+TRAFFIC_CENTER_DISTANCE_MIN_M = 12000.0
+ORBIT_PERIOD_RANGE_S = (300.0, 900.0)
+TRAFFIC_SPEED_RANGE_MS = (0.5, 5.0)
 COLLISION_INITIAL_DISTANCE_M = 3000.0
-LINEAR_CROSS_TRACK_LIMIT_M = 9500.0
-LINEAR_BEHAVIOR_COUNT = 5
 ALTITUDE_BANDS_M = (-900.0, -620.0, -330.0, -120.0, 180.0, 470.0, 820.0, 1180.0)
-LINEAR_SPEED_RANGE_MS = (23.0, 48.0)
+ORBIT_BEHAVIOR_COUNT = 5
 
 
 class TrafficGenerator:
@@ -71,21 +69,24 @@ class TrafficGenerator:
         if collision_course and index == 0:
             return self._build_collision_contact(ownship, index)
 
-        if index < CIRCLING_CONTACT_COUNT:
-            return self._build_circling_contact(ownship, index)
+        return self._build_orbiting_contact(ownship, index)
 
-        return self._build_linear_contact(ownship, index)
-
-    def _build_circling_contact(self, ownship: OwnshipState, index: int) -> TrafficContact:
-        center_distance_m = CIRCLING_CENTER_DISTANCES_M[index % len(CIRCLING_CENTER_DISTANCES_M)]
+    def _build_orbiting_contact(self, ownship: OwnshipState, index: int) -> TrafficContact:
+        speed_ms = self._traffic_speed_ms(index)
+        orbit_period_s = ORBIT_PERIOD_RANGE_S[0] + self._fraction(index, "orbit_period") * (
+            ORBIT_PERIOD_RANGE_S[1] - ORBIT_PERIOD_RANGE_S[0]
+        )
+        turn_radius_m = speed_ms * orbit_period_s / (math.pi * 2.0)
+        max_center_distance_m = MAX_TRAFFIC_RADIUS_M - TRAFFIC_RADIUS_MARGIN_M - turn_radius_m
+        center_distance_m = TRAFFIC_CENTER_DISTANCE_MIN_M + self._fraction(index, "center_distance") * (
+            max_center_distance_m - TRAFFIC_CENTER_DISTANCE_MIN_M
+        )
         center_bearing_deg = normalize_heading_deg(self._seed * 17.0 + index * 121.0 + ownship.track_deg * 0.20)
         center_bearing_rad = math.radians(center_bearing_deg)
         center_north_m = math.cos(center_bearing_rad) * center_distance_m
         center_east_m = math.sin(center_bearing_rad) * center_distance_m
 
-        turn_radius_m = CIRCLING_RADII_M[index % len(CIRCLING_RADII_M)]
         turn_direction = 1.0 if index % 2 == 0 else -1.0
-        speed_ms = 24.0 + index * 4.0 + self._fraction(index, "circling_speed") * 4.0
         angular_speed_deg_s = math.degrees(speed_ms / turn_radius_m)
         orbit_angle_deg = normalize_heading_deg(
             center_bearing_deg + 70.0 + turn_direction * self._sim_time_s * angular_speed_deg_s
@@ -95,53 +96,12 @@ class TrafficGenerator:
         relative_north_m = center_north_m + math.cos(orbit_angle_rad) * turn_radius_m
         relative_east_m = center_east_m + math.sin(orbit_angle_rad) * turn_radius_m
         track_deg = normalize_heading_deg(orbit_angle_deg + 90.0 * turn_direction)
-        climb_ms = 0.7 + self._fraction(index, "circling_climb") * 1.6
+        behavior_index = index % ORBIT_BEHAVIOR_COUNT
+        climb_ms = self._climb_for_behavior(index, behavior_index)
 
         base_relative_altitude_m = ALTITUDE_BANDS_M[index % len(ALTITUDE_BANDS_M)]
         altitude_wave_m = math.sin(math.radians(orbit_angle_deg + index * 37.0)) * 55.0
         relative_altitude_m = base_relative_altitude_m + altitude_wave_m + climb_ms * 18.0
-
-        return self._contact(
-            index=index,
-            relative_north_m=relative_north_m,
-            relative_east_m=relative_east_m,
-            relative_altitude_m=relative_altitude_m,
-            track_deg=track_deg,
-            climb_ms=climb_ms,
-            speed_ms=speed_ms,
-            alarm_level=self._alarm_level(relative_north_m, relative_east_m, relative_altitude_m),
-        )
-
-    def _build_linear_contact(self, ownship: OwnshipState, index: int) -> TrafficContact:
-        route_bearing_deg = normalize_heading_deg(self._seed * 23.0 + index * 41.0 + ownship.track_deg * 0.12)
-        route_bearing_rad = math.radians(route_bearing_deg)
-        right_bearing_rad = math.radians(normalize_heading_deg(route_bearing_deg + 90.0))
-        cross_offset_m = (-LINEAR_CROSS_TRACK_LIMIT_M) + self._fraction(index, "linear_cross") * (
-            LINEAR_CROSS_TRACK_LIMIT_M * 2.0
-        )
-        max_radius_m = MAX_TRAFFIC_RADIUS_M - TRAFFIC_RADIUS_MARGIN_M
-        along_limit_m = math.sqrt(max_radius_m * max_radius_m - cross_offset_m * cross_offset_m)
-        speed_ms = LINEAR_SPEED_RANGE_MS[0] + self._fraction(index, "linear_speed") * (
-            LINEAR_SPEED_RANGE_MS[1] - LINEAR_SPEED_RANGE_MS[0]
-        )
-        path_length_m = along_limit_m * 2.0
-        cycle_distance_m = (
-            self._sim_time_s * speed_ms + self._fraction(index, "linear_phase") * path_length_m * 2.0
-        ) % (path_length_m * 2.0)
-        if cycle_distance_m <= path_length_m:
-            along_m = -along_limit_m + cycle_distance_m
-            track_deg = route_bearing_deg
-        else:
-            along_m = along_limit_m - (cycle_distance_m - path_length_m)
-            track_deg = normalize_heading_deg(route_bearing_deg + 180.0)
-
-        relative_north_m = math.cos(route_bearing_rad) * along_m + math.cos(right_bearing_rad) * cross_offset_m
-        relative_east_m = math.sin(route_bearing_rad) * along_m + math.sin(right_bearing_rad) * cross_offset_m
-        behavior_index = index % LINEAR_BEHAVIOR_COUNT
-        climb_ms = self._climb_for_behavior(index, behavior_index)
-        base_relative_altitude_m = ALTITUDE_BANDS_M[index % len(ALTITUDE_BANDS_M)]
-        altitude_wave_m = math.sin(math.radians(route_bearing_deg + self._sim_time_s * 2.3 + index * 37.0)) * 85.0
-        relative_altitude_m = base_relative_altitude_m + altitude_wave_m + climb_ms * 24.0
 
         return self._contact(
             index=index,
@@ -195,6 +155,11 @@ class TrafficGenerator:
             climb_ms=climb_ms,
             speed_ms=traffic_speed_kmh / 3.6,
             alarm_level=alarm_level,
+        )
+
+    def _traffic_speed_ms(self, index: int) -> float:
+        return TRAFFIC_SPEED_RANGE_MS[0] + self._fraction(index, "speed") * (
+            TRAFFIC_SPEED_RANGE_MS[1] - TRAFFIC_SPEED_RANGE_MS[0]
         )
 
     def _collision_cycle_elapsed_s(self) -> float:

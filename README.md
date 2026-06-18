@@ -78,9 +78,11 @@ as positive roll.
 FLARM traffic contacts start with six decoded FLARMNet IDs: `DDA857`,
 `DDA85A`, `DDA85C`, `DDA86A`, `DDA88F` and `DDA896`, followed by 23
 authentic FLARMnet-backed devices with competition signs. The runtime and panel
-default to publishing all 29 contacts. Contacts stay within 40 km of the
-ownship; the first two circle, while the remaining contacts fly linear
-back-and-forth tracks with varied altitude, climb rate, speed and course.
+default to publishing all 29 contacts. Contacts stay within 100 km of the
+ownship and all default contacts periodically orbit at a deterministic
+tangential speed between `0.5` and `5.0 m/s`, with varied altitude, climb rate
+and course. The optional `collision course` mode still makes the first contact
+converge on the ownship.
 `$PFLAA`/`$PFLAU` emit the six-hex-digit device ID, while the control API and
 panel also expose competition ID, registration, model labels and speed.
 

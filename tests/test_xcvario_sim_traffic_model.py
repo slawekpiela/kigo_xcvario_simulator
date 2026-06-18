@@ -8,7 +8,7 @@ from kigo_xcvario_simulator.traffic_database import (
     LAB_TRAFFIC_AIRCRAFT_COUNT,
     traffic_aircraft_for,
 )
-from kigo_xcvario_simulator.traffic_model import CIRCLING_CONTACT_COUNT, MAX_TRAFFIC_RADIUS_M, TrafficGenerator
+from kigo_xcvario_simulator.traffic_model import MAX_TRAFFIC_RADIUS_M, TRAFFIC_SPEED_RANGE_MS, TrafficGenerator
 
 
 def _ownship() -> OwnshipState:
@@ -99,7 +99,7 @@ class TrafficGeneratorTests(unittest.TestCase):
                 self.assertTrue(aircraft.registration)
                 self.assertTrue(aircraft.aircraft_model)
 
-    def test_all_contacts_stay_inside_40km_bubble(self):
+    def test_all_contacts_stay_inside_100km_bubble_with_slow_orbit_speed(self):
         generator = TrafficGenerator(seed=33)
 
         for _ in range(8):
@@ -109,18 +109,16 @@ class TrafficGeneratorTests(unittest.TestCase):
                 distance_m = math.hypot(contact.relative_north_m, contact.relative_east_m)
                 with self.subTest(index=index):
                     self.assertLessEqual(distance_m, MAX_TRAFFIC_RADIUS_M)
-                    self.assertGreater(contact.speed_ms, 0.0)
+                    self.assertGreaterEqual(contact.speed_ms, TRAFFIC_SPEED_RANGE_MS[0])
+                    self.assertLessEqual(contact.speed_ms, TRAFFIC_SPEED_RANGE_MS[1])
 
-    def test_first_two_contacts_circle_and_remaining_contacts_move(self):
+    def test_all_default_contacts_orbit_periodically(self):
         generator = TrafficGenerator(seed=33)
 
         first = generator.step(_ownship(), 1.0, contact_count=len(FLARM_TRAFFIC_AIRCRAFT))
-        second = generator.step(_ownship(), 3.0, contact_count=len(FLARM_TRAFFIC_AIRCRAFT))
+        second = generator.step(_ownship(), 180.0, contact_count=len(FLARM_TRAFFIC_AIRCRAFT))
 
-        self.assertEqual(CIRCLING_CONTACT_COUNT, 2)
-        self.assertGreater(first[0].climb_ms, 0.0)
-        self.assertGreater(first[1].climb_ms, 0.0)
-        for index in range(CIRCLING_CONTACT_COUNT, len(FLARM_TRAFFIC_AIRCRAFT)):
+        for index in range(len(FLARM_TRAFFIC_AIRCRAFT)):
             with self.subTest(index=index):
                 self.assertNotAlmostEqual(first[index].relative_north_m, second[index].relative_north_m, delta=0.1)
                 self.assertNotAlmostEqual(first[index].relative_east_m, second[index].relative_east_m, delta=0.1)
@@ -129,12 +127,11 @@ class TrafficGeneratorTests(unittest.TestCase):
         generator = TrafficGenerator(seed=33)
 
         contacts = generator.step(_ownship(), 1.0, contact_count=len(FLARM_TRAFFIC_AIRCRAFT))
-        moving_contacts = contacts[CIRCLING_CONTACT_COUNT:]
 
-        self.assertLess(min(contact.relative_altitude_m for contact in moving_contacts), -800.0)
-        self.assertGreater(max(contact.relative_altitude_m for contact in moving_contacts), 1000.0)
-        self.assertLess(min(contact.climb_ms for contact in moving_contacts), -1.0)
-        self.assertGreater(max(contact.climb_ms for contact in moving_contacts), 1.0)
+        self.assertLess(min(contact.relative_altitude_m for contact in contacts), -800.0)
+        self.assertGreater(max(contact.relative_altitude_m for contact in contacts), 1000.0)
+        self.assertLess(min(contact.climb_ms for contact in contacts), -1.0)
+        self.assertGreater(max(contact.climb_ms for contact in contacts), 1.0)
 
     def test_default_contacts_do_not_rotate_onto_collision_course(self):
         generator = TrafficGenerator(seed=33)
