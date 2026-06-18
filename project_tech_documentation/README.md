@@ -80,14 +80,16 @@ _To be filled as durable knowledge is discovered._
   `climb_ms` as the vertical movement value.
 - Start-airport placement is session-local. The panel `Connection` section stores the optional
   `ICAO of the start airport` field in local browser storage and posts it to
-  `/api/v1/simulation/start-airport` during `Connect`. `AirportLookup` searches local OpenAIP
-  `*_apt.json` files, preferring sibling `Kigo/appdata/openaip` from the runtime working tree, after
-  checking built-in known positions. `FWCT` is a built-in alias for Worcester, South Africa, using the
-  local OpenAIP `FAWC` coordinate `-33.663, 19.415` and elevation `205 m`. OpenAIP lookups cache
-  resolved ICAO coordinates in `.cache/airport_icao_cache.json`. `SimulatorRuntimeSession` applies
-  the resolved coordinate through `ScenarioOrchestrator.set_home_position()`, which updates the
-  in-memory `FlightModel` home, clears active plans/traffic, and places the ownship on the ground
-  without modifying `runtime.local.json`; a runtime restart returns to the configured home position.
+  `/api/v1/simulation/start-airport` during `Connect`; despite the label, the value may be either a
+  four-character ICAO code or a start-place query such as `Minden Tahoe` / `Minden USA`. `AirportLookup`
+  searches local OpenAIP `*_apt.json` files, preferring sibling `Kigo/appdata/openaip` from the runtime
+  working tree. Place/country queries are normalized, filtered by OpenAIP `country`, and matched against
+  airport names; built-in aliases cover `FWCT` for Worcester, South Africa, and `KMEV` / `Minden Tahoe`.
+  OpenAIP lookups cache resolved ICAO or `location:<normalized-query>` coordinates in
+  `.cache/airport_icao_cache.json`. `SimulatorRuntimeSession` applies the resolved coordinate through
+  `ScenarioOrchestrator.set_home_position()`, which updates the in-memory `FlightModel` home, clears
+  active plans/traffic, and places the ownship on the ground without modifying `runtime.local.json`; a
+  runtime restart returns to the configured home position.
 
 ## Build, Run, And Test Notes
 
@@ -231,3 +233,5 @@ _To be filled as durable knowledge is discovered._
 - 2026-06-13: Documented the built-in `FWCT` Worcester start-position alias.
 - 2026-06-15: Documented rootless Tailscale access from `codex-vm` to the active Pi and the
   `kigo-pi-tail` bridge target.
+- 2026-06-18: Documented start-airport lookup accepting ICAO, `Minden Tahoe`, and place/country
+  queries backed by local OpenAIP data.

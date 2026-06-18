@@ -112,7 +112,8 @@ function normalizeRuntimeUrl(rawValue) {
 }
 
 function normalizeStartAirportIcao(rawValue) {
-  return String(rawValue || "").trim().toUpperCase();
+  const trimmed = String(rawValue || "").trim();
+  return /^[A-Za-z0-9]{4}$/.test(trimmed) ? trimmed.toUpperCase() : trimmed;
 }
 
 function loadStoredInput(node, key, defaultValue) {

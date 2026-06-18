@@ -314,6 +314,28 @@ class ControlApiTests(unittest.TestCase):
             self.assertAlmostEqual(ownship["speed_kmh"], 0.0, places=6)
             self.assertEqual(payload["runtime"]["start_airport"]["icao"], "KMEV")
 
+    def test_start_airport_endpoint_accepts_location_name_alias(self):
+        with TemporaryDirectory() as temp_dir:
+            cache_path = Path(temp_dir) / "airport-cache.json"
+            self.session._airport_lookup = AirportLookup(
+                data_dirs=(Path(temp_dir) / "missing",),
+                cache_path=cache_path,
+            )
+
+            self.connection.request(
+                "POST",
+                "/api/v1/simulation/start-airport",
+                body=json.dumps({"icao": "Minden Tahoe"}),
+                headers={"Content-Type": "application/json"},
+            )
+            response = self.connection.getresponse()
+            payload = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(payload["airport"]["icao"], "KMEV")
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["latitude_deg"], 39.0003, places=6)
+        self.assertAlmostEqual(payload["snapshot"]["ownship"]["longitude_deg"], -119.751, places=6)
+
     def test_preset_endpoint_accepts_on_ground(self):
         self.connection.request(
             "POST",

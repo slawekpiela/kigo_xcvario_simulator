@@ -258,7 +258,7 @@ class SimulatorRuntimeSession:
         *,
         heading_deg: float | None = None,
     ) -> AirportPosition:
-        airport = self._airport_lookup.find_by_icao(icao)
+        airport = self._airport_lookup.find(icao)
         self._start_airport = airport
         self.orchestrator.set_home_position(
             HomePosition(

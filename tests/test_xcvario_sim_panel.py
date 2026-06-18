@@ -19,6 +19,7 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             '<option value="sxhawk">SxHAWK</option>',
             'id="start-airport-icao-input"',
             "ICAO of the start airport",
+            'placeholder="KMEV or Minden Tahoe"',
             'id="apply-device-button"',
             "<h2>Bridge Control</h2>",
             'id="vm-bridge-target-input"',
