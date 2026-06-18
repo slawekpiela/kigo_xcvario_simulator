@@ -158,7 +158,8 @@ _To be filled as durable knowledge is discovered._
   `127.0.0.1:44353`/`44354`, and `adb reverse tcp:44353 tcp:4353` plus
   `adb reverse tcp:44354 tcp:4354` carrying the streams back to the Mac simulator. This is TCP-only;
   a normal APK cannot expose a virtual serial device to another APK without root or explicit app
-  integration.
+  integration. The bridge service is not exported; `install_bridge.sh` opens `MainActivity`, and the
+  activity starts the foreground service.
 
 ## Important Files And Ownership
 
@@ -252,3 +253,5 @@ _To be filled as durable knowledge is discovered._
 - 2026-06-18: Documented default FLARM traffic orbiting within 100 km at `0.5` to `5.0 m/s`
   tangential speed.
 - 2026-06-18: Documented the Android phone USB bridge APK and its `adb reverse` TCP data path.
+- 2026-06-18: Documented that Android bridge activation starts through `MainActivity`, not an
+  exported service.

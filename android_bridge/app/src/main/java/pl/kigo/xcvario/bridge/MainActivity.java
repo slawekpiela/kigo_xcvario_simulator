@@ -32,6 +32,7 @@ public final class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(buildContent());
+        startBridgeService();
     }
 
     @Override

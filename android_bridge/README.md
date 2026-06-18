@@ -58,8 +58,10 @@ That script:
 - builds the APK,
 - installs it with `adb install -r`,
 - creates the required `adb reverse` mappings,
-- starts the foreground bridge service,
-- opens the bridge screen.
+- opens the bridge screen, which starts the foreground bridge service.
+
+The service is not exported to other Android apps; launch `MainActivity` to
+start it from ADB or the app icon.
 
 If the simulator runs on a VM instead of the Mac, first expose the VM simulator
 ports on the Mac as local `4353` and `4354` before running the install script.

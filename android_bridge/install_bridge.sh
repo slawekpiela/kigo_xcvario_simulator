@@ -15,9 +15,6 @@ APK=$("$ROOT_DIR/build_apk.sh")
 "$ADB" reverse tcp:44353 tcp:4353
 "$ADB" reverse tcp:44354 tcp:4354
 "$ADB" install -r "$APK"
-"$ADB" shell am start-foreground-service \
-    -n pl.kigo.xcvario.bridge/.BridgeService \
-    -a pl.kigo.xcvario.bridge.START
 "$ADB" shell am start -n pl.kigo.xcvario.bridge/.MainActivity
 
 echo "installed: $APK"
