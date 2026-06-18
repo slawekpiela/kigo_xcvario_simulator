@@ -68,12 +68,14 @@ _To be filled as durable knowledge is discovered._
   the simulation seed. The six decoded records use metadata `MF`/`D-6676`/`LS-4`,
   `L1`/`D-3450`/`Discus 2`, `TH`/`D-4449`/`Hornet`, `1A`/`D-3358`/`LS-4`,
   empty-callsign/`DKERO`/`DG-800`, and `TH`/`D-5799`/`ASK-13`. `TrafficGenerator` keeps all
-  generated default contacts within 100 km of the ownship GPS position. Each default contact
-  periodically orbits a deterministic center with reported tangential speed between `0.5` and
-  `5.0 m/s`; centers, direction, altitude band, climb and course are seed/index-stable. The optional
-  collision-course override still replaces contact `0` with a converging track. `ScenarioOrchestrator`
-  defaults traffic to enabled with all 29 contacts, and the control API uses the same full count when
-  `/api/v1/simulation/traffic` enables traffic without an explicit `contact_count`.
+  generated default contacts between 5 km and 30 km from the ownship GPS position. Each default
+  contact periodically orbits a deterministic center with reported tangential speed between `0.5`
+  and `5.0 m/s`; centers, direction, altitude band, climb and course are seed/index-stable. Default
+  orbit periods are at least `2 min`, and contacts `0` through `3` always use positive climb while
+  orbiting. The optional collision-course override still replaces contact `0` with a converging
+  track. `ScenarioOrchestrator` defaults traffic to enabled with all 29 contacts, and the control API
+  uses the same full count when `/api/v1/simulation/traffic` enables traffic without an explicit
+  `contact_count`.
   `$PFLAA`/`$PFLAU` emit the configured FLARM device ID in `aircraft_id`; the control API and panel
   additionally expose `competition_id`, `registration`, `aircraft_model` and `speed_ms`. The panel
   traffic table labels `aircraft_id` as `ID`, labels `competition_id` as `CALL SIGN` with
@@ -267,7 +269,9 @@ _To be filled as durable knowledge is discovered._
 - 2026-06-18: Documented start-airport lookup accepting ICAO through local OpenAIP and non-ICAO
   free-text place/country queries through a configurable online geocoder.
 - 2026-06-18: Documented default FLARM traffic orbiting within 100 km at `0.5` to `5.0 m/s`
-  tangential speed.
+  tangential speed. Superseded later the same day by the 5-30 km traffic-distance range.
+- 2026-06-18: Documented default FLARM traffic staying 5-30 km from ownship, with at least four
+  climbing orbit contacts and orbit periods of at least `2 min`.
 - 2026-06-18: Documented the Android phone USB bridge APK and its `adb reverse` TCP data path.
 - 2026-06-18: Documented that Android bridge activation starts through `MainActivity`, not an
   exported service.

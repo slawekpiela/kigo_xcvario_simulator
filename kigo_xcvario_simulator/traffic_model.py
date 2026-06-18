@@ -10,11 +10,12 @@ from .traffic_database import traffic_aircraft_for
 from .variation import SeededRangeGenerator
 
 AUTO_COLLISION_INTERVAL_S = 10.0
-MAX_TRAFFIC_RADIUS_M = 100000.0
-TRAFFIC_RADIUS_MARGIN_M = 1200.0
-TRAFFIC_CENTER_DISTANCE_MIN_M = 12000.0
+MIN_TRAFFIC_RADIUS_M = 5000.0
+MAX_TRAFFIC_RADIUS_M = 30000.0
+TRAFFIC_RADIUS_MARGIN_M = 100.0
 ORBIT_PERIOD_RANGE_S = (300.0, 900.0)
 TRAFFIC_SPEED_RANGE_MS = (0.5, 5.0)
+CLIMBING_ORBIT_CONTACT_COUNT = 4
 COLLISION_INITIAL_DISTANCE_M = 3000.0
 ALTITUDE_BANDS_M = (-900.0, -620.0, -330.0, -120.0, 180.0, 470.0, 820.0, 1180.0)
 ORBIT_BEHAVIOR_COUNT = 5
@@ -78,8 +79,9 @@ class TrafficGenerator:
         )
         turn_radius_m = speed_ms * orbit_period_s / (math.pi * 2.0)
         max_center_distance_m = MAX_TRAFFIC_RADIUS_M - TRAFFIC_RADIUS_MARGIN_M - turn_radius_m
-        center_distance_m = TRAFFIC_CENTER_DISTANCE_MIN_M + self._fraction(index, "center_distance") * (
-            max_center_distance_m - TRAFFIC_CENTER_DISTANCE_MIN_M
+        min_center_distance_m = MIN_TRAFFIC_RADIUS_M + turn_radius_m
+        center_distance_m = min_center_distance_m + self._fraction(index, "center_distance") * (
+            max_center_distance_m - min_center_distance_m
         )
         center_bearing_deg = normalize_heading_deg(self._seed * 17.0 + index * 121.0 + ownship.track_deg * 0.20)
         center_bearing_rad = math.radians(center_bearing_deg)
@@ -97,7 +99,7 @@ class TrafficGenerator:
         relative_east_m = center_east_m + math.sin(orbit_angle_rad) * turn_radius_m
         track_deg = normalize_heading_deg(orbit_angle_deg + 90.0 * turn_direction)
         behavior_index = index % ORBIT_BEHAVIOR_COUNT
-        climb_ms = self._climb_for_behavior(index, behavior_index)
+        climb_ms = self._orbit_climb_ms(index, behavior_index)
 
         base_relative_altitude_m = ALTITUDE_BANDS_M[index % len(ALTITUDE_BANDS_M)]
         altitude_wave_m = math.sin(math.radians(orbit_angle_deg + index * 37.0)) * 55.0
@@ -161,6 +163,11 @@ class TrafficGenerator:
         return TRAFFIC_SPEED_RANGE_MS[0] + self._fraction(index, "speed") * (
             TRAFFIC_SPEED_RANGE_MS[1] - TRAFFIC_SPEED_RANGE_MS[0]
         )
+
+    def _orbit_climb_ms(self, index: int, behavior_index: int) -> float:
+        if index < CLIMBING_ORBIT_CONTACT_COUNT:
+            return 0.5 + self._fraction(index, "climbing_orbit_climb") * 1.7
+        return self._climb_for_behavior(index, behavior_index)
 
     def _collision_cycle_elapsed_s(self) -> float:
         return self._sim_time_s % AUTO_COLLISION_INTERVAL_S
