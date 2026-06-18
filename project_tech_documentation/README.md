@@ -167,6 +167,13 @@ _To be filled as durable knowledge is discovered._
   and `Port3Path="/tmp/kigo-sim/flarm"`. Switch `PortType`/`Port3Type` to `tcp_client`, set
   `PortIPAddress`/`Port3IPAddress` to `127.0.0.1`, clear `PortPath`/`Port3Path`, and keep TCP ports
   `4353`/`4354`, then force-stop/restart Kigo.
+- If Kigo crashes shortly after opening the Android setup/Advanced flow while the phone bridge is
+  active, first check whether the `Raw Logger` / `Logger nmea` action was hit or NMEA logging was
+  enabled. The 2026-06-18 Samsung A50 crash was a `kigo.nav` native abort in `IOThread`, not a bridge
+  process crash: `DeviceDescriptor::LineReceived()` called `NMEALogger::Log()`, which allocated
+  `TextWriter("logs/<timestamp>.nmea")`; file open failed and `TextWriter::Write()` asserted
+  `file.IsOpen()`. Symbolicate installed `libkigo.so` offsets with
+  `$ANDROID_HOME/ndk/26.3.11579264/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-addr2line -Cf -e ../kigo_nav/output/ANDROIDAARCH64/bin/libkigo-ns.so <offsets>`.
 
 ## Important Files And Ownership
 
@@ -218,6 +225,8 @@ _To be filled as durable knowledge is discovered._
 - 2026-06-04: Documented XCVario-stream `LXWP0` compatibility fallback for `kigo_nav` vario navbox.
 - 2026-06-03: Documented bridge-control execution host, user-systemd units, status/log locations,
   and reverse-tunnel active-state gotcha.
+- 2026-06-18: Documented Android phone bridge crash triage showing Kigo NMEA logger/TextWriter as
+  the failing path, not the bridge APK process.
 - 2026-06-04: Documented active lab Pi bridge address and transient VM runtime service using the
   durable VM-local runtime config path.
 - 2026-06-05: Documented iPhone/LAN panel access via Mac LAN address, CORS origin, and Mac-to-VM
