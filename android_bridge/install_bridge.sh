@@ -19,3 +19,4 @@ APK=$("$ROOT_DIR/build_apk.sh")
 
 echo "installed: $APK"
 echo "Kigo/Nav on phone: 127.0.0.1:4353, FLARM 127.0.0.1:4354"
+echo "Bridge service is stopped by default; press Start in the Android app to enable it."

@@ -44,7 +44,7 @@ The signed debug APK is written to:
 android_bridge/build/kigo-android-bridge.apk
 ```
 
-## Install And Start
+## Install
 
 Start the simulator so the Mac has local TCP listeners on `4353` and `4354`,
 then connect the phone over USB with Android debugging enabled:
@@ -58,10 +58,11 @@ That script:
 - builds the APK,
 - installs it with `adb install -r`,
 - creates the required `adb reverse` mappings,
-- opens the bridge screen, which starts the foreground bridge service.
+- opens the bridge screen.
 
-The service is not exported to other Android apps; launch `MainActivity` to
-start it from ADB or the app icon.
+The bridge does not autostart. Press `Start` in the bridge app when you want
+the foreground bridge service running, and press `Stop` before leaving it idle.
+The service is not exported to other Android apps.
 
 If the simulator runs on a VM instead of the Mac, first expose the VM simulator
 ports on the Mac as local `4353` and `4354` before running the install script.

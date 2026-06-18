@@ -38,7 +38,7 @@ public final class BridgeService extends Service {
         createNotificationChannel();
         startForeground(NOTIFICATION_ID, buildNotification());
         startBridgesIfNeeded();
-        return START_STICKY;
+        return START_NOT_STICKY;
     }
 
     @Override
