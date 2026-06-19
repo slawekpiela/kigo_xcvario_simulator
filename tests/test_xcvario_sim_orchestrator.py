@@ -254,11 +254,10 @@ class ScenarioOrchestratorTests(unittest.TestCase):
         before = self.orchestrator.tick(5.0)
 
         changed = self.orchestrator.set_device_qnh_hpa(995.5)
-        after = self.orchestrator.tick(5.0)
 
         self.assertAlmostEqual(changed.ownship.device_qnh_hpa, 995.5, places=4)
-        self.assertAlmostEqual(after.ownship.static_pressure_hpa, before.ownship.static_pressure_hpa, places=6)
-        self.assertAlmostEqual(after.ownship.gps_altitude_m, before.ownship.gps_altitude_m, places=6)
+        self.assertAlmostEqual(changed.ownship.static_pressure_hpa, before.ownship.static_pressure_hpa, places=6)
+        self.assertAlmostEqual(changed.ownship.gps_altitude_m, before.ownship.gps_altitude_m, places=6)
 
     def test_device_altitude_change_recalculates_qnh_without_changing_pressure(self):
         self.orchestrator.load_preset(PresetRequest(preset_id="straight", seed=5, autostart=True))

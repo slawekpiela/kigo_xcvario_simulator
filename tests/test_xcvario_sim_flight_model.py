@@ -3,7 +3,11 @@ import unittest
 
 from kigo_xcvario_simulator.baro import static_pressure_hpa_for_altitude
 from kigo_xcvario_simulator.contracts import FlightDirective, WindState
-from kigo_xcvario_simulator.flight_model import FlightModel
+from kigo_xcvario_simulator.flight_model import (
+    DEFAULT_STRAIGHT_CLIMB_MAX_MS,
+    DEFAULT_STRAIGHT_CLIMB_MIN_MS,
+    FlightModel,
+)
 from kigo_xcvario_simulator.state import FlightPhase
 
 
@@ -20,7 +24,7 @@ class FlightModelTests(unittest.TestCase):
         )
         self.initial_state = self.model.reset()
 
-    def test_straight_step_moves_forward_with_constant_altitude(self):
+    def test_straight_step_moves_forward_with_default_climb_variation(self):
         directive = FlightDirective(
             segment_id="straight_leg",
             phase=FlightPhase.STRAIGHT,
@@ -31,8 +35,9 @@ class FlightModelTests(unittest.TestCase):
 
         next_state = self.model.step(self.initial_state, directive, 10.0)
 
-        self.assertAlmostEqual(next_state.gps_altitude_m, 401.0, places=4)
-        self.assertAlmostEqual(next_state.vertical_speed_ms, 0.0, places=4)
+        self.assertGreater(next_state.gps_altitude_m, 401.0)
+        self.assertGreaterEqual(next_state.vertical_speed_ms, DEFAULT_STRAIGHT_CLIMB_MIN_MS)
+        self.assertLessEqual(next_state.vertical_speed_ms, DEFAULT_STRAIGHT_CLIMB_MAX_MS)
         self.assertGreater(next_state.longitude_deg, self.initial_state.longitude_deg)
         self.assertFalse(next_state.on_ground)
         self.assertEqual(next_state.phase, FlightPhase.STRAIGHT)
@@ -49,8 +54,7 @@ class FlightModelTests(unittest.TestCase):
 
         preview = self.model.preview_directive(self.initial_state, directive)
         next_state = self.model.step(self.initial_state, directive, 1.0)
-        reached = self.model.step(next_state, directive, 5.0)
-        settled = self.model.step(reached, directive, 1.0)
+        moving = self.model.step(next_state, directive, 1.0)
 
         self.assertAlmostEqual(preview.gps_altitude_m, 401.3, places=4)
         self.assertAlmostEqual(preview.vertical_speed_ms, 0.0, places=4)
@@ -61,12 +65,12 @@ class FlightModelTests(unittest.TestCase):
             static_pressure_hpa_for_altitude(401.3, qnh_hpa=1013.25),
             places=6,
         )
-        self.assertAlmostEqual(reached.gps_altitude_m, 401.3, places=4)
-        self.assertAlmostEqual(settled.gps_altitude_m, 401.3, places=4)
-        self.assertAlmostEqual(settled.vertical_speed_ms, 0.0, places=4)
+        self.assertGreater(moving.gps_altitude_m, 401.3)
+        self.assertGreaterEqual(moving.vertical_speed_ms, DEFAULT_STRAIGHT_CLIMB_MIN_MS)
+        self.assertLessEqual(moving.vertical_speed_ms, DEFAULT_STRAIGHT_CLIMB_MAX_MS)
         self.assertAlmostEqual(
-            settled.static_pressure_hpa,
-            static_pressure_hpa_for_altitude(401.3, qnh_hpa=1013.25),
+            moving.static_pressure_hpa,
+            static_pressure_hpa_for_altitude(moving.gps_altitude_m, qnh_hpa=1013.25),
             places=6,
         )
 
@@ -96,13 +100,14 @@ class FlightModelTests(unittest.TestCase):
 
         deltas = [abs(right - left) for left, right in zip(samples, samples[1:])]
 
-        self.assertAlmostEqual(samples[0], -5.0, places=6)
-        self.assertAlmostEqual(samples[15], 0.0, places=6)
-        self.assertAlmostEqual(samples[30], 5.0, places=6)
-        self.assertAlmostEqual(samples[45], 0.0, places=6)
-        self.assertAlmostEqual(samples[60], -5.0, places=6)
-        self.assertLess(max(deltas), 0.55)
-        self.assertLess(min(altitudes), 500.0)
+        self.assertGreaterEqual(min(samples), -5.0)
+        self.assertLessEqual(max(samples), 5.0)
+        self.assertAlmostEqual(samples[0], 0.0, delta=0.25)
+        self.assertGreater(samples[15], 4.6)
+        self.assertAlmostEqual(samples[30], 0.0, delta=0.25)
+        self.assertLess(samples[45], -4.6)
+        self.assertAlmostEqual(samples[60], 0.0, delta=0.25)
+        self.assertLess(max(deltas), 0.75)
         self.assertGreater(max(altitudes), 500.0)
 
     def test_baro_altitude_is_ignored_outside_straight_mode(self):
@@ -306,6 +311,8 @@ class FlightModelTests(unittest.TestCase):
             duration_s=10.0,
             target_heading_deg=90.0,
             target_speed_kmh=90.0,
+            climb_min_ms=0.0,
+            climb_max_ms=0.0,
         )
 
         before = self.model.step(self.initial_state, directive, 1.0)

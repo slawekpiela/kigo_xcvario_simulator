@@ -454,6 +454,21 @@ class ControlApiTests(unittest.TestCase):
             places=6,
         )
 
+        self.session.orchestrator.tick(1.0)
+        self.connection.request("GET", "/api/v1/simulation/state")
+        response = self.connection.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+
+        self.assertEqual(payload["snapshot"]["ownship"]["phase"], "straight")
+        self.assertGreater(payload["snapshot"]["ownship"]["gps_altitude_m"], 875.0)
+        self.assertGreaterEqual(payload["snapshot"]["ownship"]["vertical_speed_ms"], -2.0)
+        self.assertLessEqual(payload["snapshot"]["ownship"]["vertical_speed_ms"], 4.0)
+        self.assertAlmostEqual(
+            payload["snapshot"]["ownship"]["static_pressure_hpa"],
+            static_pressure_hpa_for_altitude(payload["snapshot"]["ownship"]["gps_altitude_m"], qnh_hpa=1013.25),
+            places=6,
+        )
+
     def test_manual_straight_accepts_climb_range(self):
         self.connection.request(
             "POST",
@@ -503,8 +518,9 @@ class ControlApiTests(unittest.TestCase):
         payload = json.loads(response.read().decode("utf-8"))
 
         self.assertEqual(payload["snapshot"]["ownship"]["phase"], "straight")
-        self.assertAlmostEqual(payload["snapshot"]["ownship"]["gps_altitude_m"], 874.0, places=6)
-        self.assertAlmostEqual(payload["snapshot"]["ownship"]["vertical_speed_ms"], -1.0, places=6)
+        self.assertGreater(payload["snapshot"]["ownship"]["gps_altitude_m"], 875.0)
+        self.assertGreaterEqual(payload["snapshot"]["ownship"]["vertical_speed_ms"], -1.0)
+        self.assertLessEqual(payload["snapshot"]["ownship"]["vertical_speed_ms"], 3.0)
         self.assertAlmostEqual(
             payload["snapshot"]["ownship"]["static_pressure_hpa"],
             static_pressure_hpa_for_altitude(payload["snapshot"]["ownship"]["gps_altitude_m"], qnh_hpa=1013.25),

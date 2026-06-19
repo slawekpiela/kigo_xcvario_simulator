@@ -53,13 +53,14 @@ _To be filled as durable knowledge is discovered._
   turns and positive roll for right turns. Pitch and acceleration fields remain empty.
 - Manual `straight` mode treats `FlightDirective.baro_altitude_m` as an immediate GPS/baro altitude
   target, clamped to home altitude, so the panel `Flight Altitude [m]` field has an instant visible
-  effect after `Apply Manual Mode`. With no climb range, the ownship remains level at that altitude;
-  with `climb_min_ms`/`climb_max_ms`, the first target application pins the altitude and subsequent
-  ticks use a smooth oscillating vertical speed between the configured min/max as a sinusoid with a
-  full `60 s` cycle. The sinusoid starts at the configured minimum, reaches the midpoint at `15 s`,
-  the maximum at `30 s`, the midpoint at `45 s`, and returns to the minimum at `60 s`. The panel
-  leaves the visible `Climb Min [m/s]` and `Climb Max [m/s]` fields empty by default, but posts them
-  for `straight`, `circling_left`, `circling_right`, and `glider_launch` when they contain
+  effect after `Apply Manual Mode`. After the first target application, all `straight` directives
+  use a seeded `60 s` sinusoidal vertical-speed cycle. When no `climb_min_ms`/`climb_max_ms` is
+  provided, the default range is `-2.0..+4.0 m/s`; explicit climb limits override that, and setting
+  both to `0` keeps level flight. The straight-mode sinusoid starts near the midpoint, reaches the
+  maximum at `15 s`, the midpoint at `30 s`, the minimum at `45 s`, and the midpoint again at `60 s`.
+  A small deterministic jitter is added and clamped inside the configured range. The panel leaves the
+  visible `Climb Min [m/s]` and `Climb Max [m/s]` fields empty by default, but posts them for
+  `straight`, `circling_left`, `circling_right`, and `glider_launch` when they contain
   operator-entered values.
 - FLARM traffic identity comes from `traffic_database.FLARM_TRAFFIC_AIRCRAFT`: the first six
   records are decoded FLARMNet IDs `DDA857`, `DDA85A`, `DDA85C`, `DDA86A`, `DDA88F` and `DDA896`,
@@ -280,3 +281,5 @@ _To be filled as durable knowledge is discovered._
   exported service or autostart.
 - 2026-06-18: Documented Android Kigo active profile location under `Android/media` and the
   serial-to-TCP profile fix needed for the USB bridge.
+- 2026-06-19: Documented default `straight` vario oscillation from `-2.0` to `+4.0 m/s` with small
+  deterministic jitter.

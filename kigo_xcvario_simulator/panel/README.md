@@ -21,6 +21,10 @@ Then open [http://127.0.0.1:8180/](http://127.0.0.1:8180/).
 - renders read-only ownship, traffic and health status,
 - exposes traffic count, visible aircraft IDs and an optional collision-course mode for contact `1`.
 
+For manual `straight`, blank `Climb Min/Max` fields use the simulator default
+vario oscillation from `-2 m/s` to `+4 m/s` with small seeded jitter. Set both
+fields to `0` for level flight.
+
 When the start-airport field is filled, the runtime accepts either a
 four-character ICAO code or a free-text place/country query such as
 `Minden Tahoe USA`. ICAO values search local OpenAIP `*_apt.json` files.

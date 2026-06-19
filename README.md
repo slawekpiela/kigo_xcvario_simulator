@@ -213,7 +213,7 @@ starts the reverse tunnel so the Pi PTYs still connect to the runtime's local
 1. Connect the panel.
 2. Choose a `Manual Mode` phase; `on_ground` is the default after an `XCvario` client connect/reconnect.
 3. Set `Flight Altitude [m]` when using `straight`; the model applies that GPS/baro altitude immediately so the change is visible right after `Apply Manual Mode`.
-4. Set `Climb Min/Max [m/s]` for `straight` when you want the post-target vario, and therefore trail colour, to follow a sinusoid between those values over a `60 s` cycle.
+4. In `straight`, the default vario follows a `60 s` seeded sinusoid with small jitter between `-2 m/s` and `+4 m/s`; set `Climb Min/Max [m/s]` to override it, or set both to `0` for level flight.
 5. Set circling speed min/max in `Manual Mode` when using `circling_left` or `circling_right`.
 6. Set wind direction and speed; the runtime sends them to `kigo_nav` as `WIMWV`.
 7. Set OAT when you need a non-default outside air temperature in the `PXCV`/`POV` stream.
