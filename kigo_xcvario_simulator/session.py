@@ -151,6 +151,8 @@ class SimulatorRuntimeSession:
                 "contact_count": traffic_config.contact_count,
                 "collision_course": traffic_config.collision_course,
                 "motion_mode": traffic_config.motion_mode,
+                "circling_radius_min_m": traffic_config.circling_radius_min_m,
+                "circling_radius_max_m": traffic_config.circling_radius_max_m,
             },
             "wind": {
                 "direction_deg": wind.direction_deg,
@@ -233,8 +235,17 @@ class SimulatorRuntimeSession:
         contact_count: int,
         collision_course: bool = False,
         motion_mode: str = "orbit",
+        circling_radius_min_m: float | None = None,
+        circling_radius_max_m: float | None = None,
     ) -> SimulationSnapshot:
-        return self.orchestrator.set_traffic_config(enabled, contact_count, collision_course, motion_mode)
+        return self.orchestrator.set_traffic_config(
+            enabled,
+            contact_count,
+            collision_course,
+            motion_mode,
+            circling_radius_min_m,
+            circling_radius_max_m,
+        )
 
     def set_wind(self, direction_deg: float, speed_kmh: float) -> SimulationSnapshot:
         return self.orchestrator.set_wind(direction_deg, speed_kmh)

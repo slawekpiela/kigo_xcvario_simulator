@@ -62,6 +62,8 @@ const applyDeviceAltitudeButton = document.getElementById("apply-device-altitude
 
 const trafficEnabledInput = document.getElementById("traffic-enabled-input");
 const trafficCountInput = document.getElementById("traffic-count-input");
+const trafficCirclingRadiusMinInput = document.getElementById("traffic-circling-radius-min-input");
+const trafficCirclingRadiusMaxInput = document.getElementById("traffic-circling-radius-max-input");
 const trafficCollisionInput = document.getElementById("traffic-collision-input");
 const trafficMotionToggleButton = document.getElementById("traffic-motion-toggle-button");
 const applyTrafficButton = document.getElementById("apply-traffic-button");
@@ -770,6 +772,8 @@ function syncControlValues() {
   if (state.runtime && state.runtime.traffic_config) {
     trafficEnabledInput.checked = Boolean(state.runtime.traffic_config.enabled);
     trafficCountInput.value = String(state.runtime.traffic_config.contact_count);
+    setNumericValueIfIdle(trafficCirclingRadiusMinInput, state.runtime.traffic_config.circling_radius_min_m ?? 100, 0);
+    setNumericValueIfIdle(trafficCirclingRadiusMaxInput, state.runtime.traffic_config.circling_radius_max_m ?? 700, 0);
     trafficCollisionInput.checked = Boolean(state.runtime.traffic_config.collision_course);
     setTrafficMotionMode(state.runtime.traffic_config.motion_mode);
   }
@@ -794,6 +798,8 @@ function trafficConfigPayload() {
   return {
     enabled: trafficEnabledInput.checked,
     contact_count: Number(trafficCountInput.value || "0"),
+    circling_radius_min_m: numericValue(trafficCirclingRadiusMinInput) ?? 100,
+    circling_radius_max_m: numericValue(trafficCirclingRadiusMaxInput) ?? 700,
     collision_course: trafficCollisionInput.checked,
     motion_mode: currentTrafficMotionMode(),
   };
@@ -1060,7 +1066,7 @@ function renderHealth(snapshot, runtime) {
     [
       "Traffic Mode",
       runtime && runtime.traffic_config
-        ? `${runtime.traffic_config.contact_count} contacts / motion=${runtime.traffic_config.motion_mode || TRAFFIC_MOTION_ORBIT} / collision=${runtime.traffic_config.collision_course}`
+        ? `${runtime.traffic_config.contact_count} contacts / motion=${runtime.traffic_config.motion_mode || TRAFFIC_MOTION_ORBIT} / radius=${formatNumber(runtime.traffic_config.circling_radius_min_m ?? 100, 0)}-${formatNumber(runtime.traffic_config.circling_radius_max_m ?? 700, 0)} m / collision=${runtime.traffic_config.collision_course}`
         : "-",
     ],
     ["Session Started", runtime ? String(runtime.started) : "-"],

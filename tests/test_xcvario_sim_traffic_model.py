@@ -1,7 +1,7 @@
 import math
 import unittest
 
-from kigo_xcvario_simulator.contracts import TRAFFIC_MOTION_STRAIGHT, OwnshipState
+from kigo_xcvario_simulator.contracts import TRAFFIC_CIRCLING_RADIUS_MAX_M, TRAFFIC_MOTION_STRAIGHT, OwnshipState
 from kigo_xcvario_simulator.state import FlightPhase
 from kigo_xcvario_simulator.traffic_database import (
     FLARM_TRAFFIC_AIRCRAFT,
@@ -10,8 +10,8 @@ from kigo_xcvario_simulator.traffic_database import (
 )
 from kigo_xcvario_simulator.traffic_model import (
     MAX_TRAFFIC_RADIUS_M,
+    MIN_CIRCLING_RADIUS_M,
     MIN_TRAFFIC_RADIUS_M,
-    ORBIT_PERIOD_RANGE_S,
     TRAFFIC_CLIMB_RANGE_MS,
     TRAFFIC_SPEED_RANGE_MS,
     TrafficGenerator,
@@ -32,6 +32,10 @@ def _ownship() -> OwnshipState:
         on_ground=False,
         phase=FlightPhase.STRAIGHT,
     )
+
+
+def _track_delta_deg(start_deg: float, end_deg: float) -> float:
+    return abs((end_deg - start_deg + 180.0) % 360.0 - 180.0)
 
 
 class TrafficGeneratorTests(unittest.TestCase):
@@ -131,6 +135,34 @@ class TrafficGeneratorTests(unittest.TestCase):
                 self.assertNotAlmostEqual(first[index].relative_north_m, second[index].relative_north_m, delta=0.1)
                 self.assertNotAlmostEqual(first[index].relative_east_m, second[index].relative_east_m, delta=0.1)
 
+    def test_orbit_contacts_use_random_radius_range_for_all_contacts(self):
+        generator = TrafficGenerator(seed=33)
+
+        first = generator.step(
+            _ownship(),
+            1.0,
+            contact_count=len(FLARM_TRAFFIC_AIRCRAFT),
+            circling_radius_min_m=300.0,
+            circling_radius_max_m=500.0,
+        )
+        second = generator.step(
+            _ownship(),
+            20.0,
+            contact_count=len(FLARM_TRAFFIC_AIRCRAFT),
+            circling_radius_min_m=300.0,
+            circling_radius_max_m=500.0,
+        )
+
+        estimated_radii_m = []
+        for index, contact in enumerate(first):
+            delta_deg = _track_delta_deg(contact.track_deg, second[index].track_deg)
+            estimated_radius_m = contact.speed_ms / math.radians(delta_deg / 20.0)
+            estimated_radii_m.append(estimated_radius_m)
+            with self.subTest(index=index):
+                self.assertGreaterEqual(estimated_radius_m, 300.0)
+                self.assertLessEqual(estimated_radius_m, 500.0)
+        self.assertGreater(max(estimated_radii_m) - min(estimated_radii_m), 100.0)
+
     def test_straight_motion_mode_keeps_contacts_in_range_and_moving(self):
         generator = TrafficGenerator(seed=33)
 
@@ -175,7 +207,8 @@ class TrafficGeneratorTests(unittest.TestCase):
         first = generator.step(_ownship(), 1.0, contact_count=len(FLARM_TRAFFIC_AIRCRAFT))
         second = generator.step(_ownship(), 120.0, contact_count=len(FLARM_TRAFFIC_AIRCRAFT))
 
-        self.assertGreaterEqual(ORBIT_PERIOD_RANGE_S[0], 120.0)
+        minimum_period_s = math.pi * 2.0 * MIN_CIRCLING_RADIUS_M / TRAFFIC_SPEED_RANGE_MS[1]
+        self.assertGreaterEqual(minimum_period_s, 120.0)
         for index in range(len(FLARM_TRAFFIC_AIRCRAFT)):
             with self.subTest(index=index):
                 self.assertGreaterEqual(first[index].climb_ms, TRAFFIC_CLIMB_RANGE_MS[0])
@@ -196,6 +229,31 @@ class TrafficGeneratorTests(unittest.TestCase):
         self.assertEqual(first[0].alarm_level, 0)
         self.assertEqual(second[1].alarm_level, 0)
         self.assertNotEqual(first[0].track_deg, second[0].track_deg)
+
+    def test_low_circling_radius_is_clamped_to_preserve_minimum_period(self):
+        generator = TrafficGenerator(seed=33)
+
+        first = generator.step(
+            _ownship(),
+            1.0,
+            contact_count=3,
+            circling_radius_min_m=1.0,
+            circling_radius_max_m=1.0,
+        )
+        second = generator.step(
+            _ownship(),
+            20.0,
+            contact_count=3,
+            circling_radius_min_m=1.0,
+            circling_radius_max_m=1.0,
+        )
+
+        for index, contact in enumerate(first):
+            delta_deg = _track_delta_deg(contact.track_deg, second[index].track_deg)
+            estimated_radius_m = contact.speed_ms / math.radians(delta_deg / 20.0)
+            with self.subTest(index=index):
+                self.assertAlmostEqual(estimated_radius_m, MIN_CIRCLING_RADIUS_M, places=6)
+                self.assertLessEqual(estimated_radius_m, TRAFFIC_CIRCLING_RADIUS_MAX_M)
 
     def test_negative_dt_is_rejected(self):
         generator = TrafficGenerator(seed=33)

@@ -40,7 +40,11 @@ from .presets import (
 )
 from .state import FlightPhase, HealthState, RuntimeState
 from .traffic_database import DEFAULT_TRAFFIC_CONTACT_COUNT
-from .traffic_model import TrafficGenerator, normalize_traffic_motion_mode
+from .traffic_model import (
+    TrafficGenerator,
+    normalize_traffic_circling_radius_range,
+    normalize_traffic_motion_mode,
+)
 
 
 class ScenarioOrchestrator:
@@ -221,15 +225,23 @@ class ScenarioOrchestrator:
         contact_count: int,
         collision_course: bool = False,
         motion_mode: str = "orbit",
+        circling_radius_min_m: float | None = None,
+        circling_radius_max_m: float | None = None,
     ) -> SimulationSnapshot:
         if contact_count < 0:
             raise ValueError("contact_count must be >= 0.")
+        circling_radius_min_m, circling_radius_max_m = normalize_traffic_circling_radius_range(
+            circling_radius_min_m,
+            circling_radius_max_m,
+        )
         with self._lock:
             self._traffic_config = TrafficConfig(
                 enabled=bool(enabled),
                 contact_count=int(contact_count),
                 collision_course=bool(collision_course),
                 motion_mode=normalize_traffic_motion_mode(motion_mode),
+                circling_radius_min_m=circling_radius_min_m,
+                circling_radius_max_m=circling_radius_max_m,
             )
             if not self._traffic_config.enabled or self._traffic_config.contact_count == 0:
                 self._traffic = ()
@@ -317,6 +329,8 @@ class ScenarioOrchestrator:
                 contact_count=self._traffic_config.contact_count,
                 collision_course=self._traffic_config.collision_course,
                 motion_mode=self._traffic_config.motion_mode,
+                circling_radius_min_m=self._traffic_config.circling_radius_min_m,
+                circling_radius_max_m=self._traffic_config.circling_radius_max_m,
             )
             self._health = HealthState.READY
         except Exception:

@@ -189,6 +189,8 @@ class ControlApiServer:
                         int(payload.get("contact_count", DEFAULT_TRAFFIC_CONTACT_COUNT)),
                         bool(payload.get("collision_course", False)),
                         str(payload.get("motion_mode", "orbit")),
+                        _optional_float_any(payload, "circling_radius_min_m", "circling_radius_min"),
+                        _optional_float_any(payload, "circling_radius_max_m", "circling_radius_max"),
                     )
                     self.send_response(204)
                     self._write_cors_headers()

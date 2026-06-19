@@ -9,6 +9,8 @@ from .state import FlightPhase, HealthState, RuntimeState
 TRAFFIC_MOTION_ORBIT = "orbit"
 TRAFFIC_MOTION_STRAIGHT = "straight"
 TRAFFIC_MOTION_MODES = frozenset((TRAFFIC_MOTION_ORBIT, TRAFFIC_MOTION_STRAIGHT))
+TRAFFIC_CIRCLING_RADIUS_MIN_M = 100.0
+TRAFFIC_CIRCLING_RADIUS_MAX_M = 700.0
 
 
 @dataclass(frozen=True)
@@ -64,6 +66,8 @@ class TrafficConfig:
     contact_count: int = 0
     collision_course: bool = False
     motion_mode: str = TRAFFIC_MOTION_ORBIT
+    circling_radius_min_m: float = TRAFFIC_CIRCLING_RADIUS_MIN_M
+    circling_radius_max_m: float = TRAFFIC_CIRCLING_RADIUS_MAX_M
 
 
 @dataclass(frozen=True)

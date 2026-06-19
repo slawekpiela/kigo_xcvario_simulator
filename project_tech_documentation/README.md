@@ -74,11 +74,15 @@ _To be filled as durable knowledge is discovered._
   orbit periods are at least `2 min`, and every default orbiting contact uses positive climb between
   `0.51` and `4.0 m/s`. `TrafficConfig.motion_mode` accepts `orbit` (default) or `straight`;
   `/api/v1/simulation/traffic` stores it and `TrafficGenerator.step()` uses the same 5-30 km distance
-  envelope for both modes. The panel Traffic section has a `Traffic: Orbiting` / `Traffic: Straight`
-  toggle that posts `motion_mode` immediately. The optional collision-course override still replaces
-  contact `0` with a converging track. `ScenarioOrchestrator` defaults traffic to enabled with all 29
-  contacts, and the control API uses the same full count when `/api/v1/simulation/traffic` enables
-  traffic without an explicit `contact_count`.
+  envelope for both modes. `TrafficConfig.circling_radius_min_m` and
+  `circling_radius_max_m` default to `100` and `700`; the traffic generator clamps requested values
+  to the usable 5-30 km envelope and picks a deterministic seed/index-stable random circling radius
+  in that range for every orbiting contact. The panel Traffic section has `Circling Radius Min/Max
+  [m]` inputs and a `Traffic: Orbiting` / `Traffic: Straight` toggle that post the updated traffic
+  config immediately. The optional collision-course override still replaces contact `0` with a
+  converging track. `ScenarioOrchestrator` defaults traffic to enabled with all 29 contacts, and the
+  control API uses the same full count when `/api/v1/simulation/traffic` enables traffic without an
+  explicit `contact_count`.
   `$PFLAA`/`$PFLAU` emit the configured FLARM device ID in `aircraft_id`; the control API and panel
   additionally expose `competition_id`, `registration`, `aircraft_model` and `speed_ms`. The panel
   traffic table labels `aircraft_id` as `ID`, labels `competition_id` as `CALL SIGN` with
@@ -287,3 +291,5 @@ _To be filled as durable knowledge is discovered._
   small deterministic jitter.
 - 2026-06-19: Documented the FLARM traffic `motion_mode` API and panel toggle for `orbit` versus
   `straight` contact movement.
+- 2026-06-19: Documented FLARM traffic circling radius min/max API and panel inputs, with per-contact
+  deterministic radius selection.

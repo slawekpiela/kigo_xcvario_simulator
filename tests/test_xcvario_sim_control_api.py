@@ -147,7 +147,14 @@ class ControlApiTests(unittest.TestCase):
             "POST",
             "/api/v1/simulation/traffic",
             body=json.dumps(
-                {"enabled": True, "contact_count": 2, "collision_course": True, "motion_mode": "straight"}
+                {
+                    "enabled": True,
+                    "contact_count": 2,
+                    "collision_course": True,
+                    "motion_mode": "straight",
+                    "circling_radius_min_m": 300.0,
+                    "circling_radius_max_m": 500.0,
+                }
             ),
             headers={"Content-Type": "application/json"},
         )
@@ -163,6 +170,8 @@ class ControlApiTests(unittest.TestCase):
         self.assertEqual(payload["runtime"]["traffic_config"]["contact_count"], 2)
         self.assertEqual(payload["runtime"]["traffic_config"]["collision_course"], True)
         self.assertEqual(payload["runtime"]["traffic_config"]["motion_mode"], "straight")
+        self.assertEqual(payload["runtime"]["traffic_config"]["circling_radius_min_m"], 300.0)
+        self.assertEqual(payload["runtime"]["traffic_config"]["circling_radius_max_m"], 500.0)
 
     def test_traffic_endpoint_defaults_to_all_contacts_when_count_is_missing(self):
         self.connection.request(
@@ -181,6 +190,8 @@ class ControlApiTests(unittest.TestCase):
 
         self.assertEqual(payload["runtime"]["traffic_config"]["contact_count"], len(FLARM_TRAFFIC_AIRCRAFT))
         self.assertEqual(payload["runtime"]["traffic_config"]["motion_mode"], "orbit")
+        self.assertEqual(payload["runtime"]["traffic_config"]["circling_radius_min_m"], 100.0)
+        self.assertEqual(payload["runtime"]["traffic_config"]["circling_radius_max_m"], 700.0)
 
     def test_wind_endpoint_updates_snapshot_and_runtime_metadata(self):
         self.connection.request(

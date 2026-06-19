@@ -273,7 +273,14 @@ class ScenarioOrchestratorTests(unittest.TestCase):
 
     def test_traffic_config_populates_snapshot_without_degrading_ownship(self):
         self.orchestrator.load_preset(PresetRequest(preset_id="straight", seed=5, autostart=True))
-        self.orchestrator.set_traffic_config(True, 2, collision_course=True, motion_mode="straight")
+        self.orchestrator.set_traffic_config(
+            True,
+            2,
+            collision_course=True,
+            motion_mode="straight",
+            circling_radius_min_m=300.0,
+            circling_radius_max_m=500.0,
+        )
 
         snapshot = self.orchestrator.tick(1.0)
 
@@ -283,6 +290,8 @@ class ScenarioOrchestratorTests(unittest.TestCase):
         self.assertTrue(snapshot.traffic[0].aircraft_id)
         self.assertEqual(self.orchestrator.get_traffic_config().collision_course, True)
         self.assertEqual(self.orchestrator.get_traffic_config().motion_mode, "straight")
+        self.assertEqual(self.orchestrator.get_traffic_config().circling_radius_min_m, 300.0)
+        self.assertEqual(self.orchestrator.get_traffic_config().circling_radius_max_m, 500.0)
 
     def test_default_traffic_config_populates_all_contacts(self):
         self.orchestrator.load_preset(PresetRequest(preset_id="straight", seed=5, autostart=True))
@@ -292,6 +301,8 @@ class ScenarioOrchestratorTests(unittest.TestCase):
         self.assertEqual(len(snapshot.traffic), len(FLARM_TRAFFIC_AIRCRAFT))
         self.assertEqual(self.orchestrator.get_traffic_config().contact_count, len(FLARM_TRAFFIC_AIRCRAFT))
         self.assertEqual(self.orchestrator.get_traffic_config().motion_mode, "orbit")
+        self.assertEqual(self.orchestrator.get_traffic_config().circling_radius_min_m, 100.0)
+        self.assertEqual(self.orchestrator.get_traffic_config().circling_radius_max_m, 700.0)
 
 
 if __name__ == "__main__":

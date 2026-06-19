@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 
 from .contracts import (
+    TRAFFIC_CIRCLING_RADIUS_MAX_M,
+    TRAFFIC_CIRCLING_RADIUS_MIN_M,
     TRAFFIC_MOTION_MODES,
     TRAFFIC_MOTION_ORBIT,
     TRAFFIC_MOTION_STRAIGHT,
@@ -19,12 +21,13 @@ AUTO_COLLISION_INTERVAL_S = 10.0
 MIN_TRAFFIC_RADIUS_M = 5000.0
 MAX_TRAFFIC_RADIUS_M = 30000.0
 TRAFFIC_RADIUS_MARGIN_M = 100.0
-ORBIT_PERIOD_RANGE_S = (300.0, 900.0)
 TRAFFIC_SPEED_RANGE_MS = (0.5, 5.0)
 TRAFFIC_CLIMB_RANGE_MS = (0.51, 4.0)
 COLLISION_INITIAL_DISTANCE_M = 3000.0
 ALTITUDE_BANDS_M = (-900.0, -620.0, -330.0, -120.0, 180.0, 470.0, 820.0, 1180.0)
 STRAIGHT_PATH_HALF_LENGTH_RANGE_M = (900.0, 2600.0)
+MIN_CIRCLING_RADIUS_M = 100.0
+MAX_CIRCLING_RADIUS_M = (MAX_TRAFFIC_RADIUS_M - TRAFFIC_RADIUS_MARGIN_M - MIN_TRAFFIC_RADIUS_M) / 2.0
 
 
 class TrafficGenerator:
@@ -51,6 +54,8 @@ class TrafficGenerator:
         contact_count: int,
         collision_course: bool = False,
         motion_mode: str = TRAFFIC_MOTION_ORBIT,
+        circling_radius_min_m: float | None = TRAFFIC_CIRCLING_RADIUS_MIN_M,
+        circling_radius_max_m: float | None = TRAFFIC_CIRCLING_RADIUS_MAX_M,
     ) -> tuple[TrafficContact, ...]:
         if dt_s < 0.0:
             raise ValueError("dt_s must be >= 0.")
@@ -61,12 +66,18 @@ class TrafficGenerator:
 
         self._sim_time_s += dt_s
         resolved_motion_mode = normalize_traffic_motion_mode(motion_mode)
+        circling_radius_min_m, circling_radius_max_m = normalize_traffic_circling_radius_range(
+            circling_radius_min_m,
+            circling_radius_max_m,
+        )
         contacts = tuple(
             self._build_contact(
                 ownship,
                 index,
                 collision_course=collision_course,
                 motion_mode=resolved_motion_mode,
+                circling_radius_min_m=circling_radius_min_m,
+                circling_radius_max_m=circling_radius_max_m,
             )
             for index in range(contact_count)
         )
@@ -80,6 +91,8 @@ class TrafficGenerator:
         *,
         collision_course: bool,
         motion_mode: str,
+        circling_radius_min_m: float,
+        circling_radius_max_m: float,
     ) -> TrafficContact:
         if collision_course and index == 0:
             return self._build_collision_contact(ownship, index)
@@ -87,14 +100,23 @@ class TrafficGenerator:
         if motion_mode == TRAFFIC_MOTION_STRAIGHT:
             return self._build_straight_contact(ownship, index)
 
-        return self._build_orbiting_contact(ownship, index)
-
-    def _build_orbiting_contact(self, ownship: OwnshipState, index: int) -> TrafficContact:
-        speed_ms = self._traffic_speed_ms(index)
-        orbit_period_s = ORBIT_PERIOD_RANGE_S[0] + self._fraction(index, "orbit_period") * (
-            ORBIT_PERIOD_RANGE_S[1] - ORBIT_PERIOD_RANGE_S[0]
+        return self._build_orbiting_contact(
+            ownship,
+            index,
+            circling_radius_min_m=circling_radius_min_m,
+            circling_radius_max_m=circling_radius_max_m,
         )
-        turn_radius_m = speed_ms * orbit_period_s / (math.pi * 2.0)
+
+    def _build_orbiting_contact(
+        self,
+        ownship: OwnshipState,
+        index: int,
+        *,
+        circling_radius_min_m: float,
+        circling_radius_max_m: float,
+    ) -> TrafficContact:
+        speed_ms = self._traffic_speed_ms(index)
+        turn_radius_m = self._circling_radius_m(index, circling_radius_min_m, circling_radius_max_m)
         max_center_distance_m = MAX_TRAFFIC_RADIUS_M - TRAFFIC_RADIUS_MARGIN_M - turn_radius_m
         min_center_distance_m = MIN_TRAFFIC_RADIUS_M + turn_radius_m
         center_distance_m = min_center_distance_m + self._fraction(index, "center_distance") * (
@@ -225,6 +247,9 @@ class TrafficGenerator:
             TRAFFIC_SPEED_RANGE_MS[1] - TRAFFIC_SPEED_RANGE_MS[0]
         )
 
+    def _circling_radius_m(self, index: int, minimum_m: float, maximum_m: float) -> float:
+        return minimum_m + self._fraction(index, "circling_radius") * (maximum_m - minimum_m)
+
     def _orbit_climb_ms(self, index: int) -> float:
         return SeededRangeGenerator(
             seed=self._seed,
@@ -288,3 +313,25 @@ def normalize_traffic_motion_mode(motion_mode: str | None) -> str:
     if motion_mode in TRAFFIC_MOTION_MODES:
         return str(motion_mode)
     return TRAFFIC_MOTION_ORBIT
+
+
+def normalize_traffic_circling_radius_range(
+    minimum_m: float | None,
+    maximum_m: float | None,
+) -> tuple[float, float]:
+    minimum = _finite_or_default(minimum_m, TRAFFIC_CIRCLING_RADIUS_MIN_M)
+    maximum = _finite_or_default(maximum_m, TRAFFIC_CIRCLING_RADIUS_MAX_M)
+    minimum = min(max(minimum, MIN_CIRCLING_RADIUS_M), MAX_CIRCLING_RADIUS_M)
+    maximum = min(max(maximum, MIN_CIRCLING_RADIUS_M), MAX_CIRCLING_RADIUS_M)
+    if maximum < minimum:
+        minimum, maximum = maximum, minimum
+    return minimum, maximum
+
+
+def _finite_or_default(value: float | None, default: float) -> float:
+    if value is None:
+        return default
+    resolved = float(value)
+    if not math.isfinite(resolved):
+        return default
+    return resolved
