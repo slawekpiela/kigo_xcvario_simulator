@@ -182,6 +182,10 @@ _To be filled as durable knowledge is discovered._
   start the foreground service. `MainActivity` shows large `Connected` and `Transmitting` indicators
   above the raw bridge counters. `Connected` is derived from active `bridging` sockets, while
   `Transmitting` stays `YES`/`PARTIAL` only when a channel moved bytes in roughly the last `2.5 s`.
+  If the phone reconnects over USB, `adb reverse --list` can become empty while the foreground bridge
+  service is still running; in that state pressing `Start` only leaves the app listening and Kigo
+  cannot reach the Mac. Re-run both `adb reverse` mappings, restart the bridge, and restart Kigo/Nav
+  if it does not reconnect on its own.
 - On the tested Android 11 Samsung device, `kigo.nav` loads the active profile from
   `/sdcard/Android/media/kigo.nav/XCSoarData/kigo_default.top`; matching-looking profiles under
   `/sdcard/Android/data/kigo.nav/files/XCSoarData` can be stale. A connection error after activating
@@ -251,6 +255,8 @@ _To be filled as durable knowledge is discovered._
   the failing path, not the bridge APK process.
 - 2026-06-19: Documented Android bridge foreground status indicators for connected/transmitting
   state.
+- 2026-06-19: Documented that Android USB reconnects can clear `adb reverse` mappings while the
+  bridge service remains running.
 - 2026-06-04: Documented active lab Pi bridge address and transient VM runtime service using the
   durable VM-local runtime config path.
 - 2026-06-05: Documented iPhone/LAN panel access via Mac LAN address, CORS origin, and Mac-to-VM

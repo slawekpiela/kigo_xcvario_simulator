@@ -98,6 +98,23 @@ Kigo/Nav.
 
 ## Troubleshooting
 
+If `Start` works but the bridge stays disconnected after reconnecting USB, check
+the host mappings:
+
+```bash
+adb reverse --list
+```
+
+USB reconnects can clear these mappings. Re-run:
+
+```bash
+adb reverse tcp:44353 tcp:4353
+adb reverse tcp:44354 tcp:4354
+```
+
+Then restart the bridge, and restart Kigo/Nav if it does not reconnect on its
+own.
+
 If Kigo/Nav still reports a connection error, check the active Android profile.
 On Android 11 devices observed here, Kigo loads:
 
