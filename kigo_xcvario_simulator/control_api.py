@@ -188,6 +188,7 @@ class ControlApiServer:
                         bool(payload.get("enabled", True)),
                         int(payload.get("contact_count", DEFAULT_TRAFFIC_CONTACT_COUNT)),
                         bool(payload.get("collision_course", False)),
+                        str(payload.get("motion_mode", "orbit")),
                     )
                     self.send_response(204)
                     self._write_cors_headers()

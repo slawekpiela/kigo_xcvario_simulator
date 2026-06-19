@@ -1,6 +1,8 @@
 const STORAGE_RUNTIME_URL = "kigo.sim.runtimeUrl";
 const STORAGE_START_AIRPORT_ICAO = "kigo.sim.startAirportIcao";
 const STORAGE_BRIDGE_PREFIX = "kigo.sim.bridge.";
+const TRAFFIC_MOTION_ORBIT = "orbit";
+const TRAFFIC_MOTION_STRAIGHT = "straight";
 const BARO_K1 = 0.190263;
 const BARO_K2 = 8.417286e-5;
 const BRIDGE_DEFAULTS = {
@@ -61,6 +63,7 @@ const applyDeviceAltitudeButton = document.getElementById("apply-device-altitude
 const trafficEnabledInput = document.getElementById("traffic-enabled-input");
 const trafficCountInput = document.getElementById("traffic-count-input");
 const trafficCollisionInput = document.getElementById("traffic-collision-input");
+const trafficMotionToggleButton = document.getElementById("traffic-motion-toggle-button");
 const applyTrafficButton = document.getElementById("apply-traffic-button");
 
 const ownshipGrid = document.getElementById("ownship-grid");
@@ -764,6 +767,40 @@ function syncControlValues() {
   if (state.runtime && state.runtime.primary_device) {
     setSelectValueIfIdle(deviceSelect, state.runtime.primary_device);
   }
+  if (state.runtime && state.runtime.traffic_config) {
+    trafficEnabledInput.checked = Boolean(state.runtime.traffic_config.enabled);
+    trafficCountInput.value = String(state.runtime.traffic_config.contact_count);
+    trafficCollisionInput.checked = Boolean(state.runtime.traffic_config.collision_course);
+    setTrafficMotionMode(state.runtime.traffic_config.motion_mode);
+  }
+}
+
+function normalizeTrafficMotionMode(value) {
+  return value === TRAFFIC_MOTION_STRAIGHT ? TRAFFIC_MOTION_STRAIGHT : TRAFFIC_MOTION_ORBIT;
+}
+
+function currentTrafficMotionMode() {
+  return normalizeTrafficMotionMode(trafficMotionToggleButton.dataset.motionMode);
+}
+
+function setTrafficMotionMode(value) {
+  const motionMode = normalizeTrafficMotionMode(value);
+  trafficMotionToggleButton.dataset.motionMode = motionMode;
+  trafficMotionToggleButton.setAttribute("aria-pressed", String(motionMode === TRAFFIC_MOTION_STRAIGHT));
+  trafficMotionToggleButton.textContent = motionMode === TRAFFIC_MOTION_STRAIGHT ? "Traffic: Straight" : "Traffic: Orbiting";
+}
+
+function trafficConfigPayload() {
+  return {
+    enabled: trafficEnabledInput.checked,
+    contact_count: Number(trafficCountInput.value || "0"),
+    collision_course: trafficCollisionInput.checked,
+    motion_mode: currentTrafficMotionMode(),
+  };
+}
+
+function postTrafficConfig() {
+  void postCommand("/api/v1/simulation/traffic", trafficConfigPayload(), { syncControls: true });
 }
 
 function setSelectValueIfIdle(node, value) {
@@ -1023,7 +1060,7 @@ function renderHealth(snapshot, runtime) {
     [
       "Traffic Mode",
       runtime && runtime.traffic_config
-        ? `${runtime.traffic_config.contact_count} contacts / collision=${runtime.traffic_config.collision_course}`
+        ? `${runtime.traffic_config.contact_count} contacts / motion=${runtime.traffic_config.motion_mode || TRAFFIC_MOTION_ORBIT} / collision=${runtime.traffic_config.collision_course}`
         : "-",
     ],
     ["Session Started", runtime ? String(runtime.started) : "-"],
@@ -1214,13 +1251,15 @@ applyDeviceAltitudeButton.addEventListener("click", () => {
   }, { syncControls: true });
 });
 
-applyTrafficButton.addEventListener("click", () => {
-  void postCommand("/api/v1/simulation/traffic", {
-    enabled: trafficEnabledInput.checked,
-    contact_count: Number(trafficCountInput.value || "0"),
-    collision_course: trafficCollisionInput.checked,
-  });
+trafficMotionToggleButton.addEventListener("click", () => {
+  setTrafficMotionMode(
+    currentTrafficMotionMode() === TRAFFIC_MOTION_STRAIGHT ? TRAFFIC_MOTION_ORBIT : TRAFFIC_MOTION_STRAIGHT
+  );
+  postTrafficConfig();
 });
 
+applyTrafficButton.addEventListener("click", postTrafficConfig);
+
 loadStoredSettings();
+setTrafficMotionMode(TRAFFIC_MOTION_ORBIT);
 renderState();

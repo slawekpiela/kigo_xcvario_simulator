@@ -40,7 +40,7 @@ from .presets import (
 )
 from .state import FlightPhase, HealthState, RuntimeState
 from .traffic_database import DEFAULT_TRAFFIC_CONTACT_COUNT
-from .traffic_model import TrafficGenerator
+from .traffic_model import TrafficGenerator, normalize_traffic_motion_mode
 
 
 class ScenarioOrchestrator:
@@ -220,6 +220,7 @@ class ScenarioOrchestrator:
         enabled: bool,
         contact_count: int,
         collision_course: bool = False,
+        motion_mode: str = "orbit",
     ) -> SimulationSnapshot:
         if contact_count < 0:
             raise ValueError("contact_count must be >= 0.")
@@ -228,6 +229,7 @@ class ScenarioOrchestrator:
                 enabled=bool(enabled),
                 contact_count=int(contact_count),
                 collision_course=bool(collision_course),
+                motion_mode=normalize_traffic_motion_mode(motion_mode),
             )
             if not self._traffic_config.enabled or self._traffic_config.contact_count == 0:
                 self._traffic = ()
@@ -314,6 +316,7 @@ class ScenarioOrchestrator:
                 dt_s,
                 contact_count=self._traffic_config.contact_count,
                 collision_course=self._traffic_config.collision_course,
+                motion_mode=self._traffic_config.motion_mode,
             )
             self._health = HealthState.READY
         except Exception:

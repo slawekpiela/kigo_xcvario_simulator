@@ -72,10 +72,13 @@ _To be filled as durable knowledge is discovered._
   contact periodically orbits a deterministic center with reported tangential speed between `0.5`
   and `5.0 m/s`; centers, direction, altitude band, climb and course are seed/index-stable. Default
   orbit periods are at least `2 min`, and every default orbiting contact uses positive climb between
-  `0.51` and `4.0 m/s`. The optional collision-course override still replaces contact `0` with a
-  converging track. `ScenarioOrchestrator` defaults traffic to enabled with all 29 contacts, and the control API
-  uses the same full count when `/api/v1/simulation/traffic` enables traffic without an explicit
-  `contact_count`.
+  `0.51` and `4.0 m/s`. `TrafficConfig.motion_mode` accepts `orbit` (default) or `straight`;
+  `/api/v1/simulation/traffic` stores it and `TrafficGenerator.step()` uses the same 5-30 km distance
+  envelope for both modes. The panel Traffic section has a `Traffic: Orbiting` / `Traffic: Straight`
+  toggle that posts `motion_mode` immediately. The optional collision-course override still replaces
+  contact `0` with a converging track. `ScenarioOrchestrator` defaults traffic to enabled with all 29
+  contacts, and the control API uses the same full count when `/api/v1/simulation/traffic` enables
+  traffic without an explicit `contact_count`.
   `$PFLAA`/`$PFLAU` emit the configured FLARM device ID in `aircraft_id`; the control API and panel
   additionally expose `competition_id`, `registration`, `aircraft_model` and `speed_ms`. The panel
   traffic table labels `aircraft_id` as `ID`, labels `competition_id` as `CALL SIGN` with
@@ -282,3 +285,5 @@ _To be filled as durable knowledge is discovered._
   serial-to-TCP profile fix needed for the USB bridge.
 - 2026-06-19: Documented `straight` vario oscillation using the panel/API `Climb Min/Max` bounds with
   small deterministic jitter.
+- 2026-06-19: Documented the FLARM traffic `motion_mode` API and panel toggle for `orbit` versus
+  `straight` contact movement.

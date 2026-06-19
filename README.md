@@ -82,8 +82,9 @@ default to publishing all 29 contacts. Default contacts stay between 5 km and
 30 km from the ownship and periodically orbit at a deterministic tangential
 speed between `0.5` and `5.0 m/s`. Every default contact orbits with positive
 climb between `0.51` and `4.0 m/s`, and all default orbit periods are at least `2 min`.
-The optional `collision course` mode still makes the first contact converge on
-the ownship.
+The panel Traffic section can toggle default contacts between `orbit` and
+`straight` motion. The optional `collision course` mode still makes the first
+contact converge on the ownship.
 `$PFLAA`/`$PFLAU` emit the six-hex-digit device ID, while the control API and
 panel also expose competition ID, registration, model labels and speed.
 

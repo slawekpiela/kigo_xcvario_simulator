@@ -1,7 +1,7 @@
 import math
 import unittest
 
-from kigo_xcvario_simulator.contracts import OwnshipState
+from kigo_xcvario_simulator.contracts import TRAFFIC_MOTION_STRAIGHT, OwnshipState
 from kigo_xcvario_simulator.state import FlightPhase
 from kigo_xcvario_simulator.traffic_database import (
     FLARM_TRAFFIC_AIRCRAFT,
@@ -130,6 +130,35 @@ class TrafficGeneratorTests(unittest.TestCase):
             with self.subTest(index=index):
                 self.assertNotAlmostEqual(first[index].relative_north_m, second[index].relative_north_m, delta=0.1)
                 self.assertNotAlmostEqual(first[index].relative_east_m, second[index].relative_east_m, delta=0.1)
+
+    def test_straight_motion_mode_keeps_contacts_in_range_and_moving(self):
+        generator = TrafficGenerator(seed=33)
+
+        first = generator.step(
+            _ownship(),
+            1.0,
+            contact_count=len(FLARM_TRAFFIC_AIRCRAFT),
+            motion_mode=TRAFFIC_MOTION_STRAIGHT,
+        )
+        second = generator.step(
+            _ownship(),
+            10.0,
+            contact_count=len(FLARM_TRAFFIC_AIRCRAFT),
+            motion_mode=TRAFFIC_MOTION_STRAIGHT,
+        )
+
+        for index, contact in enumerate(first):
+            distance_m = math.hypot(contact.relative_north_m, contact.relative_east_m)
+            with self.subTest(index=index):
+                self.assertGreaterEqual(distance_m, MIN_TRAFFIC_RADIUS_M)
+                self.assertLessEqual(distance_m, MAX_TRAFFIC_RADIUS_M)
+                self.assertGreaterEqual(contact.speed_ms, TRAFFIC_SPEED_RANGE_MS[0])
+                self.assertLessEqual(contact.speed_ms, TRAFFIC_SPEED_RANGE_MS[1])
+                movement_m = math.hypot(
+                    second[index].relative_north_m - contact.relative_north_m,
+                    second[index].relative_east_m - contact.relative_east_m,
+                )
+                self.assertGreater(movement_m, 0.1)
 
     def test_additional_contacts_have_varied_altitudes_and_behaviors(self):
         generator = TrafficGenerator(seed=33)

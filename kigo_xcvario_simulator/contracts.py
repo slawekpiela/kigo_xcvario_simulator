@@ -6,6 +6,10 @@ from dataclasses import dataclass, field
 
 from .state import FlightPhase, HealthState, RuntimeState
 
+TRAFFIC_MOTION_ORBIT = "orbit"
+TRAFFIC_MOTION_STRAIGHT = "straight"
+TRAFFIC_MOTION_MODES = frozenset((TRAFFIC_MOTION_ORBIT, TRAFFIC_MOTION_STRAIGHT))
+
 
 @dataclass(frozen=True)
 class ManualModeInput:
@@ -59,6 +63,7 @@ class TrafficConfig:
     enabled: bool = True
     contact_count: int = 0
     collision_course: bool = False
+    motion_mode: str = TRAFFIC_MOTION_ORBIT
 
 
 @dataclass(frozen=True)

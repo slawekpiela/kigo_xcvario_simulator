@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import math
 
-from .contracts import OwnshipState, TrafficContact
+from .contracts import (
+    TRAFFIC_MOTION_MODES,
+    TRAFFIC_MOTION_ORBIT,
+    TRAFFIC_MOTION_STRAIGHT,
+    OwnshipState,
+    TrafficContact,
+)
 from .flight_math import normalize_heading_deg
 from .traffic_database import traffic_aircraft_for
 from .variation import SeededRangeGenerator
@@ -18,6 +24,7 @@ TRAFFIC_SPEED_RANGE_MS = (0.5, 5.0)
 TRAFFIC_CLIMB_RANGE_MS = (0.51, 4.0)
 COLLISION_INITIAL_DISTANCE_M = 3000.0
 ALTITUDE_BANDS_M = (-900.0, -620.0, -330.0, -120.0, 180.0, 470.0, 820.0, 1180.0)
+STRAIGHT_PATH_HALF_LENGTH_RANGE_M = (900.0, 2600.0)
 
 
 class TrafficGenerator:
@@ -43,6 +50,7 @@ class TrafficGenerator:
         *,
         contact_count: int,
         collision_course: bool = False,
+        motion_mode: str = TRAFFIC_MOTION_ORBIT,
     ) -> tuple[TrafficContact, ...]:
         if dt_s < 0.0:
             raise ValueError("dt_s must be >= 0.")
@@ -52,8 +60,14 @@ class TrafficGenerator:
             return ()
 
         self._sim_time_s += dt_s
+        resolved_motion_mode = normalize_traffic_motion_mode(motion_mode)
         contacts = tuple(
-            self._build_contact(ownship, index, collision_course=collision_course)
+            self._build_contact(
+                ownship,
+                index,
+                collision_course=collision_course,
+                motion_mode=resolved_motion_mode,
+            )
             for index in range(contact_count)
         )
         self._tick_index += 1
@@ -65,9 +79,13 @@ class TrafficGenerator:
         index: int,
         *,
         collision_course: bool,
+        motion_mode: str,
     ) -> TrafficContact:
         if collision_course and index == 0:
             return self._build_collision_contact(ownship, index)
+
+        if motion_mode == TRAFFIC_MOTION_STRAIGHT:
+            return self._build_straight_contact(ownship, index)
 
         return self._build_orbiting_contact(ownship, index)
 
@@ -101,6 +119,51 @@ class TrafficGenerator:
 
         base_relative_altitude_m = ALTITUDE_BANDS_M[index % len(ALTITUDE_BANDS_M)]
         altitude_wave_m = math.sin(math.radians(orbit_angle_deg + index * 37.0)) * 55.0
+        relative_altitude_m = base_relative_altitude_m + altitude_wave_m + climb_ms * 18.0
+
+        return self._contact(
+            index=index,
+            relative_north_m=relative_north_m,
+            relative_east_m=relative_east_m,
+            relative_altitude_m=relative_altitude_m,
+            track_deg=track_deg,
+            climb_ms=climb_ms,
+            speed_ms=speed_ms,
+            alarm_level=self._alarm_level(relative_north_m, relative_east_m, relative_altitude_m),
+        )
+
+    def _build_straight_contact(self, ownship: OwnshipState, index: int) -> TrafficContact:
+        speed_ms = self._traffic_speed_ms(index)
+        half_length_m = STRAIGHT_PATH_HALF_LENGTH_RANGE_M[0] + self._fraction(index, "straight_length") * (
+            STRAIGHT_PATH_HALF_LENGTH_RANGE_M[1] - STRAIGHT_PATH_HALF_LENGTH_RANGE_M[0]
+        )
+        max_center_distance_m = math.sqrt(
+            max(0.0, (MAX_TRAFFIC_RADIUS_M - TRAFFIC_RADIUS_MARGIN_M) ** 2 - half_length_m * half_length_m)
+        )
+        center_distance_m = MIN_TRAFFIC_RADIUS_M + self._fraction(index, "straight_center") * (
+            max_center_distance_m - MIN_TRAFFIC_RADIUS_M
+        )
+        center_bearing_deg = normalize_heading_deg(self._seed * 29.0 + index * 73.0 + ownship.track_deg * 0.14)
+        center_bearing_rad = math.radians(center_bearing_deg)
+        route_bearing_deg = normalize_heading_deg(center_bearing_deg + 90.0)
+        route_bearing_rad = math.radians(route_bearing_deg)
+
+        cycle_length_m = half_length_m * 4.0
+        cycle_distance_m = (
+            self._sim_time_s * speed_ms + self._fraction(index, "straight_phase") * cycle_length_m
+        ) % cycle_length_m
+        if cycle_distance_m <= half_length_m * 2.0:
+            along_m = -half_length_m + cycle_distance_m
+            track_deg = route_bearing_deg
+        else:
+            along_m = half_length_m - (cycle_distance_m - half_length_m * 2.0)
+            track_deg = normalize_heading_deg(route_bearing_deg + 180.0)
+
+        relative_north_m = math.cos(center_bearing_rad) * center_distance_m + math.cos(route_bearing_rad) * along_m
+        relative_east_m = math.sin(center_bearing_rad) * center_distance_m + math.sin(route_bearing_rad) * along_m
+        climb_ms = self._orbit_climb_ms(index)
+        base_relative_altitude_m = ALTITUDE_BANDS_M[index % len(ALTITUDE_BANDS_M)]
+        altitude_wave_m = math.sin(math.radians(track_deg + self._sim_time_s * 1.7 + index * 37.0)) * 55.0
         relative_altitude_m = base_relative_altitude_m + altitude_wave_m + climb_ms * 18.0
 
         return self._contact(
@@ -219,3 +282,9 @@ class TrafficGenerator:
             interpolation_ticks=1,
         )
         return generator.value_at(0)
+
+
+def normalize_traffic_motion_mode(motion_mode: str | None) -> str:
+    if motion_mode in TRAFFIC_MOTION_MODES:
+        return str(motion_mode)
+    return TRAFFIC_MOTION_ORBIT
