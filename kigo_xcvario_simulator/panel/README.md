@@ -21,9 +21,9 @@ Then open [http://127.0.0.1:8180/](http://127.0.0.1:8180/).
 - renders read-only ownship, traffic and health status,
 - exposes traffic count, visible aircraft IDs and an optional collision-course mode for contact `1`.
 
-For manual `straight`, blank `Climb Min/Max` fields use the simulator default
-vario oscillation from `-2 m/s` to `+4 m/s` with small seeded jitter. Set both
-fields to `0` for level flight.
+For manual `straight`, `Climb Min/Max` set the vario sinusoid bounds, such as
+`-2 m/s` and `+4 m/s`, with small seeded jitter. Blank fields or both fields set
+to `0` keep level flight.
 
 When the start-airport field is filled, the runtime accepts either a
 four-character ICAO code or a free-text place/country query such as

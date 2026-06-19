@@ -3,11 +3,7 @@ import unittest
 
 from kigo_xcvario_simulator.baro import static_pressure_hpa_for_altitude
 from kigo_xcvario_simulator.contracts import FlightDirective, WindState
-from kigo_xcvario_simulator.flight_model import (
-    DEFAULT_STRAIGHT_CLIMB_MAX_MS,
-    DEFAULT_STRAIGHT_CLIMB_MIN_MS,
-    FlightModel,
-)
+from kigo_xcvario_simulator.flight_model import FlightModel
 from kigo_xcvario_simulator.state import FlightPhase
 
 
@@ -24,7 +20,7 @@ class FlightModelTests(unittest.TestCase):
         )
         self.initial_state = self.model.reset()
 
-    def test_straight_step_moves_forward_with_default_climb_variation(self):
+    def test_straight_step_moves_forward_with_constant_altitude_without_climb_limits(self):
         directive = FlightDirective(
             segment_id="straight_leg",
             phase=FlightPhase.STRAIGHT,
@@ -35,9 +31,8 @@ class FlightModelTests(unittest.TestCase):
 
         next_state = self.model.step(self.initial_state, directive, 10.0)
 
-        self.assertGreater(next_state.gps_altitude_m, 401.0)
-        self.assertGreaterEqual(next_state.vertical_speed_ms, DEFAULT_STRAIGHT_CLIMB_MIN_MS)
-        self.assertLessEqual(next_state.vertical_speed_ms, DEFAULT_STRAIGHT_CLIMB_MAX_MS)
+        self.assertAlmostEqual(next_state.gps_altitude_m, 401.0, places=4)
+        self.assertAlmostEqual(next_state.vertical_speed_ms, 0.0, places=4)
         self.assertGreater(next_state.longitude_deg, self.initial_state.longitude_deg)
         self.assertFalse(next_state.on_ground)
         self.assertEqual(next_state.phase, FlightPhase.STRAIGHT)
@@ -54,7 +49,8 @@ class FlightModelTests(unittest.TestCase):
 
         preview = self.model.preview_directive(self.initial_state, directive)
         next_state = self.model.step(self.initial_state, directive, 1.0)
-        moving = self.model.step(next_state, directive, 1.0)
+        reached = self.model.step(next_state, directive, 5.0)
+        settled = self.model.step(reached, directive, 1.0)
 
         self.assertAlmostEqual(preview.gps_altitude_m, 401.3, places=4)
         self.assertAlmostEqual(preview.vertical_speed_ms, 0.0, places=4)
@@ -65,12 +61,12 @@ class FlightModelTests(unittest.TestCase):
             static_pressure_hpa_for_altitude(401.3, qnh_hpa=1013.25),
             places=6,
         )
-        self.assertGreater(moving.gps_altitude_m, 401.3)
-        self.assertGreaterEqual(moving.vertical_speed_ms, DEFAULT_STRAIGHT_CLIMB_MIN_MS)
-        self.assertLessEqual(moving.vertical_speed_ms, DEFAULT_STRAIGHT_CLIMB_MAX_MS)
+        self.assertAlmostEqual(reached.gps_altitude_m, 401.3, places=4)
+        self.assertAlmostEqual(settled.gps_altitude_m, 401.3, places=4)
+        self.assertAlmostEqual(settled.vertical_speed_ms, 0.0, places=4)
         self.assertAlmostEqual(
-            moving.static_pressure_hpa,
-            static_pressure_hpa_for_altitude(moving.gps_altitude_m, qnh_hpa=1013.25),
+            settled.static_pressure_hpa,
+            static_pressure_hpa_for_altitude(401.3, qnh_hpa=1013.25),
             places=6,
         )
 

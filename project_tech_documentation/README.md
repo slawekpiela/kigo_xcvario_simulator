@@ -53,15 +53,14 @@ _To be filled as durable knowledge is discovered._
   turns and positive roll for right turns. Pitch and acceleration fields remain empty.
 - Manual `straight` mode treats `FlightDirective.baro_altitude_m` as an immediate GPS/baro altitude
   target, clamped to home altitude, so the panel `Flight Altitude [m]` field has an instant visible
-  effect after `Apply Manual Mode`. After the first target application, all `straight` directives
-  use a seeded `60 s` sinusoidal vertical-speed cycle. When no `climb_min_ms`/`climb_max_ms` is
-  provided, the default range is `-2.0..+4.0 m/s`; explicit climb limits override that, and setting
-  both to `0` keeps level flight. The straight-mode sinusoid starts near the midpoint, reaches the
-  maximum at `15 s`, the midpoint at `30 s`, the minimum at `45 s`, and the midpoint again at `60 s`.
-  A small deterministic jitter is added and clamped inside the configured range. The panel leaves the
-  visible `Climb Min [m/s]` and `Climb Max [m/s]` fields empty by default, but posts them for
-  `straight`, `circling_left`, `circling_right`, and `glider_launch` when they contain
-  operator-entered values.
+  effect after `Apply Manual Mode`. After the first target application, `straight` uses a seeded
+  `60 s` sinusoidal vertical-speed cycle only when `climb_min_ms`/`climb_max_ms` is provided by the
+  panel/API. Those values are taken from the visible `Climb Min [m/s]` and `Climb Max [m/s]` fields;
+  blank fields keep level flight, and setting both to `0` also keeps level flight. The straight-mode
+  sinusoid starts near the midpoint, reaches the maximum at `15 s`, the midpoint at `30 s`, the
+  minimum at `45 s`, and the midpoint again at `60 s`. A small deterministic jitter is added and
+  clamped inside the configured range. The panel posts climb fields for `straight`, `circling_left`,
+  `circling_right`, and `glider_launch` when they contain operator-entered values.
 - FLARM traffic identity comes from `traffic_database.FLARM_TRAFFIC_AIRCRAFT`: the first six
   records are decoded FLARMNet IDs `DDA857`, `DDA85A`, `DDA85C`, `DDA86A`, `DDA88F` and `DDA896`,
   followed by 23 authentic FLARMnet-backed records with non-empty competition IDs.
@@ -281,5 +280,5 @@ _To be filled as durable knowledge is discovered._
   exported service or autostart.
 - 2026-06-18: Documented Android Kigo active profile location under `Android/media` and the
   serial-to-TCP profile fix needed for the USB bridge.
-- 2026-06-19: Documented default `straight` vario oscillation from `-2.0` to `+4.0 m/s` with small
-  deterministic jitter.
+- 2026-06-19: Documented `straight` vario oscillation using the panel/API `Climb Min/Max` bounds with
+  small deterministic jitter.

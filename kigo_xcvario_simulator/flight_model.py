@@ -17,8 +17,6 @@ DEFAULT_HOME_TRACK_DEG = 90.0
 DEFAULT_CIRCLING_VARIATION_TICKS = 24
 DEFAULT_CIRCLING_SPEED_VARIATION_TICKS = 48
 DEFAULT_STRAIGHT_CLIMB_CYCLE_S = 60.0
-DEFAULT_STRAIGHT_CLIMB_MIN_MS = -2.0
-DEFAULT_STRAIGHT_CLIMB_MAX_MS = 4.0
 DEFAULT_STRAIGHT_CLIMB_JITTER_MS = 0.18
 DEFAULT_STRAIGHT_CLIMB_JITTER_PERIOD_S = 5.0
 DEFAULT_GLIDER_LAUNCH_VARIATION_TICKS = 12
@@ -336,29 +334,23 @@ class FlightModel:
         if directive.on_ground:
             return 0.0
 
-        if directive.phase == FlightPhase.STRAIGHT:
-            minimum, maximum = self._climb_range(
-                directive,
-                default_minimum=DEFAULT_STRAIGHT_CLIMB_MIN_MS,
-                default_maximum=DEFAULT_STRAIGHT_CLIMB_MAX_MS,
-            )
-            value = self._sinusoidal_value_at(
-                self._active_variation_elapsed_s,
-                minimum=minimum,
-                maximum=maximum,
-                cycle_s=DEFAULT_STRAIGHT_CLIMB_CYCLE_S,
-            )
-            value += self._straight_climb_jitter_at(
-                self._active_variation_elapsed_s,
-                directive=directive,
-                minimum=minimum,
-                maximum=maximum,
-            )
-            self._active_variation_elapsed_s += dt_s
-            return min(maximum, max(minimum, value))
-
         if directive.climb_min_ms is not None or directive.climb_max_ms is not None:
             minimum, maximum = self._climb_range(directive)
+            if directive.phase == FlightPhase.STRAIGHT:
+                value = self._sinusoidal_value_at(
+                    self._active_variation_elapsed_s,
+                    minimum=minimum,
+                    maximum=maximum,
+                    cycle_s=DEFAULT_STRAIGHT_CLIMB_CYCLE_S,
+                )
+                value += self._straight_climb_jitter_at(
+                    self._active_variation_elapsed_s,
+                    directive=directive,
+                    minimum=minimum,
+                    maximum=maximum,
+                )
+                self._active_variation_elapsed_s += dt_s
+                return min(maximum, max(minimum, value))
             generator = SeededRangeGenerator(
                 seed=self._seed,
                 minimum=minimum,
@@ -445,24 +437,13 @@ class FlightModel:
         return DEFAULT_GENERIC_VARIATION_TICKS
 
     @staticmethod
-    def _climb_range(
-        directive: FlightDirective,
-        *,
-        default_minimum: float | None = None,
-        default_maximum: float | None = None,
-    ) -> tuple[float, float]:
-        if directive.climb_min_ms is None and directive.climb_max_ms is None:
-            if default_minimum is None or default_maximum is None:
-                raise ValueError("climb range is required.")
-            minimum = float(default_minimum)
-            maximum = float(default_maximum)
-        else:
-            minimum = float(
-                directive.climb_min_ms if directive.climb_min_ms is not None else directive.climb_max_ms
-            )
-            maximum = float(
-                directive.climb_max_ms if directive.climb_max_ms is not None else directive.climb_min_ms
-            )
+    def _climb_range(directive: FlightDirective) -> tuple[float, float]:
+        minimum = float(
+            directive.climb_min_ms if directive.climb_min_ms is not None else directive.climb_max_ms
+        )
+        maximum = float(
+            directive.climb_max_ms if directive.climb_max_ms is not None else directive.climb_min_ms
+        )
         if maximum < minimum:
             minimum, maximum = maximum, minimum
         return minimum, maximum
