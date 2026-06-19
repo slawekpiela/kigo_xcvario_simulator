@@ -16,6 +16,7 @@ from kigo_xcvario_simulator.traffic_model import (
     ORBIT_GAIN_RANGE_M,
     ORBIT_STRAIGHT_DURATION_S,
     TRAFFIC_CLIMB_RANGE_MS,
+    TRAFFIC_SPEED_RANGE_KMH,
     TRAFFIC_SPEED_RANGE_MS,
     TrafficGenerator,
 )
@@ -115,7 +116,7 @@ class TrafficGeneratorTests(unittest.TestCase):
                 self.assertTrue(aircraft.registration)
                 self.assertTrue(aircraft.aircraft_model)
 
-    def test_all_contacts_stay_between_5km_and_30km_with_slow_orbit_speed(self):
+    def test_all_contacts_stay_between_5km_and_30km_with_visible_glider_speed(self):
         generator = TrafficGenerator(seed=33)
 
         for _ in range(8):
@@ -128,6 +129,16 @@ class TrafficGeneratorTests(unittest.TestCase):
                     self.assertLessEqual(distance_m, MAX_TRAFFIC_RADIUS_M)
                     self.assertGreaterEqual(contact.speed_ms, TRAFFIC_SPEED_RANGE_MS[0])
                     self.assertLessEqual(contact.speed_ms, TRAFFIC_SPEED_RANGE_MS[1])
+
+    def test_default_traffic_speed_range_is_100_to_200_kmh_per_contact(self):
+        generator = TrafficGenerator(seed=33)
+
+        contacts = generator.step(_ownship(), 1.0, contact_count=len(FLARM_TRAFFIC_AIRCRAFT))
+
+        self.assertEqual(TRAFFIC_SPEED_RANGE_KMH, (100.0, 200.0))
+        self.assertAlmostEqual(TRAFFIC_SPEED_RANGE_MS[0] * 3.6, 100.0, places=6)
+        self.assertAlmostEqual(TRAFFIC_SPEED_RANGE_MS[1] * 3.6, 200.0, places=6)
+        self.assertGreater(len({round(contact.speed_ms, 4) for contact in contacts}), 20)
 
     def test_all_default_contacts_orbit_periodically(self):
         generator = TrafficGenerator(seed=33)
@@ -206,7 +217,7 @@ class TrafficGeneratorTests(unittest.TestCase):
         second = generator.step(_ownship(), 120.0, contact_count=len(FLARM_TRAFFIC_AIRCRAFT))
 
         minimum_period_s = math.pi * 2.0 * MIN_CIRCLING_RADIUS_M / TRAFFIC_SPEED_RANGE_MS[1]
-        self.assertGreaterEqual(minimum_period_s, 120.0)
+        self.assertLess(minimum_period_s, 120.0)
         for index in range(len(FLARM_TRAFFIC_AIRCRAFT)):
             with self.subTest(index=index):
                 self.assertGreaterEqual(first[index].climb_ms, TRAFFIC_CLIMB_RANGE_MS[0])

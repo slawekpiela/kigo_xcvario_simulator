@@ -81,12 +81,11 @@ authentic FLARMnet-backed devices with competition signs. The runtime and panel
 default to publishing all 29 contacts. Default contacts stay between 5 km and
 30 km from the selected `Start airport or place` when one is configured, falling
 back to the ownship at traffic start; after that only `$PFLAA` reporting is
-relative to the current ownship position. Orbiting contacts use slightly
-elliptical, deterministic paths at a tangential speed between `0.5` and
-`5.0 m/s`. In each orbit cycle they climb by `300` to `1000 m`, then fly
-straight for `2 min` with zero climb before starting the next orbit. Orbit climb
-rate is positive between `0.51` and `4.0 m/s`, and all default orbit periods are
-at least `2 min`.
+relative to the current ownship position. Default contacts use deterministic
+per-contact speeds between `100` and `200 km/h` (`27.8` to `55.6 m/s`), for both
+`orbit` and `straight` motion. In each orbit cycle they climb by `300` to
+`1000 m`, then fly straight for `2 min` with zero climb before starting the next
+orbit. Orbit climb rate is positive between `0.51` and `4.0 m/s`.
 The panel Traffic section can set circling radius min/max; every orbiting contact
 gets a deterministic random maximum ellipse radius from that range. It can also
 toggle default contacts between `orbit` and `straight` motion. `Apply Traffic`

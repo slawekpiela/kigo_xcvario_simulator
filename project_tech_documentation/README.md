@@ -74,12 +74,12 @@ _To be filled as durable knowledge is discovered._
   restarts `TrafficGenerator` without moving the current ownship. After the first traffic step,
   contact motion is maintained in an anchor-local north/east coordinate system and `$PFLAA`
   relative offsets are derived by subtracting the current ownship offset from that start anchor;
-  later ownship movement does not drag the simulated traffic paths. Each default orbiting
-  contact follows a seed/index-stable, slightly elliptical path with reported tangential speed
-  between `0.5` and `5.0 m/s`. In orbit mode a contact climbs by a deterministic `300` to `1000 m`
-  target, using positive climb between `0.51` and `4.0 m/s`; after reaching that target it flies a
-  straight leg for `120 s` with reported climb `0.0 m/s`, then starts the next climbing orbit cycle.
-  Default orbit periods are at least `2 min`. `TrafficConfig.motion_mode` accepts `orbit` (default)
+  later ownship movement does not drag the simulated traffic paths. Each default contact reports a
+  seed/index-stable speed between `100` and `200 km/h` (`27.8` to `55.6 m/s`) in both `orbit` and
+  `straight` motion. In orbit mode a contact follows a slightly elliptical path and climbs by a
+  deterministic `300` to `1000 m` target, using positive climb between `0.51` and `4.0 m/s`; after
+  reaching that target it flies a straight leg for `120 s` with reported climb `0.0 m/s`, then
+  starts the next climbing orbit cycle. `TrafficConfig.motion_mode` accepts `orbit` (default)
   or `straight`; `/api/v1/simulation/traffic` stores it and `TrafficGenerator.step()` starts both
   modes from the same 5-30 km distance envelope. `TrafficConfig.circling_radius_min_m` and
   `circling_radius_max_m` default to `100` and `700`; the traffic generator clamps requested values
@@ -311,3 +311,5 @@ _To be filled as durable knowledge is discovered._
   straight legs after each 300-1000 m orbit climb.
 - 2026-06-19: Documented `Apply Traffic` restarting the traffic generator and using
   `Start airport or place` as a traffic-only anchor.
+- 2026-06-19: Raised default FLARM traffic speed to deterministic per-contact `100` to `200 km/h`
+  so moving-map traffic visibly moves in both orbit and straight modes.
