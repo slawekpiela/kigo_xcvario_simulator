@@ -68,19 +68,23 @@ _To be filled as durable knowledge is discovered._
   the simulation seed. The six decoded records use metadata `MF`/`D-6676`/`LS-4`,
   `L1`/`D-3450`/`Discus 2`, `TH`/`D-4449`/`Hornet`, `1A`/`D-3358`/`LS-4`,
   empty-callsign/`DKERO`/`DG-800`, and `TH`/`D-5799`/`ASK-13`. `TrafficGenerator` keeps all
-  generated default contacts between 5 km and 30 km from the ownship GPS position. Each default
-  contact periodically orbits a deterministic center with reported tangential speed between `0.5`
-  and `5.0 m/s`; centers, direction, altitude band, climb and course are seed/index-stable. Default
-  orbit periods are at least `2 min`, and every default orbiting contact uses positive climb between
-  `0.51` and `4.0 m/s`. `TrafficConfig.motion_mode` accepts `orbit` (default) or `straight`;
-  `/api/v1/simulation/traffic` stores it and `TrafficGenerator.step()` uses the same 5-30 km distance
-  envelope for both modes. `TrafficConfig.circling_radius_min_m` and
+  generated default contacts between 5 km and 30 km at the traffic start anchor. After the first
+  traffic step, contact motion is maintained in an anchor-local north/east coordinate system and
+  `$PFLAA` relative offsets are derived by subtracting the current ownship offset from that start
+  anchor; later ownship movement does not drag the simulated traffic paths. Each default orbiting
+  contact follows a seed/index-stable, slightly elliptical path with reported tangential speed
+  between `0.5` and `5.0 m/s`. In orbit mode a contact climbs by a deterministic `300` to `1000 m`
+  target, using positive climb between `0.51` and `4.0 m/s`; after reaching that target it flies a
+  straight leg for `120 s` with reported climb `0.0 m/s`, then starts the next climbing orbit cycle.
+  Default orbit periods are at least `2 min`. `TrafficConfig.motion_mode` accepts `orbit` (default)
+  or `straight`; `/api/v1/simulation/traffic` stores it and `TrafficGenerator.step()` starts both
+  modes from the same 5-30 km distance envelope. `TrafficConfig.circling_radius_min_m` and
   `circling_radius_max_m` default to `100` and `700`; the traffic generator clamps requested values
-  to the usable 5-30 km envelope and picks a deterministic seed/index-stable random circling radius
-  in that range for every orbiting contact. The panel Traffic section has `Circling Radius Min/Max
-  [m]` inputs and a `Traffic: Orbiting` / `Traffic: Straight` toggle that post the updated traffic
-  config immediately. The optional collision-course override still replaces contact `0` with a
-  converging track. `ScenarioOrchestrator` defaults traffic to enabled with all 29 contacts, and the
+  to the usable 5-30 km envelope and picks a deterministic seed/index-stable random maximum ellipse
+  radius in that range for every orbiting contact. The panel Traffic section has `Circling Radius
+  Min/Max [m]` inputs and a `Traffic: Orbiting` / `Traffic: Straight` toggle that post the updated
+  traffic config immediately. The optional collision-course override still replaces contact `0` with
+  a converging track. `ScenarioOrchestrator` defaults traffic to enabled with all 29 contacts, and the
   control API uses the same full count when `/api/v1/simulation/traffic` enables traffic without an
   explicit `contact_count`.
   `$PFLAA`/`$PFLAU` emit the configured FLARM device ID in `aircraft_id`; the control API and panel
@@ -293,3 +297,5 @@ _To be filled as durable knowledge is discovered._
   `straight` contact movement.
 - 2026-06-19: Documented FLARM traffic circling radius min/max API and panel inputs, with per-contact
   deterministic radius selection.
+- 2026-06-19: Documented start-anchored FLARM traffic, elliptical climbing orbit cycles, and 120 s
+  straight legs after each 300-1000 m orbit climb.
