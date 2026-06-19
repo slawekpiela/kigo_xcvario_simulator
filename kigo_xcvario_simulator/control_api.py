@@ -184,6 +184,7 @@ class ControlApiServer:
                     return True
                 if path == "/api/v1/simulation/traffic":
                     payload = self._read_json_body()
+                    start_airport_keys = ("start_airport_icao", "start_airport", "traffic_anchor_icao")
                     controller.session.set_traffic_config(
                         bool(payload.get("enabled", True)),
                         int(payload.get("contact_count", DEFAULT_TRAFFIC_CONTACT_COUNT)),
@@ -191,6 +192,9 @@ class ControlApiServer:
                         str(payload.get("motion_mode", "orbit")),
                         _optional_float_any(payload, "circling_radius_min_m", "circling_radius_min"),
                         _optional_float_any(payload, "circling_radius_max_m", "circling_radius_max"),
+                        reset_traffic=bool(payload.get("reset", payload.get("reset_traffic", False))),
+                        start_airport_icao=_first_present(payload, *start_airport_keys),
+                        use_start_airport_anchor=_has_any_key(payload, *start_airport_keys),
                     )
                     self.send_response(204)
                     self._write_cors_headers()
@@ -376,6 +380,17 @@ def _required_float_any(payload: dict[str, object], *keys: str) -> float:
         if key in payload:
             return float(payload[key])
     raise KeyError(keys[0])
+
+
+def _has_any_key(payload: dict[str, object], *keys: str) -> bool:
+    return any(key in payload for key in keys)
+
+
+def _first_present(payload: dict[str, object], *keys: str) -> object | None:
+    for key in keys:
+        if key in payload:
+            return payload.get(key)
+    return None
 
 
 def _to_jsonable(value: object):

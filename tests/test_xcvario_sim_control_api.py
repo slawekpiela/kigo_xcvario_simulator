@@ -193,6 +193,49 @@ class ControlApiTests(unittest.TestCase):
         self.assertEqual(payload["runtime"]["traffic_config"]["circling_radius_min_m"], 100.0)
         self.assertEqual(payload["runtime"]["traffic_config"]["circling_radius_max_m"], 700.0)
 
+    def test_traffic_endpoint_accepts_reset_and_start_anchor_without_moving_ownship(self):
+        with TemporaryDirectory() as temp_dir:
+            data_dir = Path(temp_dir) / "openaip"
+            data_dir.mkdir()
+            (data_dir / "us_apt.json").write_text(
+                json.dumps(
+                    [
+                        {
+                            "name": "MINDEN TAHOE AIRPORT",
+                            "icaoCode": "KMEV",
+                            "geometry": {"type": "Point", "coordinates": [-119.751, 39.0003]},
+                            "elevation": {"value": 1439, "unit": 0},
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            self.session._airport_lookup = AirportLookup(
+                data_dirs=(data_dir,),
+                cache_path=Path(temp_dir) / "airport-cache.json",
+            )
+            before = self.session.get_snapshot().ownship
+
+            self.connection.request(
+                "POST",
+                "/api/v1/simulation/traffic",
+                body=json.dumps({"enabled": True, "contact_count": 1, "reset": True, "start_airport_icao": "kmev"}),
+                headers={"Content-Type": "application/json"},
+            )
+            response = self.connection.getresponse()
+            response.read()
+            self.assertEqual(response.status, 204)
+
+            self.connection.request("GET", "/api/v1/simulation/state")
+            response = self.connection.getresponse()
+            payload = json.loads(response.read().decode("utf-8"))
+
+        ownship = payload["snapshot"]["ownship"]
+        self.assertAlmostEqual(ownship["latitude_deg"], before.latitude_deg, places=6)
+        self.assertAlmostEqual(ownship["longitude_deg"], before.longitude_deg, places=6)
+        self.assertEqual(payload["runtime"]["start_airport"]["icao"], "KMEV")
+        self.assertEqual(payload["runtime"]["traffic_config"]["contact_count"], 1)
+
     def test_wind_endpoint_updates_snapshot_and_runtime_metadata(self):
         self.connection.request(
             "POST",

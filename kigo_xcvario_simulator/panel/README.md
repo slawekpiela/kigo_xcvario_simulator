@@ -14,6 +14,7 @@ Then open [http://127.0.0.1:8180/](http://127.0.0.1:8180/).
 
 - stores the runtime URL in local browser storage,
 - stores an optional start-airport ICAO code or free-text start-place query and sends it during `Connect`,
+- sends the same start-airport/place field as the FLARM traffic anchor when `Apply Traffic` is pressed,
 - loads the latest state from `GET /api/v1/simulation/state`,
 - subscribes to `GET /api/v1/events`,
 - sends operator commands for primary device selection, lifecycle, manual mode, wind, OAT and traffic,
@@ -35,6 +36,11 @@ ownship is reset there on the ground. Online geocoder results do not include
 terrain elevation, so they start at `0 m` GPS altitude. The default geocoder URL
 can be changed with `KIGO_GEOCODER_SEARCH_URL`, and its User-Agent with
 `KIGO_GEOCODER_USER_AGENT`.
+
+`Apply Traffic` restarts generated FLARM contacts from scratch. When
+`Start airport or place` is filled, that point becomes the traffic placement
+anchor without moving the current ownship; blanking the field falls back to the
+current ownship position for the new traffic start.
 
 ## Expected Runtime Config
 

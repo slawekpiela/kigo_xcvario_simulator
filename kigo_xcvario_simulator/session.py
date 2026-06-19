@@ -237,7 +237,25 @@ class SimulatorRuntimeSession:
         motion_mode: str = "orbit",
         circling_radius_min_m: float | None = None,
         circling_radius_max_m: float | None = None,
+        reset_traffic: bool = False,
+        start_airport_icao: object | None = None,
+        use_start_airport_anchor: bool = False,
     ) -> SimulationSnapshot:
+        traffic_anchor_position = None
+        clear_traffic_anchor = False
+        if use_start_airport_anchor:
+            start_airport_value = str(start_airport_icao or "").strip()
+            if start_airport_value:
+                airport = self._airport_lookup.find(start_airport_value)
+                self._start_airport = airport
+                traffic_anchor_position = HomePosition(
+                    latitude_deg=airport.latitude_deg,
+                    longitude_deg=airport.longitude_deg,
+                    gps_altitude_m=airport.gps_altitude_m,
+                )
+            else:
+                self._start_airport = None
+                clear_traffic_anchor = True
         return self.orchestrator.set_traffic_config(
             enabled,
             contact_count,
@@ -245,6 +263,9 @@ class SimulatorRuntimeSession:
             motion_mode,
             circling_radius_min_m,
             circling_radius_max_m,
+            reset_traffic=reset_traffic,
+            traffic_anchor_position=traffic_anchor_position,
+            clear_traffic_anchor=clear_traffic_anchor,
         )
 
     def set_wind(self, direction_deg: float, speed_kmh: float) -> SimulationSnapshot:

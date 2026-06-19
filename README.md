@@ -79,7 +79,8 @@ FLARM traffic contacts start with six decoded FLARMNet IDs: `DDA857`,
 `DDA85A`, `DDA85C`, `DDA86A`, `DDA88F` and `DDA896`, followed by 23
 authentic FLARMnet-backed devices with competition signs. The runtime and panel
 default to publishing all 29 contacts. Default contacts stay between 5 km and
-30 km from the ownship at traffic start; after that only `$PFLAA` reporting is
+30 km from the selected `Start airport or place` when one is configured, falling
+back to the ownship at traffic start; after that only `$PFLAA` reporting is
 relative to the current ownship position. Orbiting contacts use slightly
 elliptical, deterministic paths at a tangential speed between `0.5` and
 `5.0 m/s`. In each orbit cycle they climb by `300` to `1000 m`, then fly
@@ -88,8 +89,10 @@ rate is positive between `0.51` and `4.0 m/s`, and all default orbit periods are
 at least `2 min`.
 The panel Traffic section can set circling radius min/max; every orbiting contact
 gets a deterministic random maximum ellipse radius from that range. It can also
-toggle default contacts between `orbit` and `straight` motion. The optional
-`collision course` mode still makes the first contact converge on the ownship.
+toggle default contacts between `orbit` and `straight` motion. `Apply Traffic`
+restarts generated traffic and uses the current `Start airport or place` field
+as the placement anchor when it is filled. The optional `collision course` mode
+still makes the first contact converge on the ownship.
 `$PFLAA`/`$PFLAU` emit the six-hex-digit device ID, while the control API and
 panel also expose competition ID, registration, model labels and speed.
 
@@ -224,7 +227,7 @@ starts the reverse tunnel so the Pi PTYs still connect to the runtime's local
 6. Set wind direction and speed; the runtime sends them to `kigo_nav` as `WIMWV`.
 7. Set OAT when you need a non-default outside air temperature in the `PXCV`/`POV` stream.
 8. Set `QNH [hPa]` or `Wysokosc [m]` in `Atmosphere` to adjust the simulated device altimeter; changing one recalculates the other from the current static pressure.
-9. Keep the default 29 traffic contacts for the full FLARM set, lower the count if needed, and enable `collision course` when you want the first traffic contact to converge on the ownship.
+9. Keep the default 29 traffic contacts for the full FLARM set, lower the count if needed, and press `Apply Traffic` to restart generated traffic around the current `Start airport or place` field. Enable `collision course` when you want the first traffic contact to converge on the ownship.
 10. Use `Start / Resume`, `Pause`, `Reset` or `Apply Manual Mode`.
 11. Watch `Ownship`, `Traffic` and `Health` update from `GET /state` and `SSE`, including each emitted FLARM ID and competition ID.
 

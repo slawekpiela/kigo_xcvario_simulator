@@ -267,6 +267,22 @@ class TrafficGeneratorTests(unittest.TestCase):
         )
         self.assertAlmostEqual(moved[0].relative_east_m, first[0].relative_east_m, delta=0.1)
 
+    def test_custom_anchor_places_contacts_around_anchor_not_current_ownship(self):
+        generator = TrafficGenerator(seed=33)
+        anchor = _ownship(latitude_delta_deg=0.02, altitude_delta_m=100.0)
+        reference_generator = TrafficGenerator(seed=33)
+
+        anchored = generator.step(_ownship(), 1.0, anchor=anchor, contact_count=1)
+        reference = reference_generator.step(anchor, 1.0, contact_count=1)
+
+        self.assertAlmostEqual(
+            anchored[0].relative_north_m,
+            reference[0].relative_north_m + 0.02 * METERS_PER_DEGREE_LATITUDE,
+            delta=0.1,
+        )
+        self.assertAlmostEqual(anchored[0].relative_east_m, reference[0].relative_east_m, delta=0.1)
+        self.assertAlmostEqual(anchored[0].relative_altitude_m, reference[0].relative_altitude_m + 100.0, delta=0.1)
+
     def test_default_contacts_do_not_rotate_onto_collision_course(self):
         generator = TrafficGenerator(seed=33)
 

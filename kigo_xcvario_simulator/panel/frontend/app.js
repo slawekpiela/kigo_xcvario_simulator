@@ -794,8 +794,8 @@ function setTrafficMotionMode(value) {
   trafficMotionToggleButton.textContent = motionMode === TRAFFIC_MOTION_STRAIGHT ? "Traffic: Straight" : "Traffic: Orbiting";
 }
 
-function trafficConfigPayload() {
-  return {
+function trafficConfigPayload(options = {}) {
+  const payload = {
     enabled: trafficEnabledInput.checked,
     contact_count: Number(trafficCountInput.value || "0"),
     circling_radius_min_m: numericValue(trafficCirclingRadiusMinInput) ?? 100,
@@ -803,10 +803,20 @@ function trafficConfigPayload() {
     collision_course: trafficCollisionInput.checked,
     motion_mode: currentTrafficMotionMode(),
   };
+  if (options.resetTraffic) {
+    payload.reset = true;
+  }
+  if (options.includeStartAirport) {
+    const startAirportIcao = normalizeStartAirportIcao(startAirportIcaoInput.value);
+    startAirportIcaoInput.value = startAirportIcao;
+    localStorage.setItem(STORAGE_START_AIRPORT_ICAO, startAirportIcao);
+    payload.start_airport_icao = startAirportIcao;
+  }
+  return payload;
 }
 
-function postTrafficConfig() {
-  void postCommand("/api/v1/simulation/traffic", trafficConfigPayload(), { syncControls: true });
+function postTrafficConfig(options = {}) {
+  void postCommand("/api/v1/simulation/traffic", trafficConfigPayload(options), { syncControls: true });
 }
 
 function setSelectValueIfIdle(node, value) {
@@ -1264,7 +1274,7 @@ trafficMotionToggleButton.addEventListener("click", () => {
   postTrafficConfig();
 });
 
-applyTrafficButton.addEventListener("click", postTrafficConfig);
+applyTrafficButton.addEventListener("click", () => postTrafficConfig({ resetTraffic: true, includeStartAirport: true }));
 
 loadStoredSettings();
 setTrafficMotionMode(TRAFFIC_MOTION_ORBIT);

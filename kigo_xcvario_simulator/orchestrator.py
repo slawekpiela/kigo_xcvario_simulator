@@ -67,6 +67,7 @@ class ScenarioOrchestrator:
         self._manual_generation = 0
         self._traffic_config = TrafficConfig(enabled=True, contact_count=DEFAULT_TRAFFIC_CONTACT_COUNT)
         self._traffic = ()
+        self._traffic_anchor_position: HomePosition | None = None
         self._wind = WindState()
         self._flight_model = flight_model or FlightModel(
             seed=runtime_config.seed,
@@ -173,6 +174,7 @@ class ScenarioOrchestrator:
     ) -> SimulationSnapshot:
         with self._lock:
             self._home_position = home_position
+            self._traffic_anchor_position = home_position
             self._flight_model.set_home_position(
                 latitude_deg=home_position.latitude_deg,
                 longitude_deg=home_position.longitude_deg,
@@ -189,6 +191,7 @@ class ScenarioOrchestrator:
             self._ownship = self._flight_model.reset()
             self._ownship = self._flight_model.apply_device_qnh_to_state(self._ownship)
             self._traffic = ()
+            self._traffic_generator.reset()
             self._manual_directive = FlightDirective(
                 segment_id=f"manual_{self._manual_generation}_on_ground",
                 phase=FlightPhase.GLIDER_LAUNCH,
@@ -227,6 +230,9 @@ class ScenarioOrchestrator:
         motion_mode: str = "orbit",
         circling_radius_min_m: float | None = None,
         circling_radius_max_m: float | None = None,
+        reset_traffic: bool = False,
+        traffic_anchor_position: HomePosition | None = None,
+        clear_traffic_anchor: bool = False,
     ) -> SimulationSnapshot:
         if contact_count < 0:
             raise ValueError("contact_count must be >= 0.")
@@ -243,6 +249,16 @@ class ScenarioOrchestrator:
                 circling_radius_min_m=circling_radius_min_m,
                 circling_radius_max_m=circling_radius_max_m,
             )
+            anchor_changed = False
+            if clear_traffic_anchor:
+                anchor_changed = self._traffic_anchor_position is not None
+                self._traffic_anchor_position = None
+            elif traffic_anchor_position is not None:
+                anchor_changed = traffic_anchor_position != self._traffic_anchor_position
+                self._traffic_anchor_position = traffic_anchor_position
+            if reset_traffic or anchor_changed:
+                self._traffic = ()
+                self._traffic_generator.reset()
             if not self._traffic_config.enabled or self._traffic_config.contact_count == 0:
                 self._traffic = ()
             return self._snapshot()
@@ -326,6 +342,7 @@ class ScenarioOrchestrator:
             self._traffic = self._traffic_generator.step(
                 self._ownship,
                 dt_s,
+                anchor=self._traffic_anchor_ownship(),
                 contact_count=self._traffic_config.contact_count,
                 collision_course=self._traffic_config.collision_course,
                 motion_mode=self._traffic_config.motion_mode,
@@ -336,6 +353,16 @@ class ScenarioOrchestrator:
         except Exception:
             self._traffic = ()
             self._health = HealthState.DEGRADED
+
+    def _traffic_anchor_ownship(self):
+        if self._traffic_anchor_position is None:
+            return None
+        return replace(
+            self._ownship,
+            latitude_deg=self._traffic_anchor_position.latitude_deg,
+            longitude_deg=self._traffic_anchor_position.longitude_deg,
+            gps_altitude_m=self._traffic_anchor_position.gps_altitude_m,
+        )
 
     def _resolve_active_directive(self) -> FlightDirective | None:
         if self._manual_directive is not None:

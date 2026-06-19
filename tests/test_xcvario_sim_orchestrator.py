@@ -304,6 +304,28 @@ class ScenarioOrchestratorTests(unittest.TestCase):
         self.assertEqual(self.orchestrator.get_traffic_config().circling_radius_min_m, 100.0)
         self.assertEqual(self.orchestrator.get_traffic_config().circling_radius_max_m, 700.0)
 
+    def test_traffic_config_reset_restarts_contacts_from_start_anchor(self):
+        self.orchestrator.load_preset(PresetRequest(preset_id="straight", seed=5, autostart=True))
+        self.orchestrator.set_traffic_config(True, 1)
+        first = self.orchestrator.tick(1.0)
+        moved = self.orchestrator.tick(10.0)
+        self.assertNotAlmostEqual(first.traffic[0].relative_north_m, moved.traffic[0].relative_north_m, delta=0.1)
+
+        self.orchestrator.set_traffic_config(
+            True,
+            1,
+            reset_traffic=True,
+            traffic_anchor_position=HomePosition(latitude_deg=49.85833, longitude_deg=19.00202, gps_altitude_m=501.0),
+        )
+        restarted = self.orchestrator.tick(1.0)
+
+        self.assertAlmostEqual(
+            restarted.traffic[0].relative_north_m,
+            first.traffic[0].relative_north_m + 0.02 * 111320.0,
+            delta=0.1,
+        )
+        self.assertAlmostEqual(restarted.traffic[0].relative_altitude_m, first.traffic[0].relative_altitude_m + 100.0, delta=0.1)
+
 
 if __name__ == "__main__":
     unittest.main()

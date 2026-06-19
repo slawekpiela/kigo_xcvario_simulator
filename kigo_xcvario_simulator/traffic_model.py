@@ -1,4 +1,4 @@
-"""Deterministic traffic generator relative to ownship."""
+"""Deterministic traffic generator around an anchor, reported relative to ownship."""
 
 from __future__ import annotations
 
@@ -97,6 +97,7 @@ class TrafficGenerator:
         ownship: OwnshipState,
         dt_s: float,
         *,
+        anchor: OwnshipState | None = None,
         contact_count: int,
         collision_course: bool = False,
         motion_mode: str = TRAFFIC_MOTION_ORBIT,
@@ -111,7 +112,7 @@ class TrafficGenerator:
             return ()
 
         self._sim_time_s += dt_s
-        self._ensure_anchor(ownship)
+        self._ensure_anchor(anchor or ownship)
         resolved_motion_mode = normalize_traffic_motion_mode(motion_mode)
         circling_radius_min_m, circling_radius_max_m = normalize_traffic_circling_radius_range(
             circling_radius_min_m,
