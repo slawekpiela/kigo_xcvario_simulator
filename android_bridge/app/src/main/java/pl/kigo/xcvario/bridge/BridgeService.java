@@ -47,19 +47,44 @@ public final class BridgeService extends Service {
         super.onDestroy();
     }
 
-    static String snapshot() {
-        StringBuilder text = new StringBuilder();
-        text.append("service: ").append(lifecycleStatus).append('\n');
+    static StatusSnapshot statusSnapshot() {
+        long nowMillis = System.currentTimeMillis();
         synchronized (LOCK) {
+            int total = ACTIVE_BRIDGES.size();
+            int connected = 0;
+            int transmitting = 0;
+            for (TcpBridge bridge : ACTIVE_BRIDGES) {
+                if (bridge.isConnected()) {
+                    connected++;
+                }
+                if (bridge.isTransmitting(nowMillis)) {
+                    transmitting++;
+                }
+            }
+
+            String connectedStatus = statusValue(connected, total);
+            String transmittingStatus = statusValue(transmitting, total);
+
+            StringBuilder text = new StringBuilder();
+            text.append("service: ").append(lifecycleStatus).append('\n');
+            text.append("connected: ").append(connectedStatus)
+                    .append(" (").append(connected).append('/').append(total).append(")\n");
+            text.append("transmitting: ").append(transmittingStatus)
+                    .append(" (").append(transmitting).append('/').append(total).append(")\n");
             if (ACTIVE_BRIDGES.isEmpty()) {
                 text.append("bridges: stopped\n");
             } else {
                 for (TcpBridge bridge : ACTIVE_BRIDGES) {
-                    text.append(bridge.snapshot()).append('\n');
+                    text.append(bridge.snapshot(nowMillis)).append('\n');
                 }
             }
+
+            return new StatusSnapshot(connectedStatus, transmittingStatus, text.toString());
         }
-        return text.toString();
+    }
+
+    static String snapshot() {
+        return statusSnapshot().details;
     }
 
     private void startBridgesIfNeeded() {
@@ -131,5 +156,27 @@ public final class BridgeService extends Service {
                 NotificationManager.IMPORTANCE_LOW
         );
         manager.createNotificationChannel(channel);
+    }
+
+    private static String statusValue(int active, int total) {
+        if (total == 0 || active == 0) {
+            return "NO";
+        }
+        if (active == total) {
+            return "YES";
+        }
+        return "PARTIAL";
+    }
+
+    static final class StatusSnapshot {
+        final String connectedStatus;
+        final String transmittingStatus;
+        final String details;
+
+        StatusSnapshot(String connectedStatus, String transmittingStatus, String details) {
+            this.connectedStatus = connectedStatus;
+            this.transmittingStatus = transmittingStatus;
+            this.details = details;
+        }
     }
 }

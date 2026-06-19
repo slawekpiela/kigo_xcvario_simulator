@@ -62,7 +62,13 @@ That script:
 
 The bridge does not autostart. Press `Start` in the bridge app when you want
 the foreground bridge service running, and press `Stop` before leaving it idle.
-The service is not exported to other Android apps.
+The service is not exported to other Android apps. The main screen shows clear
+`Connected` and `Transmitting` indicators above the raw per-channel counters:
+
+- `Connected: YES` means both local Kigo/Nav sockets are bridged to the Mac
+  upstream ports; `PARTIAL` means only one channel is bridged.
+- `Transmitting: YES` means bridge bytes flowed recently; `PARTIAL` means only
+  one channel is currently moving data.
 
 If the simulator runs on a VM instead of the Mac, first expose the VM simulator
 ports on the Mac as local `4353` and `4354` before running the install script.

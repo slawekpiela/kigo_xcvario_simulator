@@ -16,6 +16,7 @@ final class TcpBridge {
     private final int upstreamPort;
     private final AtomicLong upstreamToDeviceBytes = new AtomicLong();
     private final AtomicLong deviceToUpstreamBytes = new AtomicLong();
+    private final AtomicLong lastTransmissionMillis = new AtomicLong();
 
     private volatile boolean running;
     private volatile String status = "stopped";
@@ -50,16 +51,28 @@ final class TcpBridge {
         closeQuietly(currentDeviceSocket);
         closeQuietly(currentUpstreamSocket);
         closeQuietly(serverSocket);
+        lastTransmissionMillis.set(0L);
         status = "stopped";
     }
 
-    String snapshot() {
+    String snapshot(long nowMillis) {
         return name
                 + " listen=127.0.0.1:" + listenPort
                 + " upstream=" + upstreamHost + ":" + upstreamPort
+                + " connected=" + yesNo(isConnected())
+                + " transmitting=" + yesNo(isTransmitting(nowMillis))
                 + " status=" + status
                 + " upstream_to_device=" + upstreamToDeviceBytes.get()
                 + " device_to_upstream=" + deviceToUpstreamBytes.get();
+    }
+
+    boolean isConnected() {
+        return "bridging".equals(status);
+    }
+
+    boolean isTransmitting(long nowMillis) {
+        long lastTransmission = lastTransmissionMillis.get();
+        return isConnected() && lastTransmission > 0L && nowMillis - lastTransmission <= 2500L;
     }
 
     private void runServer() {
@@ -151,6 +164,7 @@ final class TcpBridge {
                         output.write(buffer, 0, read);
                         output.flush();
                         byteCounter.addAndGet(read);
+                        lastTransmissionMillis.set(System.currentTimeMillis());
                     }
                 } catch (IOException ignored) {
                     // Socket shutdown or client disconnect.
@@ -187,5 +201,9 @@ final class TcpBridge {
         } catch (IOException ignored) {
             // Already closed.
         }
+    }
+
+    private String yesNo(boolean value) {
+        return value ? "YES" : "NO";
     }
 }

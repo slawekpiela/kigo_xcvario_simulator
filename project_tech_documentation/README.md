@@ -179,7 +179,9 @@ _To be filled as durable knowledge is discovered._
   a normal APK cannot expose a virtual serial device to another APK without root or explicit app
   integration. The bridge service is not exported and is intentionally not sticky/autostarted;
   `install_bridge.sh` opens `MainActivity`, but the operator must press `Start` in the bridge app to
-  start the foreground service.
+  start the foreground service. `MainActivity` shows large `Connected` and `Transmitting` indicators
+  above the raw bridge counters. `Connected` is derived from active `bridging` sockets, while
+  `Transmitting` stays `YES`/`PARTIAL` only when a channel moved bytes in roughly the last `2.5 s`.
 - On the tested Android 11 Samsung device, `kigo.nav` loads the active profile from
   `/sdcard/Android/media/kigo.nav/XCSoarData/kigo_default.top`; matching-looking profiles under
   `/sdcard/Android/data/kigo.nav/files/XCSoarData` can be stale. A connection error after activating
@@ -247,6 +249,8 @@ _To be filled as durable knowledge is discovered._
   and reverse-tunnel active-state gotcha.
 - 2026-06-18: Documented Android phone bridge crash triage showing Kigo NMEA logger/TextWriter as
   the failing path, not the bridge APK process.
+- 2026-06-19: Documented Android bridge foreground status indicators for connected/transmitting
+  state.
 - 2026-06-04: Documented active lab Pi bridge address and transient VM runtime service using the
   durable VM-local runtime config path.
 - 2026-06-05: Documented iPhone/LAN panel access via Mac LAN address, CORS origin, and Mac-to-VM

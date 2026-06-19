@@ -2,6 +2,7 @@ package pl.kigo.xcvario.bridge;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
@@ -16,13 +17,24 @@ import android.widget.TextView;
 
 public final class MainActivity extends Activity {
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private TextView connectedView;
+    private TextView transmittingView;
     private TextView statusView;
 
     private final Runnable refreshStatus = new Runnable() {
         @Override
         public void run() {
+            BridgeService.StatusSnapshot snapshot = BridgeService.statusSnapshot();
+            if (connectedView != null) {
+                connectedView.setText("Connected: " + snapshot.connectedStatus);
+                connectedView.setTextColor(statusColor(snapshot.connectedStatus));
+            }
+            if (transmittingView != null) {
+                transmittingView.setText("Transmitting: " + snapshot.transmittingStatus);
+                transmittingView.setTextColor(statusColor(snapshot.transmittingStatus));
+            }
             if (statusView != null) {
-                statusView.setText(BridgeService.snapshot());
+                statusView.setText(snapshot.details);
             }
             handler.postDelayed(this, 1000L);
         }
@@ -89,10 +101,18 @@ public final class MainActivity extends Activity {
         });
         buttons.addView(stop);
 
+        connectedView = statusLine();
+        connectedView.setPadding(0, dp(16), 0, 0);
+        root.addView(connectedView, matchWrap());
+
+        transmittingView = statusLine();
+        transmittingView.setPadding(0, dp(4), 0, 0);
+        root.addView(transmittingView, matchWrap());
+
         statusView = new TextView(this);
         statusView.setTypeface(Typeface.MONOSPACE);
         statusView.setTextSize(14);
-        statusView.setPadding(0, dp(16), 0, dp(16));
+        statusView.setPadding(0, dp(12), 0, dp(16));
         root.addView(statusView, matchWrap());
 
         TextView commands = new TextView(this);
@@ -135,5 +155,22 @@ public final class MainActivity extends Activity {
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private TextView statusLine() {
+        TextView view = new TextView(this);
+        view.setTextSize(20);
+        view.setTypeface(Typeface.DEFAULT_BOLD);
+        return view;
+    }
+
+    private int statusColor(String status) {
+        if ("YES".equals(status)) {
+            return Color.rgb(24, 128, 72);
+        }
+        if ("PARTIAL".equals(status)) {
+            return Color.rgb(196, 117, 0);
+        }
+        return Color.rgb(176, 0, 32);
     }
 }
