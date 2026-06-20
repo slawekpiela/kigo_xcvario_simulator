@@ -116,7 +116,10 @@ class TelemetryScheduler:
     def _run_loop(self) -> None:
         while not self._stop_event.is_set():
             started_s = self._time.monotonic()
-            self.run_tick()
+            try:
+                self.run_tick()
+            except Exception as exc:
+                self._record_error(exc)
             elapsed_s = self._time.monotonic() - started_s
             sleep_s = max(0.0, self._tick_interval_s - elapsed_s)
             if sleep_s > 0.0:

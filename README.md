@@ -230,6 +230,12 @@ starts the reverse tunnel so the Pi PTYs still connect to the runtime's local
 10. Use `Start / Resume`, `Pause`, `Reset` or `Apply Manual Mode`.
 11. Watch `Ownship`, `Traffic` and `Health` update from `GET /state` and `SSE`, including each emitted FLARM ID and competition ID.
 
+If Kigo's `Devices` screen shows `XCVario ... No data` while the bridge is
+connected, check the panel `Health` scheduler fields or `GET /state`. A stale
+timestamp with a scheduler `last_error` means the runtime needs restart; current
+builds keep the scheduler alive after tick errors and cap impossible barometric
+altitudes before they can stop the telemetry thread.
+
 ## Test Commands
 
 ```bash

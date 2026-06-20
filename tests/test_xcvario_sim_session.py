@@ -9,9 +9,10 @@ from kigo_xcvario_simulator.config import (
     SimulatorRuntimeConfig,
     XcvarioConfig,
 )
-from kigo_xcvario_simulator.contracts import ManualModeInput, PresetRequest
+from kigo_xcvario_simulator.contracts import ManualModeInput, OwnshipState, PresetRequest, SimulationSnapshot
+from kigo_xcvario_simulator.scheduler import TelemetryScheduler
 from kigo_xcvario_simulator.session import SimulatorRuntimeSession
-from kigo_xcvario_simulator.state import FlightPhase, RuntimeState
+from kigo_xcvario_simulator.state import FlightPhase, HealthState, RuntimeState
 
 
 class _FakePublisher:
@@ -33,6 +34,42 @@ class _FakePublisher:
 class _FailingPublisher(_FakePublisher):
     def publish_snapshot(self, snapshot) -> None:
         raise RuntimeError("publish failed")
+
+
+def _snapshot() -> SimulationSnapshot:
+    return SimulationSnapshot(
+        runtime_state=RuntimeState.RUNNING,
+        ownship=OwnshipState(
+            timestamp_utc="2026-05-08T12:00:00.000Z",
+            latitude_deg=49.83833,
+            longitude_deg=19.00202,
+            gps_altitude_m=401.0,
+            static_pressure_hpa=965.99,
+            device_qnh_hpa=1013.25,
+            vertical_speed_ms=0.0,
+            speed_kmh=90.0,
+            track_deg=90.0,
+            on_ground=False,
+            phase=FlightPhase.STRAIGHT,
+            device_altitude_m=401.0,
+        ),
+        health=HealthState.READY,
+    )
+
+
+class _FlakyOrchestrator:
+    def __init__(self) -> None:
+        self.calls = 0
+        self.snapshot = _snapshot()
+
+    def get_snapshot(self):
+        return self.snapshot
+
+    def tick(self, dt_s):
+        self.calls += 1
+        if self.calls == 1:
+            raise ValueError("first tick failed")
+        return self.snapshot
 
 
 def _config() -> SimulatorRuntimeConfig:
@@ -75,6 +112,28 @@ class SessionAndSchedulerTests(unittest.TestCase):
         self.assertEqual(session.scheduler.tick_count, 5)
         self.assertEqual(metadata["scheduler"]["error_count"], 1)
         self.assertIn("RuntimeError: publish failed", metadata["scheduler"]["last_error"])
+
+    def test_scheduler_thread_survives_orchestrator_tick_error(self):
+        orchestrator = _FlakyOrchestrator()
+        ownship = _FakePublisher()
+        scheduler = TelemetryScheduler(
+            orchestrator=orchestrator,
+            ownship_publishers=(ownship,),
+            tick_hz=50,
+            ownship_hz=50,
+            traffic_hz=1,
+        )
+
+        scheduler.start()
+        deadline_s = time.monotonic() + 1.0
+        while time.monotonic() < deadline_s and scheduler.tick_count < 1:
+            time.sleep(0.01)
+        scheduler.stop()
+
+        self.assertGreaterEqual(orchestrator.calls, 2)
+        self.assertGreaterEqual(scheduler.tick_count, 1)
+        self.assertEqual(scheduler.error_count, 1)
+        self.assertIn("ValueError: first tick failed", scheduler.last_error)
 
     def test_headless_session_starts_and_stops_without_hanging_threads(self):
         ownship = _FakePublisher()

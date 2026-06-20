@@ -106,6 +106,23 @@ class FlightModelTests(unittest.TestCase):
         self.assertLess(max(deltas), 0.75)
         self.assertGreater(max(altitudes), 500.0)
 
+    def test_straight_climb_above_baro_ceiling_is_capped(self):
+        directive = FlightDirective(
+            segment_id="straight_leg",
+            phase=FlightPhase.STRAIGHT,
+            duration_s=10.0,
+            target_heading_deg=90.0,
+            target_speed_kmh=90.0,
+            climb_min_ms=50000.0,
+            climb_max_ms=50000.0,
+        )
+
+        next_state = self.model.step(self.initial_state, directive, 1.0)
+
+        self.assertLess(next_state.gps_altitude_m, 45000.0)
+        self.assertGreater(next_state.static_pressure_hpa, 0.0)
+        self.assertAlmostEqual(next_state.vertical_speed_ms, 0.0, places=6)
+
     def test_baro_altitude_is_ignored_outside_straight_mode(self):
         directive = FlightDirective(
             segment_id="circling_core",

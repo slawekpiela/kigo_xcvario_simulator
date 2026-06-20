@@ -226,6 +226,9 @@ _To be filled as durable knowledge is discovered._
   The VM bridge could be `active/tcp` but `primary_bytes_tcp_to_pty` stayed at zero until the runtime
   service was restarted. Recovery was: restart `kigo-xcvario-runtime.service`, re-apply manual mode,
   restart the VM bridge, then verify `$GPRMC`/`$GPGGA` output with `nc 127.0.0.1 4353` on the VM.
+  As of 2026-06-20, `flight_model.FlightModel` clamps impossible barometric altitudes and
+  `scheduler.TelemetryScheduler` records unexpected tick errors without killing its background
+  thread, so this stale-runtime failure should not recur from altitude runaway.
 - As of 2026-06-12, `admin@192.168.0.111` is not a usable Pi bridge target for this lab setup: from
   the VM it presents a changed host key relative to `/home/slawek/.ssh/known_hosts`, and with a clean
   temporary known-hosts file it still rejects `/home/slawek/.ssh/kigo_pi`. Do not clear the stale

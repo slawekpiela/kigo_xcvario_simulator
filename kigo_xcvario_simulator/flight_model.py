@@ -6,7 +6,13 @@ from dataclasses import replace
 from datetime import datetime, timezone
 import math
 
-from .baro import altitude_m_for_static_pressure, simulation_timestamp_utc, static_pressure_hpa_for_altitude
+from .baro import (
+    BARO_K1,
+    BARO_K2,
+    altitude_m_for_static_pressure,
+    simulation_timestamp_utc,
+    static_pressure_hpa_for_altitude,
+)
 from .contracts import FlightDirective, OwnshipState, WindState
 from .flight_math import advance_heading_deg, advance_position, ground_velocity_from_true_wind, normalize_heading_deg
 from .state import FlightPhase
@@ -21,6 +27,7 @@ DEFAULT_STRAIGHT_CLIMB_JITTER_MS = 0.18
 DEFAULT_STRAIGHT_CLIMB_JITTER_PERIOD_S = 5.0
 DEFAULT_GLIDER_LAUNCH_VARIATION_TICKS = 12
 DEFAULT_GENERIC_VARIATION_TICKS = 8
+BARO_ALTITUDE_HEADROOM_M = 1.0
 
 
 class FlightModel:
@@ -138,6 +145,10 @@ class FlightModel:
                 on_ground = True
             else:
                 on_ground = False
+            capped_altitude_m = self._clamp_baro_altitude_m(gps_altitude_m)
+            if capped_altitude_m < gps_altitude_m and vertical_speed_ms > 0.0:
+                vertical_speed_ms = 0.0
+            gps_altitude_m = capped_altitude_m
 
         movement_speed_kmh, movement_track_deg = self._movement_velocity(
             speed_kmh=speed_kmh,
@@ -231,8 +242,12 @@ class FlightModel:
         phase: FlightPhase,
         baro_altitude_m: float | None = None,
     ) -> OwnshipState:
+        gps_altitude_m = self._clamp_baro_altitude_m(gps_altitude_m)
+        pressure_altitude_m = self._clamp_baro_altitude_m(
+            gps_altitude_m if baro_altitude_m is None else float(baro_altitude_m)
+        )
         static_pressure_hpa = static_pressure_hpa_for_altitude(
-            gps_altitude_m if baro_altitude_m is None else float(baro_altitude_m),
+            pressure_altitude_m,
             qnh_hpa=self._pressure_reference_qnh_hpa,
         )
         device_altitude_m = altitude_m_for_static_pressure(
@@ -395,7 +410,13 @@ class FlightModel:
     def _straight_altitude_target_m(self, directive: FlightDirective) -> float | None:
         if directive.phase != FlightPhase.STRAIGHT or directive.baro_altitude_m is None:
             return None
-        return max(self._home_altitude_m, float(directive.baro_altitude_m))
+        return max(self._home_altitude_m, self._clamp_baro_altitude_m(float(directive.baro_altitude_m)))
+
+    def _clamp_baro_altitude_m(self, altitude_m: float) -> float:
+        return min(float(altitude_m), self._maximum_baro_altitude_m())
+
+    def _maximum_baro_altitude_m(self) -> float:
+        return (math.pow(self._pressure_reference_qnh_hpa, BARO_K1) / BARO_K2) - BARO_ALTITUDE_HEADROOM_M
 
     def _directive_changed(self, directive: FlightDirective) -> bool:
         return self._active_directive_key != self._variation_key(directive)
