@@ -124,6 +124,12 @@ _To be filled as durable knowledge is discovered._
   SSH tunnel from the runtime host to Pi for ports `4353` and `4354`.
 - As of 2026-06-04, the active lab Pi address is `admin@192.168.0.106`; override stale panel/API
   bridge targets that still point at `admin@192.168.0.114`.
+- As of 2026-06-21, the active lab Pi for matching VM/Pi display is
+  `admin@192.168.0.111`, hostname `ssdkigo1`, identity `/home/slawek/.ssh/kigo_pi` from the VM.
+  Keep `kigo-xcvario-runtime.service` disabled/inactive on Pi. The single runtime source of truth is
+  the VM `kigo-xcvario-runtime.service`; Pi receives VM runtime ports through the persistent VM user
+  unit `kigo-xcvario-tunnel-pi.service` and persistent Pi user units
+  `kigo-xcvario-pty-xcvario.service` / `kigo-xcvario-pty-flarm.service`.
 - The panel can run bridge control in VM-only mode when the Pi is powered off: leave the Pi bridge
   target empty so bridge API requests include only the VM node. A filled Pi target is treated as an
   explicit request to start/status that Pi and will make bridge readiness fail while the Pi is
@@ -182,6 +188,11 @@ _To be filled as durable knowledge is discovered._
   start the foreground service. `MainActivity` shows large `Connected` and `Transmitting` indicators
   above the raw bridge counters. `Connected` is derived from active `bridging` sockets, while
   `Transmitting` stays `YES`/`PARTIAL` only when a channel moved bytes in roughly the last `2.5 s`.
+  The local simulator panel also exposes Mac-side Android bridge diagnostics at
+  `/api/v1/android-bridge/status` from `panel/start_frontend.py`, because ADB and USB state are
+  local to the Mac, not the VM runtime. The Bridge Control card renders that endpoint as
+  `Connected` and `Transmitting` phone status pills after checking `adb devices -l`,
+  `adb reverse --list`, APK/service state, Android `ss` sockets, and Mac `127.0.0.1:4353`/`4354`.
   If the phone reconnects over USB, `adb reverse --list` can become empty while the foreground bridge
   service is still running; in that state pressing `Start` only leaves the app listening and Kigo
   cannot reach the Mac. Re-run both `adb reverse` mappings, restart the bridge, and restart Kigo/Nav
@@ -211,14 +222,16 @@ _To be filled as durable knowledge is discovered._
   not store or redraw historical trail points. If a displayed old trail immediately changes shape
   after updating wind, suspect the consumer's trail rendering/wind-drift compensation rather than
   historical position output from this simulator.
-- TCP-to-PTY bridge control uses transient user-systemd units:
+- TCP-to-PTY bridge control uses user-systemd units named
   `kigo-xcvario-pty-xcvario.service`, `kigo-xcvario-pty-flarm.service`, and for Pi
-  `kigo-xcvario-tunnel-pi.service`. Status JSON lives under `/tmp/kigo-sim/*.status.json`, while
-  bridge logs are appended in the remote workdir (`pty-xcvario-to-mac.log`,
-  `pty-flarm-to-mac.log`) and the Pi tunnel log is `/tmp/kigo-sim/kigo-xcvario-tunnel-pi.log` on
-  the runtime host. `systemctl --user is-active kigo-xcvario-tunnel-pi.service` can report
-  `active` while SSH is repeatedly timing out or restarting; inspect the tunnel log or
-  `systemctl --user status ...` restart counter before treating it as a healthy tunnel.
+  `kigo-xcvario-tunnel-pi.service`. If a persistent unit file exists, bridge start/restart uses
+  `systemctl --user restart`; otherwise it falls back to transient `systemd-run --user`. Status JSON
+  lives under `/tmp/kigo-sim/*.status.json`, while bridge logs are appended in the remote workdir
+  (`pty-xcvario-to-mac.log`, `pty-flarm-to-mac.log`) and the Pi tunnel log is
+  `/tmp/kigo-sim/kigo-xcvario-tunnel-pi.log` on the runtime host.
+  `systemctl --user is-active kigo-xcvario-tunnel-pi.service` can report `active` while SSH is
+  repeatedly timing out or restarting; inspect the tunnel log or `systemctl --user status ...`
+  restart counter before treating it as a healthy tunnel.
 - If XCSoar reports `GPS waiting for fix` while the control API says the runtime is `running`, check
   the `snapshot.ownship.timestamp_utc`, `runtime.scheduler.last_error`, and bridge byte counters. On
   2026-06-12 the runtime API stayed live with a stale 2026-06-11 snapshot after the telemetry
@@ -229,11 +242,10 @@ _To be filled as durable knowledge is discovered._
   As of 2026-06-20, `flight_model.FlightModel` clamps impossible barometric altitudes and
   `scheduler.TelemetryScheduler` records unexpected tick errors without killing its background
   thread, so this stale-runtime failure should not recur from altitude runaway.
-- As of 2026-06-12, `admin@192.168.0.111` is not a usable Pi bridge target for this lab setup: from
-  the VM it presents a changed host key relative to `/home/slawek/.ssh/known_hosts`, and with a clean
-  temporary known-hosts file it still rejects `/home/slawek/.ssh/kigo_pi`. Do not clear the stale
-  known-hosts entry as a bridge fix unless the device identity and authorized key are verified first.
-  `192.168.0.106`, `192.168.0.108`, and `192.168.0.113` timed out for SSH in the same check.
+- The 2026-06-12 note that `admin@192.168.0.111` was not usable is superseded. On 2026-06-21 the
+  address was verified as Pi hostname `ssdkigo1` with ED25519 fingerprint
+  `SHA256:SIFoATrz9YnT1K3uKKH8a600gjbaKuCHiiOvcD3TClQ`, VM known_hosts was refreshed, and
+  `/home/slawek/.ssh/kigo_pi` authenticates from `codex-vm`.
 
 ## Decisions And Assumptions
 
@@ -260,6 +272,8 @@ _To be filled as durable knowledge is discovered._
   state.
 - 2026-06-19: Documented that Android USB reconnects can clear `adb reverse` mappings while the
   bridge service remains running.
+- 2026-06-20: Documented the panel-side Android bridge status endpoint and Bridge Control phone
+  `Connected`/`Transmitting` indicators.
 - 2026-06-04: Documented active lab Pi bridge address and transient VM runtime service using the
   durable VM-local runtime config path.
 - 2026-06-05: Documented iPhone/LAN panel access via Mac LAN address, CORS origin, and Mac-to-VM
@@ -322,3 +336,5 @@ _To be filled as durable knowledge is discovered._
   `Start airport or place` as a traffic-only anchor.
 - 2026-06-19: Raised default FLARM traffic speed to deterministic per-contact `100` to `200 km/h`
   so moving-map traffic visibly moves in both orbit and straight modes.
+- 2026-06-21: Documented the persistent VM-runtime-to-Pi reverse-tunnel setup, disabled Pi-local
+  runtime, refreshed `admin@192.168.0.111` Pi identity, and persistent-unit-aware bridge restart.

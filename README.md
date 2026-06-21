@@ -165,6 +165,11 @@ settings such as QNH, altitude, MacCready, ballast and bugs are accepted from
 any connected primary-device client; if both clients send settings, the latest
 valid command wins.
 
+Current lab setup for identical VM/Pi display keeps the runtime only on the VM.
+The Pi local `kigo-xcvario-runtime.service` stays disabled, and the Pi serial
+bridges connect through the VM `kigo-xcvario-tunnel-pi.service` reverse tunnel
+to VM ports `4353` and `4354`.
+
 ### 5. Reuse An Existing Serial Profile Such As `SLAWEK2`
 
 If the navigation profile already expects serial devices instead of `tcp_client`,
@@ -249,6 +254,11 @@ separate helper APK under [android_bridge](android_bridge). The APK listens on
 the phone at `127.0.0.1:4353` and `127.0.0.1:4354`, then connects upstream to
 `127.0.0.1:44353` and `127.0.0.1:44354`; `adb reverse` maps those upstream
 ports back to the simulator TCP ports on the Mac.
+
+The local panel's `Bridge Control` section shows Android phone bridge status
+from the Mac-side `/api/v1/android-bridge/status` endpoint. `Connected` requires
+ADB device state, installed/running bridge APK, `adb reverse` for both streams
+and open Mac ports; `Transmitting` also requires established phone sockets.
 
 Build and install:
 

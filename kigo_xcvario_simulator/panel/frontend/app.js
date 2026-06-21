@@ -5,6 +5,7 @@ const TRAFFIC_MOTION_ORBIT = "orbit";
 const TRAFFIC_MOTION_STRAIGHT = "straight";
 const BARO_K1 = 0.190263;
 const BARO_K2 = 8.417286e-5;
+const PHONE_BRIDGE_STATUS_POLL_MS = 5000;
 const BRIDGE_DEFAULTS = {
   primaryPort: 4353,
   flarmPort: 4354,
@@ -79,6 +80,7 @@ const bridgeRestartButton = document.getElementById("bridge-restart-button");
 const bridgeStatusButton = document.getElementById("bridge-status-button");
 const bridgeErrorNode = document.getElementById("bridge-error");
 const bridgeStatusGrid = document.getElementById("bridge-status-grid");
+const phoneBridgeStatusGrid = document.getElementById("phone-bridge-status-grid");
 const bridgeDetailsDialog = document.getElementById("bridge-details-dialog");
 const bridgeDetailsTitle = document.getElementById("bridge-details-title");
 const bridgeDetailsCloseButton = document.getElementById("bridge-details-close-button");
@@ -90,6 +92,8 @@ const state = {
   connected: false,
   snapshot: null,
   runtime: null,
+  phoneBridgeStatus: null,
+  phoneBridgeStatusPending: false,
 };
 
 function loadStoredSettings() {
@@ -266,6 +270,17 @@ async function requestJson(path, options = {}) {
     throw new Error(
       `Expected simulator JSON from ${response.url}, got ${contentType || "unknown content type"}. Check Runtime URL.`,
     );
+  }
+  return response.json();
+}
+
+async function requestPanelJson(path) {
+  const response = await fetch(path, {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const message = await readErrorMessage(response);
+    throw new Error(message || `${response.status} ${response.statusText}`);
   }
   return response.json();
 }
@@ -583,6 +598,7 @@ async function requestBridge(action) {
     if (action !== "status") {
       const finalStatus = await pollBridgeStatus(bridgePayload, action);
       renderBridgeStatus(finalStatus);
+      void refreshPhoneBridgeStatus();
       await fetchState().catch(() => undefined);
     }
   } catch (error) {
@@ -591,6 +607,28 @@ async function requestBridge(action) {
     if (isBusy) {
       setBridgeBusy(false, action);
     }
+  }
+}
+
+async function refreshPhoneBridgeStatus() {
+  if (state.phoneBridgeStatusPending) {
+    return;
+  }
+  state.phoneBridgeStatusPending = true;
+  try {
+    const payload = await requestPanelJson("/api/v1/android-bridge/status");
+    state.phoneBridgeStatus = payload;
+    renderPhoneBridgeStatus(payload);
+  } catch (error) {
+    const payload = {
+      connected: false,
+      transmitting: false,
+      error: String(error.message || error),
+    };
+    state.phoneBridgeStatus = payload;
+    renderPhoneBridgeStatus(payload);
+  } finally {
+    state.phoneBridgeStatusPending = false;
   }
 }
 
@@ -891,6 +929,92 @@ function renderState() {
   renderHealth(state.snapshot, state.runtime);
 }
 
+function renderPhoneBridgeStatus(payload) {
+  phoneBridgeStatusGrid.innerHTML = "";
+  phoneBridgeStatusGrid.appendChild(buildPhoneBridgeStatusBlock(payload));
+}
+
+function buildPhoneBridgeStatusBlock(payload) {
+  const block = document.createElement("div");
+  block.className = "bridge-status-block bridge-status-block--phone";
+
+  const header = document.createElement("div");
+  header.className = "bridge-status-block__header bridge-status-block__header--phone";
+  const heading = document.createElement("h3");
+  heading.textContent = "Android Phone";
+  const badges = document.createElement("div");
+  badges.className = "bridge-status-badges";
+  badges.appendChild(buildBridgeStatePill("Connected", payload ? payload.connected : null));
+  badges.appendChild(buildBridgeStatePill("Transmitting", payload ? payload.transmitting : null));
+  header.appendChild(heading);
+  header.appendChild(badges);
+
+  const details = document.createElement("dl");
+  details.className = "bridge-status-details bridge-status-details--phone";
+  appendBridgeDetail(details, "Device", phoneDeviceSummary(payload));
+  appendBridgeDetail(details, "APK", payload && payload.bridge_app_installed ? "installed" : "not ready");
+  appendBridgeDetail(details, "Service", payload && payload.bridge_service_running ? "running" : "stopped");
+  appendBridgeDetail(details, "Reverse", phoneReverseSummary(payload));
+  appendBridgeDetail(details, "Mac Ports", phoneMacPortSummary(payload));
+  appendBridgeDetail(details, "Phone Sockets", phoneSocketSummary(payload));
+  if (payload && (payload.error || (Array.isArray(payload.errors) && payload.errors.length > 0))) {
+    appendBridgeDetail(details, "Error", payload.error || payload.errors.join("; "));
+  }
+
+  block.appendChild(header);
+  block.appendChild(details);
+  return block;
+}
+
+function buildBridgeStatePill(label, value) {
+  const pill = document.createElement("span");
+  const ready = value === true;
+  pill.className = `bridge-state ${ready ? "bridge-state--ok" : "bridge-state--idle"}`;
+  pill.textContent = `${label}: ${value === null || value === undefined ? "..." : ready ? "YES" : "NO"}`;
+  return pill;
+}
+
+function phoneDeviceSummary(payload) {
+  const device = payload && payload.device ? payload.device : null;
+  if (!device) {
+    return "not connected";
+  }
+  const model = device.model || device.device || "";
+  return `${device.serial || "-"} / ${device.state || "unknown"}${model ? ` / ${model}` : ""}`;
+}
+
+function phoneReverseSummary(payload) {
+  const ports = payload && payload.ports ? payload.ports : {};
+  return `primary=${yesNo(ports.primary && ports.primary.reverse)} / flarm=${yesNo(ports.flarm && ports.flarm.reverse)}`;
+}
+
+function phoneMacPortSummary(payload) {
+  const ports = payload && payload.ports ? payload.ports : {};
+  return `4353=${yesNo(ports.primary && ports.primary.mac_port_open)} / 4354=${yesNo(ports.flarm && ports.flarm.mac_port_open)}`;
+}
+
+function phoneSocketSummary(payload) {
+  const ports = payload && payload.ports ? payload.ports : {};
+  return `primary=${phoneSocketPart(ports.primary)} / flarm=${phoneSocketPart(ports.flarm)}`;
+}
+
+function phoneSocketPart(portStatus) {
+  if (!portStatus) {
+    return "no";
+  }
+  if (portStatus.phone_established || portStatus.upstream_established) {
+    return "established";
+  }
+  if (portStatus.phone_listening) {
+    return "listening";
+  }
+  return "no";
+}
+
+function yesNo(value) {
+  return value ? "yes" : "no";
+}
+
 function renderBridgeStatus(payload) {
   bridgeStatusGrid.innerHTML = "";
   const nodes = payload && Array.isArray(payload.nodes) ? payload.nodes : [];
@@ -1162,6 +1286,7 @@ bridgeRestartButton.addEventListener("click", () => {
 
 bridgeStatusButton.addEventListener("click", () => {
   void requestBridge("status");
+  void refreshPhoneBridgeStatus();
 });
 
 bridgeDetailsCloseButton.addEventListener("click", closeBridgeDetails);
@@ -1279,3 +1404,8 @@ applyTrafficButton.addEventListener("click", () => postTrafficConfig({ resetTraf
 loadStoredSettings();
 setTrafficMotionMode(TRAFFIC_MOTION_ORBIT);
 renderState();
+renderPhoneBridgeStatus(null);
+void refreshPhoneBridgeStatus();
+window.setInterval(() => {
+  void refreshPhoneBridgeStatus();
+}, PHONE_BRIDGE_STATUS_POLL_MS);

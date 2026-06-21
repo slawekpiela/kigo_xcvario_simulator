@@ -313,7 +313,11 @@ def _start_reverse_tunnel_script(node: BridgeNode, primary_port: int, flarm_port
         "mkdir -p /tmp/kigo-sim\n"
         f"systemctl --user stop {unit}.service 2>/dev/null || true\n"
         f"systemctl --user reset-failed {unit}.service 2>/dev/null || true\n"
-        f"systemd-run --user --unit={unit} "
+        f"unit_path=$(systemctl --user show -p FragmentPath --value {unit}.service 2>/dev/null || true)\n"
+        'if [ -n "$unit_path" ]; then\n'
+        f"  systemctl --user restart {unit}.service\n"
+        "else\n"
+        f"  systemd-run --user --unit={unit} "
         "--property=Restart=always "
         "--property=RestartSec=1 "
         "--property=StartLimitIntervalSec=0 "
@@ -330,6 +334,7 @@ def _start_reverse_tunnel_script(node: BridgeNode, primary_port: int, flarm_port
         f"-R 127.0.0.1:{int(primary_port)}:127.0.0.1:{int(primary_port)} "
         f"-R 127.0.0.1:{int(flarm_port)}:127.0.0.1:{int(flarm_port)} "
         f"{_shell_quote(node.ssh_target)}\n"
+        "fi\n"
     )
 
 
@@ -387,7 +392,11 @@ def _start_script(node: BridgeNode, primary_port: int, flarm_port: int) -> str:
         f"{_stop_script(node)}"
         f"systemctl --user reset-failed {PRIMARY_UNIT} 2>/dev/null || true\n"
         f"systemctl --user reset-failed {FLARM_UNIT} 2>/dev/null || true\n"
-        f"systemd-run --user --unit={PRIMARY_UNIT_NAME} "
+        f"primary_unit_path=$(systemctl --user show -p FragmentPath --value {PRIMARY_UNIT} 2>/dev/null || true)\n"
+        'if [ -n "$primary_unit_path" ]; then\n'
+        f"  systemctl --user restart {PRIMARY_UNIT}\n"
+        "else\n"
+        f"  systemd-run --user --unit={PRIMARY_UNIT_NAME} "
         f"--working-directory={_shell_quote(node.workdir)} "
         "--property=Restart=always "
         "--property=RestartSec=1 "
@@ -399,7 +408,12 @@ def _start_script(node: BridgeNode, primary_port: int, flarm_port: int) -> str:
         f"--tcp-host {_shell_quote(node.simulator_host)} "
         f"--tcp-port {int(primary_port)} "
         f"--status-path {_shell_quote(_status_path_for_serial(node.primary_serial_path))}\n"
-        f"systemd-run --user --unit={FLARM_UNIT_NAME} "
+        "fi\n"
+        f"flarm_unit_path=$(systemctl --user show -p FragmentPath --value {FLARM_UNIT} 2>/dev/null || true)\n"
+        'if [ -n "$flarm_unit_path" ]; then\n'
+        f"  systemctl --user restart {FLARM_UNIT}\n"
+        "else\n"
+        f"  systemd-run --user --unit={FLARM_UNIT_NAME} "
         f"--working-directory={_shell_quote(node.workdir)} "
         "--property=Restart=always "
         "--property=RestartSec=1 "
@@ -411,6 +425,7 @@ def _start_script(node: BridgeNode, primary_port: int, flarm_port: int) -> str:
         f"--tcp-host {_shell_quote(node.simulator_host)} "
         f"--tcp-port {int(flarm_port)} "
         f"--status-path {_shell_quote(_status_path_for_serial(node.flarm_serial_path))}\n"
+        "fi\n"
     )
 
 

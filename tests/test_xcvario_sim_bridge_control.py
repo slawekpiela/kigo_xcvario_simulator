@@ -136,6 +136,9 @@ class BridgeControlPayloadTests(unittest.TestCase):
 
         self.assertIn("--property=Restart=always", script)
         self.assertIn("--property=RestartSec=1", script)
+        self.assertIn("systemctl --user show -p FragmentPath --value kigo-xcvario-pty-xcvario.service", script)
+        self.assertIn("systemctl --user restart kigo-xcvario-pty-xcvario.service", script)
+        self.assertIn("systemctl --user restart kigo-xcvario-pty-flarm.service", script)
         self.assertIn("--status-path '/tmp/kigo-sim/xcvario.status.json'", script)
         self.assertIn("--status-path '/tmp/kigo-sim/flarm.status.json'", script)
 
@@ -152,6 +155,8 @@ class BridgeControlPayloadTests(unittest.TestCase):
         script = _start_reverse_tunnel_script(node, 4353, 4354)
 
         self.assertIn("--unit=kigo-xcvario-tunnel-pi", script)
+        self.assertIn("systemctl --user show -p FragmentPath --value kigo-xcvario-tunnel-pi.service", script)
+        self.assertIn("systemctl --user restart kigo-xcvario-tunnel-pi.service", script)
         self.assertIn("-o ExitOnForwardFailure=yes", script)
         self.assertIn("-R 127.0.0.1:4353:127.0.0.1:4353", script)
         self.assertIn("-R 127.0.0.1:4354:127.0.0.1:4354", script)

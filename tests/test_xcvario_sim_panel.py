@@ -2,11 +2,13 @@ import http.client
 import json
 import os
 from pathlib import Path
+from types import SimpleNamespace
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
 
-from kigo_xcvario_simulator.panel.start_frontend import build_frontend_server
+from kigo_xcvario_simulator.panel.start_frontend import _android_bridge_status_payload, build_frontend_server
 
 
 class SimulatorPanelAssetsTests(unittest.TestCase):
@@ -30,6 +32,7 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             'id="bridge-stop-button"',
             'id="bridge-restart-button"',
             'id="bridge-status-button"',
+            'id="phone-bridge-status-grid"',
             'id="bridge-status-grid"',
             'id="bridge-details-dialog"',
             'id="bridge-details-title"',
@@ -217,6 +220,10 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             "bridgesReady(latest)",
             "bridgesStopped(latest)",
             "bridgeTimeoutMessage(action, latest)",
+            '"/api/v1/android-bridge/status"',
+            "renderPhoneBridgeStatus",
+            'buildBridgeStatePill("Connected"',
+            'buildBridgeStatePill("Transmitting"',
             "setBridgeBusy(true, action)",
             "vmBridgeTargetInput",
             "piBridgeTargetInput",
@@ -264,6 +271,8 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
             ".bridge-details-button",
             ".bridge-status-details",
             ".bridge-status-grid",
+            ".bridge-status-grid--phone",
+            ".bridge-status-badges",
             ".bridge-state--ok",
             ".chart-shell",
             ".cpu-chart-canvas",
@@ -366,6 +375,68 @@ class SimulatorPanelAssetsTests(unittest.TestCase):
                     os.environ.pop("KIGO_CPU_LOG_LOCAL_FILE", None)
                 else:
                     os.environ["KIGO_CPU_LOG_LOCAL_FILE"] = old_local_file
+
+    def test_android_bridge_status_payload_reports_connected_phone(self):
+        class FakeSocket:
+            def close(self):
+                return None
+
+        def fake_run(command, **kwargs):
+            if command[-2:] == ["devices", "-l"]:
+                return SimpleNamespace(
+                    returncode=0,
+                    stdout=(
+                        "List of devices attached\n"
+                        "R58M9050KLY device product:a50 model:SM-A505FN device:a50 transport_id:1\n"
+                    ),
+                    stderr="",
+                )
+            if command[-2:] == ["reverse", "--list"]:
+                return SimpleNamespace(
+                    returncode=0,
+                    stdout=(
+                        "UsbFfs tcp:44353 tcp:4353\n"
+                        "UsbFfs tcp:44354 tcp:4354\n"
+                    ),
+                    stderr="",
+                )
+            if command[-4:] == ["shell", "pm", "path", "pl.kigo.xcvario.bridge"]:
+                return SimpleNamespace(returncode=0, stdout="package:/data/app/pl.kigo.xcvario.bridge/base.apk\n", stderr="")
+            if command[-5:] == ["shell", "dumpsys", "activity", "services", "pl.kigo.xcvario.bridge"]:
+                return SimpleNamespace(returncode=0, stdout="ServiceRecord pl.kigo.xcvario.bridge/.BridgeService\n", stderr="")
+            if command[-3:] == ["shell", "ss", "-tn"]:
+                return SimpleNamespace(
+                    returncode=0,
+                    stdout=(
+                        "ESTAB 0 0 127.0.0.1:4353 127.0.0.1:50100\n"
+                        "ESTAB 0 0 127.0.0.1:44353 127.0.0.1:50101\n"
+                        "ESTAB 0 0 127.0.0.1:4354 127.0.0.1:50102\n"
+                        "ESTAB 0 0 127.0.0.1:44354 127.0.0.1:50103\n"
+                    ),
+                    stderr="",
+                )
+            if command[-3:] == ["shell", "ss", "-ltn"]:
+                return SimpleNamespace(
+                    returncode=0,
+                    stdout=(
+                        "LISTEN 0 50 127.0.0.1:4353 0.0.0.0:*\n"
+                        "LISTEN 0 50 127.0.0.1:4354 0.0.0.0:*\n"
+                    ),
+                    stderr="",
+                )
+            raise AssertionError(f"unexpected command: {command}")
+
+        with (
+            patch("kigo_xcvario_simulator.panel.start_frontend.subprocess.run", side_effect=fake_run),
+            patch("kigo_xcvario_simulator.panel.start_frontend.socket.create_connection", return_value=FakeSocket()),
+        ):
+            payload = _android_bridge_status_payload()
+
+        self.assertTrue(payload["connected"])
+        self.assertTrue(payload["transmitting"])
+        self.assertEqual(payload["device"]["serial"], "R58M9050KLY")
+        self.assertTrue(payload["ports"]["primary"]["reverse"])
+        self.assertTrue(payload["ports"]["flarm"]["mac_port_open"])
 
 
 if __name__ == "__main__":
