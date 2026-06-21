@@ -20,7 +20,7 @@ Then open [http://127.0.0.1:8180/](http://127.0.0.1:8180/).
 - sends operator commands for primary device selection, lifecycle, manual mode, wind, OAT and traffic,
 - opens a snapshot chart for Raspberry Pi CPU temperature and CPU usage from `logs/CPU_temperature`,
 - renders read-only ownship, traffic and health status,
-- exposes traffic count, circling radius min/max, visible aircraft IDs, a straight/orbit
+- exposes traffic count, circling radius min/max, DDB-backed visible aircraft IDs, a straight/orbit
   traffic-motion toggle, and an optional collision-course mode for contact `1`.
 
 For manual `straight`, `Climb Min/Max` set the vario sinusoid bounds, such as

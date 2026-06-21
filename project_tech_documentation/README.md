@@ -61,14 +61,18 @@ _To be filled as durable knowledge is discovered._
   minimum at `45 s`, and the midpoint again at `60 s`. A small deterministic jitter is added and
   clamped inside the configured range. The panel posts climb fields for `straight`, `circling_left`,
   `circling_right`, and `glider_launch` when they contain operator-entered values.
-- FLARM traffic identity comes from `traffic_database.FLARM_TRAFFIC_AIRCRAFT`: the first six
-  records are decoded FLARMNet IDs `DDA857`, `DDA85A`, `DDA85C`, `DDA86A`, `DDA88F` and `DDA896`,
-  followed by 23 authentic FLARMnet-backed records with non-empty competition IDs.
-  `traffic_aircraft_for()` maps by contact index so those first six IDs remain stable regardless of
-  the simulation seed. The six decoded records use metadata `MF`/`D-6676`/`LS-4`,
-  `L1`/`D-3450`/`Discus 2`, `TH`/`D-4449`/`Hornet`, `1A`/`D-3358`/`LS-4`,
-  empty-callsign/`DKERO`/`DG-800`, and `TH`/`D-5799`/`ASK-13`. `TrafficGenerator` keeps all
-  generated default contacts between 5 km and 30 km at the traffic start anchor. When the panel
+- FLARM traffic identity is loaded once on the simulator side when `ScenarioOrchestrator` creates
+  `TrafficGenerator`: `traffic_database.load_default_traffic_aircraft()` checks
+  `KIGO_FLARM_DDB_PATH`, then nearby `KigoData`/`Kigodata` directories for `ddb.jason`, `ddb.json`
+  and related OGN/FLARMNet DDB JSON names. `load_traffic_aircraft_from_ddb()` parses DDB JSON
+  mappings with `device_id`/`id`, `aircraft_model`/`model`, `registration`/`aircraft_registration`
+  and `cn`/`competition_id`/`callsign`, including nested `devices` arrays; records with false
+  `tracked` or `identified` are skipped, invalid non-six-hex IDs are skipped, and duplicate IDs keep
+  the first record. If no usable DDB file is found, the fallback
+  `traffic_database.FLARM_TRAFFIC_AIRCRAFT` keeps the previous 29 FLARMnet-backed records starting
+  with `DDA857`, `DDA85A`, `DDA85C`, `DDA86A`, `DDA88F` and `DDA896`.
+  `TrafficGenerator` keeps all generated default contacts between 5 km and 30 km at the traffic
+  start anchor. When the panel
   sends `start_airport_icao` with `/api/v1/simulation/traffic`, `SimulatorRuntimeSession` resolves
   it through `AirportLookup` and `ScenarioOrchestrator` stores it as a traffic-only anchor; `reset`
   restarts `TrafficGenerator` without moving the current ownship. After the first traffic step,
@@ -336,5 +340,7 @@ _To be filled as durable knowledge is discovered._
   `Start airport or place` as a traffic-only anchor.
 - 2026-06-19: Raised default FLARM traffic speed to deterministic per-contact `100` to `200 km/h`
   so moving-map traffic visibly moves in both orbit and straight modes.
+- 2026-06-21: Documented simulator-side FLARM traffic metadata loading from cached local
+  `ddb.jason`/`ddb.json` DDB data with fallback to packaged records.
 - 2026-06-21: Documented the persistent VM-runtime-to-Pi reverse-tunnel setup, disabled Pi-local
   runtime, refreshed `admin@192.168.0.111` Pi identity, and persistent-unit-aware bridge restart.

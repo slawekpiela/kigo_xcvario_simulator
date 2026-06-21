@@ -39,7 +39,7 @@ from .presets import (
     build_glider_launch_sequence,
 )
 from .state import FlightPhase, HealthState, RuntimeState
-from .traffic_database import DEFAULT_TRAFFIC_CONTACT_COUNT
+from .traffic_database import DEFAULT_TRAFFIC_CONTACT_COUNT, load_default_traffic_aircraft
 from .traffic_model import (
     TrafficGenerator,
     normalize_traffic_circling_radius_range,
@@ -78,7 +78,10 @@ class ScenarioOrchestrator:
             device_qnh_hpa=runtime_config.device_qnh_hpa,
             start_utc=self._start_utc,
         )
-        self._traffic_generator = traffic_generator or TrafficGenerator(seed=runtime_config.seed)
+        self._traffic_generator = traffic_generator or TrafficGenerator(
+            seed=runtime_config.seed,
+            aircraft=load_default_traffic_aircraft(),
+        )
         self._preset_plan = None
         self._preset_segment_index = 0
         self._preset_segment_elapsed_s = 0.0

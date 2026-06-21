@@ -1,13 +1,28 @@
-"""Configured FLARM aircraft used by simulated traffic contacts."""
+"""FLARM aircraft metadata used by simulated traffic contacts."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
+import json
+import os
+from pathlib import Path
+import string
+from typing import Any, Iterable, Mapping
 
 
 FLARMNET_DDB_SOURCE_URL = "https://www.flarmnet.org/files/ddb.json"
 FLARMNET_DDB_SOURCE_DATE = "2026-06-06"
 LAB_TRAFFIC_AIRCRAFT_COUNT = 6
+TRAFFIC_DDB_PATH_ENV = "KIGO_FLARM_DDB_PATH"
+TRAFFIC_DDB_FILENAMES = (
+    "ddb.jason",
+    "ddb.json",
+    "ogn-ddb.json",
+    "ogn.json",
+    "ogn_devices.json",
+    "flarmnet_ddb.json",
+)
 
 
 @dataclass(frozen=True)
@@ -18,7 +33,7 @@ class FlarmTrafficAircraft:
     aircraft_model: str
 
 
-# FLARMnet-backed traffic IDs requested for the FLARM stream.
+# Fallback FLARMnet-backed traffic IDs used when no local DDB file is available.
 FLARM_TRAFFIC_AIRCRAFT: tuple[FlarmTrafficAircraft, ...] = (
     FlarmTrafficAircraft(device_id="DDA857", competition_id="MF", registration="D-6676", aircraft_model="LS-4"),
     FlarmTrafficAircraft(device_id="DDA85A", competition_id="L1", registration="D-3450", aircraft_model="Discus 2"),
@@ -54,9 +69,135 @@ FLARM_TRAFFIC_AIRCRAFT: tuple[FlarmTrafficAircraft, ...] = (
 DEFAULT_TRAFFIC_CONTACT_COUNT = len(FLARM_TRAFFIC_AIRCRAFT)
 
 
-def traffic_aircraft_for(seed: int, index: int) -> FlarmTrafficAircraft:
+def traffic_aircraft_for(
+    seed: int,
+    index: int,
+    *,
+    aircraft: tuple[FlarmTrafficAircraft, ...] | None = None,
+) -> FlarmTrafficAircraft:
     if index < 0:
         raise ValueError("index must be >= 0.")
     int(seed)
-    aircraft_index = int(index) % len(FLARM_TRAFFIC_AIRCRAFT)
-    return FLARM_TRAFFIC_AIRCRAFT[aircraft_index]
+    resolved_aircraft = aircraft or FLARM_TRAFFIC_AIRCRAFT
+    aircraft_index = int(index) % len(resolved_aircraft)
+    return resolved_aircraft[aircraft_index]
+
+
+@lru_cache(maxsize=1)
+def load_default_traffic_aircraft() -> tuple[FlarmTrafficAircraft, ...]:
+    ddb_path = find_default_traffic_ddb_path()
+    if ddb_path is not None:
+        aircraft = load_traffic_aircraft_from_ddb(ddb_path)
+        if aircraft:
+            return aircraft
+    return FLARM_TRAFFIC_AIRCRAFT
+
+
+def find_default_traffic_ddb_path() -> Path | None:
+    explicit_path = os.environ.get(TRAFFIC_DDB_PATH_ENV, "").strip()
+    if explicit_path:
+        path = Path(explicit_path).expanduser()
+        if path.is_file():
+            return path
+
+    for directory in _default_traffic_ddb_directories():
+        for filename in TRAFFIC_DDB_FILENAMES:
+            path = directory / filename
+            if path.is_file():
+                return path
+    return None
+
+
+def load_traffic_aircraft_from_ddb(path: str | Path) -> tuple[FlarmTrafficAircraft, ...]:
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    aircraft = []
+    seen_device_ids: set[str] = set()
+    for record in _iter_ddb_record_mappings(raw):
+        item = _aircraft_from_ddb_record(record)
+        if item is None or item.device_id in seen_device_ids:
+            continue
+        seen_device_ids.add(item.device_id)
+        aircraft.append(item)
+    return tuple(aircraft)
+
+
+def _default_traffic_ddb_directories() -> tuple[Path, ...]:
+    cwd = Path.cwd()
+    home = Path.home()
+    return (
+        cwd / "KigoData",
+        cwd / "Kigodata",
+        cwd.parent / "KigoData",
+        cwd.parent / "Kigodata",
+        home / "KigoData",
+        home / "Kigodata",
+        Path("/KigoData"),
+        Path("/Kigodata"),
+    )
+
+
+def _iter_ddb_record_mappings(value: Any) -> Iterable[Mapping[str, Any]]:
+    if isinstance(value, Mapping):
+        if _text_value(value, ("device_id", "deviceid", "id")):
+            yield value
+        for child in value.values():
+            if isinstance(child, (Mapping, list, tuple)):
+                yield from _iter_ddb_record_mappings(child)
+    elif isinstance(value, (list, tuple)):
+        for child in value:
+            yield from _iter_ddb_record_mappings(child)
+
+
+def _aircraft_from_ddb_record(record: Mapping[str, Any]) -> FlarmTrafficAircraft | None:
+    if not _ddb_flag_enabled(record.get("tracked", True)):
+        return None
+    if not _ddb_flag_enabled(record.get("identified", True)):
+        return None
+
+    device_id = _normalize_device_id(_text_value(record, ("device_id", "deviceid", "id")))
+    if device_id is None:
+        return None
+
+    registration = _text_value(record, ("registration", "aircraft_registration")) or device_id
+    competition_id = _text_value(record, ("cn", "competition_number", "competition_id", "callsign"))
+    aircraft_model = _text_value(record, ("aircraft_model", "model", "type")) or "Glider"
+    return FlarmTrafficAircraft(
+        device_id=device_id,
+        competition_id=competition_id,
+        registration=registration,
+        aircraft_model=aircraft_model,
+    )
+
+
+def _text_value(record: Mapping[str, Any], keys: tuple[str, ...]) -> str:
+    lower_keys = {str(key).casefold(): key for key in record}
+    for key in keys:
+        actual_key = lower_keys.get(key.casefold())
+        if actual_key is None:
+            continue
+        value = record.get(actual_key)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return ""
+
+
+def _normalize_device_id(value: str) -> str | None:
+    device_id = value.strip().upper()
+    if device_id.startswith("0X"):
+        device_id = device_id[2:]
+    if len(device_id) != 6:
+        return None
+    if any(ch not in string.hexdigits.upper() for ch in device_id):
+        return None
+    return device_id
+
+
+def _ddb_flag_enabled(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().casefold() not in {"0", "n", "no", "false"}

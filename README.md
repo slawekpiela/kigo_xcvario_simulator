@@ -75,17 +75,20 @@ During `circling_left`/`circling_right`, `$PXCV` also includes synthetic AHRS
 roll angle in the XCVario roll field. The bank magnitude varies smoothly between
 `35` and `50` degrees; left turns are emitted as negative roll and right turns
 as positive roll.
-FLARM traffic contacts start with six decoded FLARMNet IDs: `DDA857`,
-`DDA85A`, `DDA85C`, `DDA86A`, `DDA88F` and `DDA896`, followed by 23
-authentic FLARMnet-backed devices with competition signs. The runtime and panel
-default to publishing all 29 contacts. Default contacts stay between 5 km and
-30 km from the selected `Start airport or place` when one is configured, falling
-back to the ownship at traffic start; after that only `$PFLAA` reporting is
-relative to the current ownship position. Default contacts use deterministic
-per-contact speeds between `100` and `200 km/h` (`27.8` to `55.6 m/s`), for both
-`orbit` and `straight` motion. In each orbit cycle they climb by `300` to
-`1000 m`, then fly straight for `2 min` with zero climb before starting the next
-orbit. Orbit climb rate is positive between `0.51` and `4.0 m/s`.
+FLARM traffic IDs and aircraft metadata are loaded once by the runtime from a
+local DDB JSON file when available. The default lookup checks `ddb.jason` and
+`ddb.json` under nearby `KigoData`/`Kigodata` directories such as
+`../KigoData`; `KIGO_FLARM_DDB_PATH` can point at an explicit file. If no DDB is
+available, the simulator falls back to the packaged 29 FLARMnet-backed records.
+The runtime and panel default to publishing 29 contacts so a full DDB does not
+flood the FLARM stream. Default contacts stay between 5 km and 30 km from the
+selected `Start airport or place` when one is configured, falling back to the
+ownship at traffic start; after that only `$PFLAA` reporting is relative to the
+current ownship position. Default contacts use deterministic per-contact speeds
+between `100` and `200 km/h` (`27.8` to `55.6 m/s`), for both `orbit` and
+`straight` motion. In each orbit cycle they climb by `300` to `1000 m`, then fly
+straight for `2 min` with zero climb before starting the next orbit. Orbit climb
+rate is positive between `0.51` and `4.0 m/s`.
 The panel Traffic section can set circling radius min/max; every orbiting contact
 gets a deterministic random maximum ellipse radius from that range. It can also
 toggle default contacts between `orbit` and `straight` motion. `Apply Traffic`

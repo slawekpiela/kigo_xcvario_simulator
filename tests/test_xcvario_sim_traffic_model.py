@@ -1,4 +1,8 @@
+import json
 import math
+import os
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 
 from kigo_xcvario_simulator.contracts import TRAFFIC_CIRCLING_RADIUS_MAX_M, TRAFFIC_MOTION_STRAIGHT, OwnshipState
@@ -6,6 +10,9 @@ from kigo_xcvario_simulator.state import FlightPhase
 from kigo_xcvario_simulator.traffic_database import (
     FLARM_TRAFFIC_AIRCRAFT,
     LAB_TRAFFIC_AIRCRAFT_COUNT,
+    TRAFFIC_DDB_PATH_ENV,
+    load_default_traffic_aircraft,
+    load_traffic_aircraft_from_ddb,
     traffic_aircraft_for,
 )
 from kigo_xcvario_simulator.traffic_model import (
@@ -115,6 +122,108 @@ class TrafficGeneratorTests(unittest.TestCase):
                     self.assertRegex(aircraft.competition_id, r"^[A-Z0-9]{1,4}$")
                 self.assertTrue(aircraft.registration)
                 self.assertTrue(aircraft.aircraft_model)
+
+    def test_ddb_json_records_can_seed_generated_traffic_metadata(self):
+        with TemporaryDirectory() as temp_dir:
+            ddb_path = Path(temp_dir) / "ddb.jason"
+            ddb_path.write_text(
+                json.dumps(
+                    [
+                        {
+                            "device_type": "F",
+                            "device_id": "abc123",
+                            "aircraft_model": "ASK 21",
+                            "registration": "SP-ABC",
+                            "cn": "AB",
+                            "tracked": True,
+                            "identified": True,
+                        },
+                        {
+                            "device_id": "ABC123",
+                            "registration": "DUP",
+                            "tracked": True,
+                            "identified": True,
+                        },
+                        {
+                            "device_id": "BAD001",
+                            "registration": "PRIVATE",
+                            "tracked": False,
+                            "identified": True,
+                        },
+                        {
+                            "devices": [
+                                {
+                                    "id": "00beef",
+                                    "model": "Discus",
+                                    "aircraft_registration": "D-BEEF",
+                                    "competition_id": "BF",
+                                    "tracked": "Y",
+                                    "identified": "Y",
+                                },
+                                {
+                                    "id": "000114",
+                                    "registration": "D-HIDE",
+                                    "cn": "HD",
+                                    "tracked": True,
+                                    "identified": False,
+                                },
+                            ]
+                        },
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            aircraft = load_traffic_aircraft_from_ddb(ddb_path)
+
+        self.assertEqual([item.device_id for item in aircraft], ["ABC123", "00BEEF"])
+        self.assertEqual(aircraft[0].competition_id, "AB")
+        self.assertEqual(aircraft[1].registration, "D-BEEF")
+        self.assertEqual(aircraft[1].aircraft_model, "Discus")
+
+        generator = TrafficGenerator(seed=33, aircraft=aircraft)
+        contacts = generator.step(_ownship(), 1.0, contact_count=2)
+
+        self.assertEqual(contacts[0].aircraft_id, "ABC123")
+        self.assertEqual(contacts[0].registration, "SP-ABC")
+        self.assertEqual(contacts[1].aircraft_id, "00BEEF")
+        self.assertEqual(contacts[1].competition_id, "BF")
+
+    def test_default_ddb_loader_reads_explicit_file_once(self):
+        old_path = os.environ.get(TRAFFIC_DDB_PATH_ENV)
+        load_default_traffic_aircraft.cache_clear()
+        try:
+            with TemporaryDirectory() as temp_dir:
+                ddb_path = Path(temp_dir) / "ddb.jason"
+                ddb_path.write_text(
+                    json.dumps(
+                        [
+                            {
+                                "device_id": "abc123",
+                                "aircraft_model": "ASK 21",
+                                "registration": "SP-ABC",
+                                "cn": "AB",
+                                "tracked": True,
+                                "identified": True,
+                            }
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+                os.environ[TRAFFIC_DDB_PATH_ENV] = str(ddb_path)
+
+                first = load_default_traffic_aircraft()
+                ddb_path.unlink()
+                second = load_default_traffic_aircraft()
+
+            self.assertEqual([item.device_id for item in first], ["ABC123"])
+            self.assertEqual(second, first)
+        finally:
+            if old_path is None:
+                os.environ.pop(TRAFFIC_DDB_PATH_ENV, None)
+            else:
+                os.environ[TRAFFIC_DDB_PATH_ENV] = old_path
+            load_default_traffic_aircraft.cache_clear()
 
     def test_all_contacts_stay_between_5km_and_30km_with_visible_glider_speed(self):
         generator = TrafficGenerator(seed=33)

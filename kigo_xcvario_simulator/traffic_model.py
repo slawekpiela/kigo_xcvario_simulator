@@ -15,7 +15,7 @@ from .contracts import (
     TrafficContact,
 )
 from .flight_math import normalize_heading_deg
-from .traffic_database import traffic_aircraft_for
+from .traffic_database import FLARM_TRAFFIC_AIRCRAFT, FlarmTrafficAircraft, traffic_aircraft_for
 from .variation import SeededRangeGenerator
 
 AUTO_COLLISION_INTERVAL_S = 10.0
@@ -63,8 +63,9 @@ class _OrbitingContactState:
 class TrafficGenerator:
     """Produces deterministic FLARM-like contacts around the ownship."""
 
-    def __init__(self, *, seed: int) -> None:
+    def __init__(self, *, seed: int, aircraft: tuple[FlarmTrafficAircraft, ...] | None = None) -> None:
         self._seed = int(seed)
+        self._aircraft = aircraft or FLARM_TRAFFIC_AIRCRAFT
         self._sim_time_s = 0.0
         self._tick_index = 0
         self._anchor_latitude_deg: float | None = None
@@ -598,7 +599,7 @@ class TrafficGenerator:
         speed_ms: float,
         alarm_level: int,
     ) -> TrafficContact:
-        aircraft = traffic_aircraft_for(self._seed, index)
+        aircraft = traffic_aircraft_for(self._seed, index, aircraft=self._aircraft)
         return TrafficContact(
             contact_id=f"TFC-{index + 1:02d}",
             relative_north_m=relative_north_m,
