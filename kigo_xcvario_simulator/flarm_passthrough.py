@@ -42,6 +42,11 @@ class FlarmPassthroughConnectionState:
 class FlarmPassthroughSimulator:
     """Responds to the FLARM commands XCSoar sends through an XCvario link."""
 
+    @classmethod
+    def synthetic(cls):
+        """Public simulator fixture; never inspect operator flight-log directories."""
+        return cls(records=(_default_record(),))
+
     def __init__(self, *, records: tuple[FlarmRecordedFlight, ...] | None = None) -> None:
         self._records = records or load_default_igc_records()
         self._lock = Lock()

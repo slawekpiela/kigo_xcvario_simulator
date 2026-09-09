@@ -32,6 +32,7 @@ class SxHawkTcpAdapter(XcvarioTcpAdapter):
         on_qnh_command=None,
         on_altitude_command=None,
         on_client_connect=None,
+        flarm_passthrough=None,
         gps_every_baro_frames: int = DEFAULT_GPS_EVERY_BARO_FRAMES,
         device_info_every_baro_frames: int = DEFAULT_DEVICE_INFO_EVERY_BARO_FRAMES,
         settings_every_baro_frames: int = DEFAULT_SETTINGS_EVERY_BARO_FRAMES,
@@ -43,6 +44,7 @@ class SxHawkTcpAdapter(XcvarioTcpAdapter):
             on_qnh_command=on_qnh_command,
             on_altitude_command=on_altitude_command,
             on_client_connect=on_client_connect,
+            flarm_passthrough=flarm_passthrough,
             gps_every_baro_frames=gps_every_baro_frames,
             thread_name="sxhawk-adapter",
         )

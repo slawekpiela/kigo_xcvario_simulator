@@ -28,6 +28,8 @@ class SimulatorRuntimeSession:
         flarm_adapter=None,
         scheduler: TelemetryScheduler | None = None,
         airport_lookup: AirportLookup | None = None,
+        activate_on_connect: bool = True,
+        flarm_passthrough=None,
     ) -> None:
         self.runtime_config = runtime_config
         self.orchestrator = orchestrator or ScenarioOrchestrator(runtime_config)
@@ -40,9 +42,10 @@ class SimulatorRuntimeSession:
             bind_host=runtime_config.xcvario.bind_host,
             port=runtime_config.xcvario.port,
             polar=xcvario_polar,
+            flarm_passthrough=flarm_passthrough,
             on_qnh_command=self.set_device_qnh_hpa,
             on_altitude_command=self.set_device_altitude_m,
-            on_client_connect=self.activate_on_ground_default,
+            on_client_connect=self.activate_on_ground_default if activate_on_connect else None,
             gps_every_baro_frames=_gps_every_baro_frames(
                 gps_hz=runtime_config.scheduler.gps_hz,
                 baro_hz=runtime_config.scheduler.baro_hz or runtime_config.scheduler.ownship_hz,
@@ -52,9 +55,10 @@ class SimulatorRuntimeSession:
             bind_host=runtime_config.xcvario.bind_host,
             port=runtime_config.xcvario.port,
             polar=xcvario_polar,
+            flarm_passthrough=flarm_passthrough,
             on_qnh_command=self.set_device_qnh_hpa,
             on_altitude_command=self.set_device_altitude_m,
-            on_client_connect=self.activate_on_ground_default,
+            on_client_connect=self.activate_on_ground_default if activate_on_connect else None,
             gps_every_baro_frames=_gps_every_baro_frames(
                 gps_hz=runtime_config.scheduler.gps_hz,
                 baro_hz=runtime_config.scheduler.baro_hz or runtime_config.scheduler.ownship_hz,
@@ -67,6 +71,7 @@ class SimulatorRuntimeSession:
         self.flarm_adapter = flarm_adapter or FlarmTcpAdapter(
             bind_host=runtime_config.flarm.bind_host,
             port=runtime_config.flarm.port,
+            flarm_passthrough=flarm_passthrough,
         )
         self._oat_c = float(getattr(self._active_primary_adapter(), "oat_c", DEFAULT_OAT_C))
         self.scheduler = scheduler or TelemetryScheduler(

@@ -13,6 +13,7 @@ dependencies = []
 kigo-xcvario-runtime = "kigo_xcvario_simulator.start_remote_runtime:main"
 kigo-xcvario-panel = "kigo_xcvario_simulator.panel.start_frontend:main"
 kigo-xcvario-pty-bridge = "kigo_xcvario_simulator.pty_bridge:main"
+kigo-simulator-online = "kigo_xcvario_simulator.online:main"
 
 [tool.setuptools.packages.find]
 include = ["kigo_xcvario_simulator*"]
@@ -24,4 +25,5 @@ kigo_xcvario_simulator = [
   "examples/igc_logs/*.igc",
   "examples/igc_logs/*.md",
   "panel/frontend/*",
+  "online_frontend/*",
 ]

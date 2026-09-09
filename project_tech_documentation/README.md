@@ -13,6 +13,32 @@ This file is the durable technical memory for this project. Keep it concise, pra
 
 _To be filled as durable knowledge is discovered._
 
+## Online Sessions On Anton
+
+- Public entrypoint: `https://hermes5.koioslabs.pl/simulator/`; service owner
+  `online.py`, UI `online_frontend/`, operations `deploy/README.md`.
+- One managed process holds up to 50 independent `OnlineSession` objects. Each
+  owns a runtime, scheduler, private loopback TCP adapters and private control
+  API with automatically allocated ports. No public per-user port allocation.
+  Explicit panel actions create sessions; device polls cannot create them.
+- The public facade allowlists only simulation controls, validates bounded JSON
+  and exchanges arbitrary bytes in hex over HTTPS. `(channel, client, sequence)`
+  supplies idempotent retries. Device expiry is 30 seconds, session inactivity
+  expiry is 900 seconds. See the deploy document for resource bounds.
+- Application ID is the shared simulator key, not proof of account ownership.
+  Same ID intentionally shares state; different IDs have independent declarations
+  and logger state. `FlarmPassthroughSimulator.synthetic()` avoids reading real
+  host flight logs. Online sessions pass `activate_on_connect=False`, preserving
+  paused/running state on either device reconnect; lab behavior stays default.
+- The native client uses curl and Android uses the existing Java HTTPS stack;
+  this protocol is bounded HTTP exchange, not WebSocket. Kigo FLY mode is required
+  because the built-in simulator bypasses device opening.
+- Verification entrypoints: `tests/test_xcvario_sim_online.py` (session isolation,
+  both channels, retries, limits, expiry, binary bytes and logger separation),
+  `tests/benchmark_online.py` (bounded active-session load). Existing end-to-end
+  traffic-ID fixture assertions can vary with external DDB files: compare the
+  unchanged baseline before treating those fixture-name failures as regressions.
+
 ## Architecture And Data Flow
 
 - Wind handling for ownship is split by vector type. `ScenarioOrchestrator.tick()` passes the current
