@@ -24,7 +24,14 @@ _To be filled as durable knowledge is discovered._
 - The public facade allowlists only simulation controls, validates bounded JSON
   and exchanges arbitrary bytes in hex over HTTPS. `(channel, client, sequence)`
   supplies idempotent retries. Device expiry is 30 seconds, session inactivity
-  expiry is 900 seconds. See the deploy document for resource bounds.
+  expiry is 900 seconds. The frontend sends the opaque runtime session ID to the
+  idempotent `/api/close` endpoint with `sendBeacon` on non-BFCache `pagehide`.
+  The `kigoconcept.pl` modal also sends an origin-checked
+  `kigo-simulator-close` message and unloads the iframe when its close action is
+  used. The registry removes and stops only a matching `(Application ID,
+  session ID)` pair, preventing a stale page from closing a replacement session. This works
+  in both a standalone page and the `kigoconcept.pl` iframe popup. See
+  the deploy document for resource bounds.
 - Application ID is the shared simulator key, not proof of account ownership.
   Same ID intentionally shares state; different IDs have independent declarations
   and logger state. `FlarmPassthroughSimulator.synthetic()` avoids reading real

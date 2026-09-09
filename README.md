@@ -22,9 +22,11 @@ Each different ID has its own flight. The same ID deliberately shares a flight,
 including controls and simulated logger declarations; give it only to people
 who may control your simulation. It does not grant access to a pilot account.
 The online logger contains only synthetic data. Opening the panel or reconnecting
-does not reset a flight; paused flights remain paused. A session expires after
-15 minutes without panel/device activity. On expiry, open/start it again in the
-panel. If all 50 session slots are occupied, the panel asks you to try later.
+does not reset a flight; paused flights remain paused. Closing the simulator
+page ends its session immediately, including when the page is shown in the
+`kigoconcept.pl` popup. A session also expires after 15 minutes without
+panel/device activity. After either event, open/start it again in the panel.
+If all 50 session slots are occupied, the panel asks you to try later.
 
 Use a separate test profile to preserve normal hardware configuration. The built-in
 Kigo SIM mode does not connect hardware ports. Both the app and panel need Internet.

@@ -27,6 +27,7 @@ that protection. The system cloudflared config needs no simulator rule.
 
 Verify the local and public `/simulator/health`, the panel, two independent
 Application IDs, and both device channels. Keep test IDs disposable. Sessions
+close immediately when their browser page or `kigoconcept.pl` popup closes and
 expire after 15 minutes without panel/device activity; idle device connections
 are closed after 30 seconds. A service restart loses active sessions; explicitly
 open/start a session again in the panel. Existing active sessions aren't reset

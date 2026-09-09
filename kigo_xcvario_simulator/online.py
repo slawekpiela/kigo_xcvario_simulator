@@ -186,6 +186,18 @@ class SessionRegistry:
         for session in expired:
             session.close()
 
+    def close_session(self, key, session_id):
+        key = application_id(key)
+        if not isinstance(session_id, str) or not TOKEN_PATTERN.fullmatch(session_id):
+            raise ApiError(400, "Invalid session ID.")
+        with self.lock:
+            session = self.sessions.get(key)
+            if session is None or session.runtime.runtime_config.session_id != session_id:
+                return False
+            del self.sessions[key]
+        session.close()
+        return True
+
     def _reap(self):
         while not self.closed.wait(5):
             self.expire()
@@ -283,8 +295,14 @@ class OnlineHandler(BaseHTTPRequestHandler):
             if not isinstance(payload, dict):
                 raise ApiError(400, "JSON object required.")
             path = urlsplit(self.path).path
-            if path not in (PREFIX + "/api/session", PREFIX + "/api/control", PREFIX + "/api/exchange"):
+            if path not in (PREFIX + "/api/session", PREFIX + "/api/close",
+                            PREFIX + "/api/control", PREFIX + "/api/exchange"):
                 raise ApiError(404, "Not found")
+            if path.endswith("/close"):
+                closed = self.server.registry.close_session(
+                    payload.get("application_id"), payload.get("session_id"))
+                self.reply(200, {"closed": closed})
+                return
             session = self.server.registry.get(payload.get("application_id"),
                         create=path.endswith("/session"), peer=self.client_address[0])
             if path.endswith("/session"):

@@ -1,7 +1,7 @@
 "use strict";
 const idInput = document.getElementById("application-id");
 const statusLine = document.getElementById("status");
-let activeID = "", busy = false, timer = null;
+let activeID = "", activeSessionID = "", busy = false, timer = null;
 idInput.value = localStorage.getItem("kigo.sim.applicationId") || "";
 
 function status(text, error = false) {
@@ -27,10 +27,35 @@ async function connect() {
   const id = idInput.value.trim();
   if (!/^[A-Za-z0-9_.-]{1,64}$/.test(id)) throw new Error("Wpisz poprawne Application ID z Kigo.");
   // Explicit actions can recreate an expired session; background polling cannot.
-  await request("session", {}, id);
+  const session = await request("session", {}, id);
   activeID = id;
+  activeSessionID = session.session_id;
   localStorage.setItem("kigo.sim.applicationId", id);
 }
+
+function closeSession() {
+  const applicationID = activeID;
+  const sessionID = activeSessionID;
+  activeID = "";
+  activeSessionID = "";
+  clearTimeout(timer);
+  if (!applicationID || !sessionID) return;
+  const body = JSON.stringify({application_id: applicationID, session_id: sessionID});
+  const beacon = new Blob([body], {type: "application/json"});
+  if (!navigator.sendBeacon("/simulator/api/close", beacon)) {
+    void fetch("/simulator/api/close", {
+      method: "POST", headers: {"Content-Type": "application/json"}, body, keepalive: true
+    });
+  }
+}
+
+window.addEventListener("message", event => {
+  const trustedParent = event.origin === "https://kigoconcept.pl" ||
+    event.origin === "https://www.kigoconcept.pl";
+  if (trustedParent && event.data && event.data.type === "kigo-simulator-close") {
+    closeSession();
+  }
+});
 
 async function control(action, parameters = {}) {
   return request("control", {action, parameters});
@@ -105,11 +130,14 @@ for (const [formID, action] of [["wind", "wind"], ["traffic", "traffic"], ["airp
 document.getElementById("pause").addEventListener("click", () => run(() => control("pause")));
 document.getElementById("resume").addEventListener("click", () => run(() => control("start")));
 idInput.addEventListener("input", () => {
-  activeID = "";
+  closeSession();
   if (!idInput.value.trim()) localStorage.removeItem("kigo.sim.applicationId");
   for (const id of ["altitude", "speed", "vario", "contacts"])
     document.getElementById(id).textContent = "—";
   document.getElementById("devices").textContent = "Vario: oczekiwanie · FLARM: oczekiwanie";
   status("Wpisz ID i otwórz sesję.");
+});
+window.addEventListener("pagehide", event => {
+  if (!event.persisted) closeSession();
 });
 schedule();

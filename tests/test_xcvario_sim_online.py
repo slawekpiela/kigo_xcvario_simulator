@@ -106,6 +106,34 @@ class OnlineTests(unittest.TestCase):
         self.assertFalse(self.registry.sessions)
         self.assertEqual(self.exchange("alpha", "vario", sequence=2)[0], 404)
 
+    def test_page_close_ends_only_the_matching_session(self):
+        session = self.create("alpha")
+        token = session.runtime.runtime_config.session_id
+        self.assertEqual(
+            self.post("close", {"application_id": "alpha", "session_id": "0" * 32}),
+            (200, b'{"closed": false}'),
+        )
+        self.assertIn("alpha", self.registry.sessions)
+
+        status, data = self.post("close", {"application_id": "alpha", "session_id": token})
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(data), {"closed": True})
+        self.assertNotIn("alpha", self.registry.sessions)
+        self.assertFalse(session.runtime.started)
+        self.assertEqual(
+            self.post("close", {"application_id": "alpha", "session_id": token})[0],
+            200,
+        )
+
+    def test_frontend_closes_session_when_its_page_is_closed(self):
+        frontend = Path("kigo_xcvario_simulator/online_frontend/app.js").read_text()
+        self.assertIn('navigator.sendBeacon("/simulator/api/close"', frontend)
+        self.assertIn('window.addEventListener("pagehide"', frontend)
+        self.assertIn("if (!event.persisted) closeSession();", frontend)
+        self.assertIn('event.data.type === "kigo-simulator-close"', frontend)
+        self.assertIn('event.origin === "https://kigoconcept.pl"', frontend)
+        self.assertIn('idInput.addEventListener("input", () => {\n  closeSession();', frontend)
+
     def test_failed_connection_retry_does_not_duplicate_arbitrary_binary_writes(self):
         peer, client = socket.socketpair()
         self.addCleanup(peer.close)
