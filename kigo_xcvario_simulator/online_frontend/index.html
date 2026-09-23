@@ -1,51 +1,51 @@
 <!doctype html>
-<html lang="pl">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Kigo — symulator online</title>
+  <title data-i18n="pageTitle">Kigo — online simulator</title>
   <link rel="stylesheet" href="/simulator/style.css">
   <script src="/simulator/app.js" defer></script>
 </head>
 <body>
 <main>
-  <header><div><p class="eyebrow">KIGO / SYMULATOR ONLINE</p><h1>Twój lot testowy.</h1></div><span class="badge">Vario + FLARM</span></header>
+  <header><div><p class="eyebrow" data-i18n="eyebrow">KIGO / ONLINE SIMULATOR</p><h1 data-i18n="heading">Your test flight.</h1></div><span class="badge">Vario + FLARM</span></header>
   <section class="identity">
-    <label for="application-id">Application ID z Kigo</label>
-    <div class="identity-row"><input id="application-id" form="flight" required maxlength="64" pattern="[A-Za-z0-9_.\-]+" autocomplete="off" spellcheck="false" placeholder="Wpisz ID aplikacji"><button id="connect" type="button" class="secondary">Otwórz sesję</button></div>
-    <p class="hint">Uruchom Kigo w trybie <strong>FLY</strong>. ID znajdziesz w Setup → General → Service → Application ID. W Hardware wybierz porty <strong>SIM Vario</strong> i <strong>SIM FLARM</strong>.</p>
-    <p class="hint">To samo ID oznacza wspólną symulację. Udostępnij je tylko osobom, które mają sterować tym lotem.</p>
+    <label for="application-id" data-i18n="applicationId">Kigo Application ID</label>
+    <div class="identity-row"><input id="application-id" form="flight" required maxlength="64" pattern="[A-Za-z0-9_.\-]+" autocomplete="off" spellcheck="false" placeholder="Enter the application ID" data-i18n-placeholder="applicationIdPlaceholder"><button id="connect" type="button" class="secondary" data-i18n="openSession">Open session</button></div>
+    <p class="hint" data-i18n="applicationIdHint">To set/retrieve your Application ID go to: CONFIGURATION -&gt; GENERAL -&gt; SERVICE -&gt; APPLICATION ID</p>
+    <p class="hint" data-i18n="setupHint">To start, open Hardware → Devices and restart the devices by clicking Restart.</p>
   </section>
-  <div id="status" role="status" aria-live="polite">Wpisz ID, ustaw parametry i naciśnij Start.</div>
-  <div id="devices" class="devices">Vario: oczekiwanie · FLARM: oczekiwanie</div>
-  <section class="telemetry" aria-label="Dane lotu">
-    <div><span>Wysokość</span><strong id="altitude">—</strong><small>m</small></div>
-    <div><span>Prędkość</span><strong id="speed">—</strong><small>km/h</small></div>
+  <div id="status" role="status" aria-live="polite" data-i18n="initialStatus">Enter the ID, set the parameters and press Start.</div>
+  <div id="devices" class="devices">Vario: waiting · FLARM: waiting</div>
+  <section class="telemetry" aria-label="Flight data" data-i18n-aria-label="flightData">
+    <div><span data-i18n="altitude">Altitude</span><strong id="altitude">—</strong><small>m</small></div>
+    <div><span data-i18n="speed">Speed</span><strong id="speed">—</strong><small>km/h</small></div>
     <div><span>Vario</span><strong id="vario">—</strong><small>m/s</small></div>
-    <div><span>Ruch FLARM</span><strong id="contacts">—</strong><small>obiektów</small></div>
+    <div><span data-i18n="flarmTraffic">FLARM traffic</span><strong id="contacts">—</strong><small data-i18n="objects">objects</small></div>
   </section>
   <div class="panels">
     <form id="flight" class="card">
-      <h2>Lot</h2>
+      <h2 data-i18n="flight">Flight</h2>
       <div class="fields">
-        <label>Tryb<select name="phase"><option value="straight">Lot prosty</option><option value="on_ground">Na ziemi</option><option value="glider_launch">Start szybowca</option><option value="circling_left">Krążenie w lewo</option><option value="circling_right">Krążenie w prawo</option><option value="sink">Duszenie</option><option value="glider_landing">Lądowanie</option></select></label>
-        <label>Prędkość (km/h)<input name="speed_kmh" type="number" value="110" min="0" max="400" step="1" required></label>
-        <label>Wysokość (m)<input name="baro_altitude_m" type="number" value="1500" min="-500" max="15000" required></label>
-        <label>Kurs (°)<input name="heading_deg" type="number" value="90" min="0" max="360" required></label>
-        <label>Vario min. (m/s)<input name="climb_min_ms" type="number" value="1" min="-30" max="30" step="0.1" required></label>
-        <label>Vario maks. (m/s)<input name="climb_max_ms" type="number" value="3" min="-30" max="30" step="0.1" required></label>
-        <label>Promień krążenia (m)<input name="turn_radius_m" type="number" value="150" min="30" max="5000" required></label>
+        <label><span data-i18n="mode">Mode</span><select name="phase"><option value="straight" data-i18n="straightFlight">Straight flight</option><option value="on_ground" data-i18n="onGround">On ground</option><option value="glider_launch" data-i18n="gliderLaunch">Glider launch</option><option value="circling_left" data-i18n="circlingLeft">Circling left</option><option value="circling_right" data-i18n="circlingRight">Circling right</option><option value="sink" data-i18n="sink">Sink</option><option value="glider_landing" data-i18n="landing">Landing</option></select></label>
+        <label><span data-i18n="speedKmh">Speed (km/h)</span><input name="speed_kmh" type="number" value="110" min="0" max="400" step="1" required></label>
+        <label><span data-i18n="altitudeM">Altitude (m)</span><input name="baro_altitude_m" type="number" value="1500" min="-500" max="15000" required></label>
+        <label><span data-i18n="headingDeg">Heading (°)</span><input name="heading_deg" type="number" value="90" min="0" max="360" required></label>
+        <label><span data-i18n="varioMin">Vario min. (m/s)</span><input name="climb_min_ms" type="number" value="1" min="-30" max="30" step="0.1" required></label>
+        <label><span data-i18n="varioMax">Vario max. (m/s)</span><input name="climb_max_ms" type="number" value="3" min="-30" max="30" step="0.1" required></label>
+        <label><span data-i18n="turnRadius">Turn radius (m)</span><input name="turn_radius_m" type="number" value="150" min="30" max="5000" required></label>
       </div>
-      <div class="buttons"><button type="submit">Zastosuj i Start</button><button id="pause" type="button" class="secondary">Pauza</button><button id="resume" type="button" class="secondary">Wznów</button></div>
+      <div class="buttons"><button type="submit" data-i18n="applyStart">Apply and Start</button><button id="pause" type="button" class="secondary" data-i18n="pause">Pause</button><button id="resume" type="button" class="secondary" data-i18n="resume">Resume</button></div>
     </form>
     <div class="stack">
-      <form id="wind" class="card"><h2>Wiatr</h2><div class="fields"><label>Kierunek (°)<input name="direction_deg" type="number" min="0" max="360" value="270" required></label><label>Prędkość (km/h)<input name="speed_kmh" type="number" min="0" max="200" value="15" required></label></div><button type="submit" class="secondary">Ustaw wiatr</button></form>
-      <form id="traffic" class="card"><h2>FLARM</h2><div class="fields"><label>Liczba obiektów<input name="contact_count" type="number" min="0" max="100" value="29" required></label><label>Ruch<select name="motion_mode"><option value="orbit">Krążenie</option><option value="straight">Lot prosty</option></select></label></div><label class="check"><input name="collision_course" type="checkbox"> Kurs kolizyjny</label><button type="submit" class="secondary">Ustaw ruch FLARM</button></form>
+      <form id="wind" class="card"><h2 data-i18n="wind">Wind</h2><div class="fields"><label><span data-i18n="directionDeg">Direction (°)</span><input name="direction_deg" type="number" min="0" max="360" value="270" required></label><label><span data-i18n="speedKmh">Speed (km/h)</span><input name="speed_kmh" type="number" min="0" max="200" value="15" required></label></div><button type="submit" class="secondary" data-i18n="setWind">Set wind</button></form>
+      <form id="traffic" class="card"><h2>FLARM</h2><div class="fields"><label><span data-i18n="objectCount">Number of objects</span><input name="contact_count" type="number" min="0" max="100" value="29" required></label><label><span data-i18n="motion">Motion</span><select name="motion_mode"><option value="orbit" data-i18n="circling">Circling</option><option value="straight" data-i18n="straightFlight">Straight flight</option></select></label></div><label class="check"><input name="collision_course" type="checkbox"> <span data-i18n="collisionCourse">Collision course</span></label><button type="submit" class="secondary" data-i18n="setFlarmTraffic">Set FLARM traffic</button></form>
     </div>
-    <form id="airport" class="card"><h2>Miejsce startu</h2><label>Lotnisko ICAO lub miejscowość<input name="icao" maxlength="100" placeholder="EPBA lub Bielsko-Biała, Polska" required></label><p class="hint">Zmiana miejsca przestawia symulowany szybowiec.</p><button type="submit" class="secondary">Ustaw miejsce</button></form>
-    <form id="altimeter" class="card"><h2>Wysokościomierz</h2><label>QNH (hPa)<input name="qnh_hpa" type="number" min="800" max="1100" step="0.1" value="1013.25" required></label><button type="submit" class="secondary">Ustaw QNH</button></form>
+    <form id="airport" class="card"><h2 data-i18n="startLocation">Start location</h2><label><span data-i18n="airportOrPlace">Airport ICAO or place</span><input name="icao" maxlength="100" placeholder="EPBA or Bielsko-Biała, Poland" data-i18n-placeholder="airportPlaceholder" required></label><p class="hint" data-i18n="locationHint">Changing the location moves the simulated glider.</p><button type="submit" class="secondary" data-i18n="setLocation">Set location</button></form>
+    <form id="altimeter" class="card"><h2 data-i18n="altimeter">Altimeter</h2><label>QNH (hPa)<input name="qnh_hpa" type="number" min="800" max="1100" step="0.1" value="1013.25" required></label><button type="submit" class="secondary" data-i18n="setQnh">Set QNH</button></form>
   </div>
-  <footer>Każde inne Application ID ma osobny lot. Sesja wygasa po 15 minutach bez połączonej aplikacji i panelu.</footer>
+  <footer data-i18n="footer">Each Application ID has a separate flight. The session expires after 15 minutes without a connected application or panel.</footer>
 </main>
 </body>
 </html>

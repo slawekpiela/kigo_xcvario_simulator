@@ -14,6 +14,8 @@ from kigo_xcvario_simulator.online import Channel, OnlineServer, SessionRegistry
 from kigo_xcvario_simulator.state import RuntimeState
 
 CONFIG = Path(__file__).resolve().parents[1] / "kigo_xcvario_simulator/examples/runtime.example.json"
+PANEL_A = "a" * 32
+PANEL_B = "b" * 32
 
 
 class OnlineTests(unittest.TestCase):
@@ -39,8 +41,9 @@ class OnlineTests(unittest.TestCase):
         finally:
             conn.close()
 
-    def control(self, key, action, parameters=None):
-        status, data = self.post("control", {"application_id": key, "action": action, "parameters": parameters or {}})
+    def control(self, key, action, parameters=None, panel_client=PANEL_A):
+        status, data = self.post("control", {"application_id": key, "panel_client": panel_client,
+                                             "action": action, "parameters": parameters or {}})
         self.assertEqual(status, 200, data)
         return json.loads(data)
 
@@ -48,8 +51,8 @@ class OnlineTests(unittest.TestCase):
         return self.post("exchange", {"application_id": key, "channel": kind,
                                      "client": client, "sequence": sequence, "data": data})
 
-    def create(self, key):
-        return self.registry.get(key, create=True, peer=key)
+    def create(self, key, panel_client=PANEL_A):
+        return self.registry.get_panel(key, panel_client, create=True, peer=key)
 
     def test_two_ids_two_channels_and_reconnect_do_not_reset_pause(self):
         a, b = self.create("alpha"), self.create("bravo")
@@ -76,23 +79,44 @@ class OnlineTests(unittest.TestCase):
         self.assertEqual(a.runtime.get_snapshot().runtime_state, RuntimeState.PAUSED)
         self.assertEqual(a.runtime.get_snapshot().sim_time_s, before.sim_time_s)
         self.assertEqual(b.runtime.get_snapshot().runtime_state, RuntimeState.RUNNING)
-        status, data = self.post("session", {"application_id": "alpha"})
+        status, data = self.post("session", {"application_id": "alpha", "panel_client": PANEL_A})
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(data)["session_id"], a.runtime.runtime_config.session_id)
+
+    def test_active_application_id_rejects_a_different_panel(self):
+        status, data = self.post("session", {"application_id": "alpha", "panel_client": PANEL_A})
+        self.assertEqual(status, 200, data)
+        session_id = json.loads(data)["session_id"]
+
+        status, data = self.post("session", {"application_id": "alpha", "panel_client": PANEL_B})
+        self.assertEqual(status, 409)
+        self.assertIn("Podaj inny Application ID", json.loads(data)["error"])
+        self.assertEqual(
+            self.post("control", {"application_id": "alpha", "panel_client": PANEL_B,
+                                  "action": "state", "parameters": {}})[0],
+            409,
+        )
+        status, data = self.post("session", {"application_id": "alpha", "panel_client": PANEL_A})
+        self.assertEqual(status, 200, data)
+        self.assertEqual(json.loads(data)["session_id"], session_id)
 
     def test_waiting_before_panel_invalid_ids_private_routes_and_limits(self):
         self.assertEqual(self.exchange("missing", "vario")[0], 404)
         self.assertFalse(self.registry.sessions)
         for key in ("", "x"*65, "a/b", "a\nb", "a\"b"):
-            self.assertEqual(self.post("session", {"application_id": key})[0], 400)
+            self.assertEqual(self.post("session", {"application_id": key, "panel_client": PANEL_A})[0], 400)
+        self.assertEqual(self.post("session", {"application_id": "valid"})[0], 400)
         self.create("alpha")
-        self.assertEqual(self.post("control", {"application_id": "alpha", "action": "../bridges/start"})[0], 400)
-        self.assertEqual(self.post("session", {"application_id": "alpha"}, {"Origin": "https://untrusted.example"})[0], 403)
-        self.assertEqual(self.post("control", {"application_id": "alpha", "action": "traffic",
+        self.assertEqual(self.post("control", {"application_id": "alpha", "panel_client": PANEL_A,
+                                               "action": "../bridges/start"})[0], 400)
+        self.assertEqual(self.post("session", {"application_id": "alpha", "panel_client": PANEL_A},
+                                   {"Origin": "https://untrusted.example"})[0], 403)
+        self.assertEqual(self.post("control", {"application_id": "alpha", "panel_client": PANEL_A,
+                                               "action": "traffic",
                                              "parameters": {"contact_count": 1000000}})[0], 400)
         self.create("bravo")
         self.create("charlie")
-        self.assertEqual(self.post("session", {"application_id": "delta"})[0], 503)
+        self.assertEqual(self.post("session", {"application_id": "delta", "panel_client": PANEL_A})[0], 503)
 
     def test_exchange_retry_sequence_validation_and_expiry(self):
         session = self.create("alpha")
@@ -110,28 +134,46 @@ class OnlineTests(unittest.TestCase):
         session = self.create("alpha")
         token = session.runtime.runtime_config.session_id
         self.assertEqual(
-            self.post("close", {"application_id": "alpha", "session_id": "0" * 32}),
+            self.post("close", {"application_id": "alpha", "session_id": "0" * 32,
+                                "panel_client": PANEL_A}),
             (200, b'{"closed": false}'),
         )
         self.assertIn("alpha", self.registry.sessions)
 
-        status, data = self.post("close", {"application_id": "alpha", "session_id": token})
+        self.assertEqual(
+            self.post("close", {"application_id": "alpha", "session_id": token,
+                                "panel_client": PANEL_B})[0],
+            409,
+        )
+        self.assertIn("alpha", self.registry.sessions)
+
+        status, data = self.post("close", {"application_id": "alpha", "session_id": token,
+                                           "panel_client": PANEL_A})
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(data), {"closed": True})
         self.assertNotIn("alpha", self.registry.sessions)
         self.assertFalse(session.runtime.started)
         self.assertEqual(
-            self.post("close", {"application_id": "alpha", "session_id": token})[0],
+            self.post("close", {"application_id": "alpha", "session_id": token,
+                                "panel_client": PANEL_A})[0],
             200,
         )
 
     def test_frontend_closes_session_when_its_page_is_closed(self):
         frontend = Path("kigo_xcvario_simulator/online_frontend/app.js").read_text()
+        style = Path("kigo_xcvario_simulator/online_frontend/style.css").read_text()
         self.assertIn('navigator.sendBeacon("/simulator/api/close"', frontend)
+        self.assertIn('sessionStorage.getItem(storageKey)', frontend)
+        self.assertIn('crypto.getRandomValues(new Uint8Array(16))', frontend)
+        self.assertIn('panel_client: panelClient', frontend)
+        self.assertIn('response.status === 409 && path === "session"', frontend)
+        self.assertIn('idInUse:"Ten Application ID jest już używany.', frontend)
+        self.assertIn("#status.error{margin-top:12px", style)
         self.assertIn('window.addEventListener("pagehide"', frontend)
         self.assertIn("if (!event.persisted) closeSession();", frontend)
         self.assertIn('event.data.type === "kigo-simulator-close"', frontend)
-        self.assertIn('event.origin === "https://kigoconcept.pl"', frontend)
+        self.assertIn('event.origin !== "https://kigoconcept.pl"', frontend)
+        self.assertIn('event.origin !== "https://www.kigoconcept.pl"', frontend)
         self.assertIn('idInput.addEventListener("input", () => {\n  closeSession();', frontend)
 
     def test_failed_connection_retry_does_not_duplicate_arbitrary_binary_writes(self):

@@ -10,7 +10,7 @@ This directory contains the complete test simulator for KIGO:
 
 ## Online simulator on Anton
 
-Open [Kigo simulator](https://hermes5.koioslabs.pl/simulator/), enter the
+Open [Kigo simulator](https://api.koioslabs.pl/simulator/), enter the
 Application ID shown in Kigo under `Setup > General > Service`, choose the
 flight parameters and press **Zastosuj i Start**. Run Kigo in **FLY** mode and
 select **SIM Vario** and **SIM FLARM** in two device slots under
@@ -18,11 +18,11 @@ select **SIM Vario** and **SIM FLARM** in two device slots under
 These new ports require an app version containing TASK-nav-000482.
 There are no addresses or TCP port numbers to enter in Kigo.
 
-Each different ID has its own flight. The same ID deliberately shares a flight,
-including controls and simulated logger declarations; give it only to people
-who may control your simulation. It does not grant access to a pilot account.
-The online logger contains only synthetic data. Opening the panel or reconnecting
-does not reset a flight; paused flights remain paused. Closing the simulator
+Each different ID has its own flight. One active browser panel reserves an ID;
+a second browser or tab using that ID is rejected and must enter another ID.
+Refreshing the owning tab or reconnecting a device does not reset the flight;
+paused flights remain paused. The ID does not grant access to a pilot account,
+and the online logger contains only synthetic data. Closing the simulator
 page ends its session immediately, including when the page is shown in the
 `kigoconcept.pl` popup. A session also expires after 15 minutes without
 panel/device activity. After either event, open/start it again in the panel.

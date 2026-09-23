@@ -21,7 +21,7 @@ def run(count, seconds):
     thread.start()
     try:
         for n in range(count):
-            session = registry.get(f"load-{n}", create=True, peer=str(n))
+            session = registry.get_panel(f"load-{n}", f"{n:032x}", create=True, peer=str(n))
             session.runtime.set_manual_mode(ManualModeInput(phase=FlightPhase.STRAIGHT, speed_kmh=110,
                                                             baro_altitude_m=1500 + n * 10))
             session.runtime.set_traffic_config(True, 29, False)

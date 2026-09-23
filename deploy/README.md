@@ -1,32 +1,21 @@
 # Online simulator on Anton
 
 The service listens only on `127.0.0.1:8010`. Public URL:
-`https://hermes5.koioslabs.pl/simulator/`.
+`https://api.koioslabs.pl/simulator/`.
 
 Install source (including package data) into `/home/slawek/kigo-simulator-online`.
 No additional Python dependencies are required. Install the supplied user unit
 as `~/.config/systemd/user/kigo-simulator-online.service`, reload the user manager
 and enable/start the unit. Do not publish the legacy runtime API or TCP sockets.
 
-Hermes5 already has a public Cloudflare route to the private proxy on port 8005.
-Install the narrow route using:
+The `api.koioslabs.pl` gateway forwards the public `/simulator/` panel and its
+bounded API routes to this loopback service. Gateway and Cloudflare routing are
+owned by `kigo_services`; deploying this package does not require changing them.
+Do not restore the retired public Hermes5 simulator route.
 
-```sh
-python3 deploy/add_hermes5_route.py /home/slawek/kigo-hermes5-rag-proxy.py
-docker compose -p kigo-security-proxies \
-  -f /home/slawek/kigo-security-stage1/hermes-proxies-compose.yaml restart hermes5
-```
-
-The installer preserves the proxy's existing authentication and routes and
-creates `kigo-hermes5-rag-proxy.py.before-task482`. The restart briefly interrupts
-Hermes5 requests. Verify `/stats/` still returns 401 and `/rag/index` 404 without
-credentials. Keep Compose and its existing env_file; never replace the container
-with the historical bare docker-run recipe. `hermes.koioslabs.pl` is protected
-by Cloudflare Access and cannot serve the automatic device client; do not remove
-that protection. The system cloudflared config needs no simulator rule.
-
-Verify the local and public `/simulator/health`, the panel, two independent
-Application IDs, and both device channels. Keep test IDs disposable. Sessions
+Verify the local service, public panel, two independent Application IDs, a
+duplicate-ID rejection from another panel client, and both device channels.
+Keep test IDs disposable. Sessions
 close immediately when their browser page or `kigoconcept.pl` popup closes and
 expire after 15 minutes without panel/device activity; idle device connections
 are closed after 30 seconds. A service restart loses active sessions; explicitly
@@ -35,13 +24,15 @@ by opening the panel or reconnecting either device channel.
 
 Status: `systemctl --user status kigo-simulator-online.service`.
 Stop: `systemctl --user stop kigo-simulator-online.service`.
-Rollback: stop the new service, remove only the added simulator route from the
-Hermes5 proxy (or restore the backup if no later edits exist) and restart that
-Compose service. This deployment does not stop the old lab runtime.
+Rollback: restore the previous simulator source from the deployment backup and
+restart this user service. This deployment does not stop the old lab runtime.
 
-The public API implements a shared-key simulator, not pilot account login:
-anyone given an Application ID can operate that simulation. No mail/account
-permissions are granted. No IDs or protocol bytes are written to access logs.
+The public API implements a simulator key, not pilot account login. One browser
+panel owns an active Application ID; another panel client receives HTTP 409 and
+must use a different ID. The owning panel sends a random 32-hex token on session,
+control and close requests. Device exchange continues to use the Application ID
+and its separate device client token. No mail/account permissions are granted.
+No IDs or protocol bytes are written to access logs.
 Keep bridge administration private. Limits: 50 sessions, eight byte connections
 per session, 16 KiB per exchange, 256 concurrent HTTP connections, one new
 session per second per direct peer. Behind the local Cloudflare tunnel the

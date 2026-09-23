@@ -1,7 +1,8 @@
 """Session-isolated Internet facade. Bind to loopback behind an HTTPS proxy.
 
-Application ID is the shared simulator key chosen by the operator, not account
-authentication. The facade never publishes the lab bridge administration API.
+Application ID selects a simulator session and is reserved by one browser panel
+at a time; it is not account authentication. The facade never publishes the lab
+bridge administration API.
 Device transport uses bounded HTTPS exchanges, preserving arbitrary wire bytes.
 """
 from __future__ import annotations
@@ -58,6 +59,12 @@ def application_id(value):
     return value
 
 
+def panel_client(value):
+    if not isinstance(value, str) or not TOKEN_PATTERN.fullmatch(value):
+        raise ApiError(400, "Invalid panel client ID.")
+    return value
+
+
 class Channel:
     """One persistent device socket; retrying an exchange never replays commands."""
     def __init__(self, port):
@@ -96,7 +103,7 @@ class Channel:
 
 
 class OnlineSession:
-    def __init__(self, config):
+    def __init__(self, config, panel_client_id):
         config = replace(config, session_id=secrets.token_hex(16),
                          xcvario=replace(config.xcvario, bind_host="127.0.0.1", port=0),
                          flarm=replace(config.flarm, bind_host="127.0.0.1", port=0))
@@ -104,6 +111,7 @@ class OnlineSession:
                          flarm_passthrough=FlarmPassthroughSimulator.synthetic())
         self.api = ControlApiServer(bind_host="127.0.0.1", port=0, session=self.runtime)
         self.channels = {}
+        self.panel_client = panel_client_id
         self.lock = threading.RLock()
         self.touched = time.monotonic()
         try:
@@ -154,8 +162,18 @@ class SessionRegistry:
         self.reaper = threading.Thread(target=self._reap, name="sim-session-expiry", daemon=True)
         self.reaper.start()
 
-    def get(self, key, create=False, peer=""):
+    def get(self, key):
         key = application_id(key)
+        with self.lock:
+            session = self.sessions.get(key)
+            if session is None:
+                raise ApiError(404, "Waiting: open the simulator page and enter this Application ID.")
+            session.touched = time.monotonic()
+            return session
+
+    def get_panel(self, key, panel_client_id, create=False, peer=""):
+        key = application_id(key)
+        panel_client_id = panel_client(panel_client_id)
         with self.lock:
             session = self.sessions.get(key)
             if session is None and create:
@@ -169,9 +187,11 @@ class SessionRegistry:
                 self.creation_times.move_to_end(peer)
                 while len(self.creation_times) > 1024:
                     self.creation_times.popitem(last=False)
-                session = self.sessions[key] = OnlineSession(self.config)
+                session = self.sessions[key] = OnlineSession(self.config, panel_client_id)
             if session is None:
                 raise ApiError(404, "Waiting: open the simulator page and enter this Application ID.")
+            if not secrets.compare_digest(session.panel_client, panel_client_id):
+                raise ApiError(409, "Ten Application ID jest już używany w innym oknie lub przez innego użytkownika. Podaj inny Application ID.")
             session.touched = time.monotonic()
             return session
 
@@ -186,13 +206,18 @@ class SessionRegistry:
         for session in expired:
             session.close()
 
-    def close_session(self, key, session_id):
+    def close_session(self, key, session_id, panel_client_id):
         key = application_id(key)
+        panel_client_id = panel_client(panel_client_id)
         if not isinstance(session_id, str) or not TOKEN_PATTERN.fullmatch(session_id):
             raise ApiError(400, "Invalid session ID.")
         with self.lock:
             session = self.sessions.get(key)
-            if session is None or session.runtime.runtime_config.session_id != session_id:
+            if session is None:
+                return False
+            if not secrets.compare_digest(session.panel_client, panel_client_id):
+                raise ApiError(409, "Ten Application ID jest używany przez inny panel.")
+            if session.runtime.runtime_config.session_id != session_id:
                 return False
             del self.sessions[key]
         session.close()
@@ -257,7 +282,10 @@ class OnlineHandler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("Content-Security-Policy", "default-src 'self'; frame-ancestors 'none'; base-uri 'none'")
+        self.send_header(
+            "Content-Security-Policy",
+            "default-src 'self'; frame-ancestors https://kigoconcept.pl https://www.kigoconcept.pl; base-uri 'none'",
+        )
         self.end_headers()
         self.wfile.write(payload)
 
@@ -300,16 +328,21 @@ class OnlineHandler(BaseHTTPRequestHandler):
                 raise ApiError(404, "Not found")
             if path.endswith("/close"):
                 closed = self.server.registry.close_session(
-                    payload.get("application_id"), payload.get("session_id"))
+                    payload.get("application_id"), payload.get("session_id"),
+                    payload.get("panel_client"))
                 self.reply(200, {"closed": closed})
                 return
-            session = self.server.registry.get(payload.get("application_id"),
-                        create=path.endswith("/session"), peer=self.client_address[0])
             if path.endswith("/session"):
+                session = self.server.registry.get_panel(
+                    payload.get("application_id"), payload.get("panel_client"),
+                    create=True, peer=self.client_address[0])
                 self.reply(200, {"session_id": session.runtime.runtime_config.session_id})
             elif path.endswith("/control"):
+                session = self.server.registry.get_panel(
+                    payload.get("application_id"), payload.get("panel_client"))
                 self.control(session, payload)
             else:
+                session = self.server.registry.get(payload.get("application_id"))
                 self.exchange(session, payload)
         except ApiError as error:
             self.close_connection = True

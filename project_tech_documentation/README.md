@@ -15,7 +15,7 @@ _To be filled as durable knowledge is discovered._
 
 ## Online Sessions On Anton
 
-- Public entrypoint: `https://hermes5.koioslabs.pl/simulator/`; service owner
+- Public entrypoint: `https://api.koioslabs.pl/simulator/`; service owner
   `online.py`, UI `online_frontend/`, operations `deploy/README.md`.
 - One managed process holds up to 50 independent `OnlineSession` objects. Each
   owns a runtime, scheduler, private loopback TCP adapters and private control
@@ -24,17 +24,22 @@ _To be filled as durable knowledge is discovered._
 - The public facade allowlists only simulation controls, validates bounded JSON
   and exchanges arbitrary bytes in hex over HTTPS. `(channel, client, sequence)`
   supplies idempotent retries. Device expiry is 30 seconds, session inactivity
-  expiry is 900 seconds. The frontend sends the opaque runtime session ID to the
-  idempotent `/api/close` endpoint with `sendBeacon` on non-BFCache `pagehide`.
+  expiry is 900 seconds. The frontend creates a random 32-hex panel-client token,
+  keeps it in tab-scoped `sessionStorage`, and sends it on session, control and
+  close requests. A different panel token for an active Application ID receives
+  HTTP 409. The frontend also sends the opaque runtime session ID to the idempotent
+  `/api/close` endpoint with `sendBeacon` on non-BFCache `pagehide`.
   The `kigoconcept.pl` modal also sends an origin-checked
   `kigo-simulator-close` message and unloads the iframe when its close action is
   used. The registry removes and stops only a matching `(Application ID,
-  session ID)` pair, preventing a stale page from closing a replacement session. This works
+  panel client, session ID)` tuple, preventing another or stale page from closing
+  a session. This works
   in both a standalone page and the `kigoconcept.pl` iframe popup. See
   the deploy document for resource bounds.
-- Application ID is the shared simulator key, not proof of account ownership.
-  Same ID intentionally shares state; different IDs have independent declarations
-  and logger state. `FlarmPassthroughSimulator.synthetic()` avoids reading real
+- Application ID selects a session, not proof of account ownership. One active
+  browser panel owns an ID; another browser or tab must choose a different ID.
+  Different IDs have independent declarations and logger state.
+  `FlarmPassthroughSimulator.synthetic()` avoids reading real
   host flight logs. Online sessions pass `activate_on_connect=False`, preserving
   paused/running state on either device reconnect; lab behavior stays default.
 - The native client uses curl and Android uses the existing Java HTTPS stack;
