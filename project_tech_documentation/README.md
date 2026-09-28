@@ -23,8 +23,9 @@ _To be filled as durable knowledge is discovered._
   Explicit panel actions create sessions; device polls cannot create them.
 - The public facade allowlists only simulation controls, validates bounded JSON
   and exchanges arbitrary bytes in hex over HTTPS. `(channel, client, sequence)`
-  supplies idempotent retries. Device expiry is 30 seconds, session inactivity
-  expiry is 900 seconds. The frontend creates a random 32-hex panel-client token,
+  supplies idempotent retries. Device-channel expiry is 30 seconds; a session
+  without a successful SIM-device exchange expires after 300 seconds, while the
+  general inactivity ceiling remains 900 seconds. The frontend creates a random 32-hex panel-client token,
   keeps it in tab-scoped `sessionStorage`, and sends it on session, control and
   close requests. A different panel token for an active Application ID receives
   HTTP 409. The frontend also sends the opaque runtime session ID to the idempotent
@@ -36,6 +37,12 @@ _To be filled as durable knowledge is discovered._
   a session. This works
   in both a standalone page and the `kigoconcept.pl` iframe popup. See
   the deploy document for resource bounds.
+- The frontend reuses its active session and calls `/api/session` only when the
+  user first opens it or once after HTTP 404 reports expiry. The registry allows
+  at most two sessions created by one trusted source IP and at most two source
+  IPs active on one Application ID during a rolling two-minute window. The
+  loopback service accepts `X-Real-IP` only from a loopback peer; the gateway
+  overwrites that header from its verified Cloudflare client address.
 - Application ID selects a session, not proof of account ownership. One active
   browser panel owns an ID; another browser or tab must choose a different ID.
   Different IDs have independent declarations and logger state.

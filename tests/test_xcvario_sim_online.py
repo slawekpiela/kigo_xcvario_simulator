@@ -32,12 +32,16 @@ class OnlineTests(unittest.TestCase):
         self.registry.close()
 
     def post(self, path, payload, headers=None):
+        status, data, _headers = self.post_response(path, payload, headers)
+        return status, data
+
+    def post_response(self, path, payload, headers=None):
         conn = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
         try:
             conn.request("POST", "/simulator/api/" + path, json.dumps(payload),
                          {"Content-Type": "application/json", **(headers or {})})
             response = conn.getresponse()
-            return response.status, response.read()
+            return response.status, response.read(), dict(response.getheaders())
         finally:
             conn.close()
 
@@ -99,6 +103,48 @@ class OnlineTests(unittest.TestCase):
         status, data = self.post("session", {"application_id": "alpha", "panel_client": PANEL_A})
         self.assertEqual(status, 200, data)
         self.assertEqual(json.loads(data)["session_id"], session_id)
+
+    def test_limits_two_sessions_per_ip_and_ignores_spoofed_forwarded_for(self):
+        headers = {"X-Real-IP": "198.51.100.10", "X-Forwarded-For": "203.0.113.1"}
+        for key in ("alpha", "bravo"):
+            status, data = self.post("session", {"application_id": key, "panel_client": PANEL_A}, headers)
+            self.assertEqual(status, 200, data)
+        status, data, response_headers = self.post_response(
+            "session", {"application_id": "charlie", "panel_client": PANEL_A},
+            {**headers, "X-Forwarded-For": "203.0.113.99"},
+        )
+        self.assertEqual(status, 429, data)
+        self.assertEqual(response_headers["Retry-After"], "60")
+
+    def test_application_id_allows_two_active_ips_then_recovers(self):
+        session = self.registry.get_panel("alpha", PANEL_A, create=True, peer="198.51.100.1")
+        self.registry.get_panel("alpha", PANEL_A, peer="198.51.100.2")
+        with self.assertRaises(ApiError) as rejected:
+            self.registry.get("alpha", "198.51.100.3")
+        self.assertEqual(rejected.exception.status, 429)
+        self.assertEqual(rejected.exception.retry_after, 120)
+        session.active_peers["198.51.100.1"] -= 121
+        self.assertIs(self.registry.get("alpha", "198.51.100.3"), session)
+        self.assertEqual(set(session.active_peers), {"198.51.100.2", "198.51.100.3"})
+
+    def test_session_without_device_expires_after_five_minutes(self):
+        session = self.create("alpha")
+        session.touched = session.created_at + 299
+        self.registry.expire(session.created_at + 299)
+        self.assertIn("alpha", self.registry.sessions)
+        self.registry.expire(session.created_at + 301)
+        self.assertNotIn("alpha", self.registry.sessions)
+
+    def test_device_exchange_moves_five_minute_expiry_window(self):
+        session = self.create("alpha")
+        self.assertEqual(self.exchange("alpha", "vario")[0], 200)
+        self.assertIsNotNone(session.last_device_activity)
+        last_device = session.last_device_activity
+        session.touched = last_device + 299
+        self.registry.expire(last_device + 299)
+        self.assertIn("alpha", self.registry.sessions)
+        self.registry.expire(last_device + 301)
+        self.assertNotIn("alpha", self.registry.sessions)
 
     def test_waiting_before_panel_invalid_ids_private_routes_and_limits(self):
         self.assertEqual(self.exchange("missing", "vario")[0], 404)
@@ -167,7 +213,10 @@ class OnlineTests(unittest.TestCase):
         self.assertIn('crypto.getRandomValues(new Uint8Array(16))', frontend)
         self.assertIn('panel_client: panelClient', frontend)
         self.assertIn('response.status === 409 && path === "session"', frontend)
+        self.assertIn('response.status === 429 ? t("rateLimited")', frontend)
         self.assertIn('idInUse:"Ten Application ID jest już używany.', frontend)
+        self.assertIn('if (activeID === id && activeSessionID) return;', frontend)
+        self.assertIn('if (error.status !== 404) throw error;', frontend)
         self.assertIn("#status.error{margin-top:12px", style)
         self.assertIn('window.addEventListener("pagehide"', frontend)
         self.assertIn("if (!event.persisted) closeSession();", frontend)

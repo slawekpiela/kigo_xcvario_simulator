@@ -24,9 +24,14 @@ Refreshing the owning tab or reconnecting a device does not reset the flight;
 paused flights remain paused. The ID does not grant access to a pilot account,
 and the online logger contains only synthetic data. Closing the simulator
 page ends its session immediately, including when the page is shown in the
-`kigoconcept.pl` popup. A session also expires after 15 minutes without
-panel/device activity. After either event, open/start it again in the panel.
+`kigoconcept.pl` popup. A session without traffic from a connected SIM Vario or
+SIM FLARM expires after 5 minutes. After either event, open/start it again in the panel.
 If all 50 session slots are occupied, the panel asks you to try later.
+
+The panel creates a session only when it is opened or after the backend reports
+that the previous session expired. One source IP can own at most two active
+sessions, and one Application ID can be active from at most two source IPs seen
+in the last two minutes. A third source receives HTTP 429 with `Retry-After`.
 
 Use a separate test profile to preserve normal hardware configuration. The built-in
 Kigo SIM mode does not connect hardware ports. Both the app and panel need Internet.

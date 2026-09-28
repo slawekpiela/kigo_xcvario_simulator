@@ -17,7 +17,7 @@ Verify the local service, public panel, two independent Application IDs, a
 duplicate-ID rejection from another panel client, and both device channels.
 Keep test IDs disposable. Sessions
 close immediately when their browser page or `kigoconcept.pl` popup closes and
-expire after 15 minutes without panel/device activity; idle device connections
+expire after 5 minutes without SIM-device exchange; idle device connections
 are closed after 30 seconds. A service restart loses active sessions; explicitly
 open/start a session again in the panel. Existing active sessions aren't reset
 by opening the panel or reconnecting either device channel.
@@ -34,9 +34,13 @@ control and close requests. Device exchange continues to use the Application ID
 and its separate device client token. No mail/account permissions are granted.
 No IDs or protocol bytes are written to access logs.
 Keep bridge administration private. Limits: 50 sessions, eight byte connections
-per session, 16 KiB per exchange, 256 concurrent HTTP connections, one new
-session per second per direct peer. Behind the local Cloudflare tunnel the
-creation limit is shared by that peer; existing sessions remain accessible.
+per session, 16 KiB per exchange and 256 concurrent HTTP connections. The
+trusted gateway source address is read from `X-Real-IP` only when the direct
+peer is loopback. One source IP can own at most two active sessions. One
+Application ID accepts at most two source IPs active within the last two minutes;
+a third receives HTTP 429 with `Retry-After`. The gateway separately limits
+`/simulator/api/session` to 2 requests/minute/IP with burst 1, one concurrent
+request/IP, and 10 requests/minute globally with burst 2.
 
 The device protocol POSTs JSON to `/simulator/api/exchange` containing
 `application_id`, `channel` (`vario`/`flarm`), a random 32-hex `client`, an integer

@@ -12,6 +12,7 @@ from collections import OrderedDict
 from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import http.client
+import ipaddress
 import json
 import math
 from pathlib import Path
@@ -49,8 +50,9 @@ FRONTEND = Path(__file__).with_name("online_frontend")
 
 
 class ApiError(Exception):
-    def __init__(self, status, message):
+    def __init__(self, status, message, retry_after=None):
         self.status, self.message = status, message
+        self.retry_after = retry_after
 
 
 def application_id(value):
@@ -103,7 +105,7 @@ class Channel:
 
 
 class OnlineSession:
-    def __init__(self, config, panel_client_id):
+    def __init__(self, config, panel_client_id, peer, peer_active_seconds, max_active_peers):
         config = replace(config, session_id=secrets.token_hex(16),
                          xcvario=replace(config.xcvario, bind_host="127.0.0.1", port=0),
                          flarm=replace(config.flarm, bind_host="127.0.0.1", port=0))
@@ -113,7 +115,12 @@ class OnlineSession:
         self.channels = {}
         self.panel_client = panel_client_id
         self.lock = threading.RLock()
-        self.touched = time.monotonic()
+        self.created_peer = peer
+        self.created_at = self.touched = time.monotonic()
+        self.last_device_activity = None
+        self.peer_active_seconds = peer_active_seconds
+        self.max_active_peers = max_active_peers
+        self.active_peers = OrderedDict(((peer, self.created_at),))
         try:
             self.runtime.start()
             self.api.start()
@@ -136,6 +143,22 @@ class OnlineSession:
                 channel = self.channels[key] = Channel(adapter.bound_port)
             return channel
 
+    def touch_peer(self, peer, now=None):
+        now = time.monotonic() if now is None else now
+        with self.lock:
+            for address, touched in list(self.active_peers.items()):
+                if now - touched > self.peer_active_seconds:
+                    del self.active_peers[address]
+            if peer not in self.active_peers and len(self.active_peers) >= self.max_active_peers:
+                raise ApiError(
+                    429,
+                    "This Application ID is active from two networks. Wait two minutes or use another ID.",
+                    self.peer_active_seconds,
+                )
+            self.active_peers[peer] = now
+            self.active_peers.move_to_end(peer)
+            self.touched = now
+
     def expire_channels(self, now):
         with self.lock:
             for key, channel in list(self.channels.items()):
@@ -153,22 +176,26 @@ class OnlineSession:
 
 
 class SessionRegistry:
-    def __init__(self, config, limit=50, idle_seconds=900):
+    def __init__(self, config, limit=50, idle_seconds=900, max_sessions_per_peer=2,
+                 max_active_peers=2, peer_active_seconds=120, no_device_seconds=300):
         self.config, self.limit, self.idle_seconds = config, limit, idle_seconds
+        self.max_sessions_per_peer = max_sessions_per_peer
+        self.max_active_peers = max_active_peers
+        self.peer_active_seconds = peer_active_seconds
+        self.no_device_seconds = no_device_seconds
         self.sessions = {}
         self.lock = threading.Lock()
         self.closed = threading.Event()
-        self.creation_times = OrderedDict()
         self.reaper = threading.Thread(target=self._reap, name="sim-session-expiry", daemon=True)
         self.reaper.start()
 
-    def get(self, key):
+    def get(self, key, peer):
         key = application_id(key)
         with self.lock:
             session = self.sessions.get(key)
             if session is None:
                 raise ApiError(404, "Waiting: open the simulator page and enter this Application ID.")
-            session.touched = time.monotonic()
+            session.touch_peer(peer)
             return session
 
     def get_panel(self, key, panel_client_id, create=False, peer=""):
@@ -179,20 +206,15 @@ class SessionRegistry:
             if session is None and create:
                 if len(self.sessions) >= self.limit:
                     raise ApiError(503, "Simulator busy. Try again later.")
-                now = time.monotonic()
-                previous = self.creation_times.get(peer, 0)
-                if now - previous < 1:
-                    raise ApiError(429, "Please wait before creating another session.")
-                self.creation_times[peer] = now
-                self.creation_times.move_to_end(peer)
-                while len(self.creation_times) > 1024:
-                    self.creation_times.popitem(last=False)
-                session = self.sessions[key] = OnlineSession(self.config, panel_client_id)
+                if sum(item.created_peer == peer for item in self.sessions.values()) >= self.max_sessions_per_peer:
+                    raise ApiError(429, "Two active simulator sessions are already using this network.", 60)
+                session = self.sessions[key] = OnlineSession(
+                    self.config, panel_client_id, peer, self.peer_active_seconds, self.max_active_peers)
             if session is None:
                 raise ApiError(404, "Waiting: open the simulator page and enter this Application ID.")
             if not secrets.compare_digest(session.panel_client, panel_client_id):
                 raise ApiError(409, "Ten Application ID jest już używany w innym oknie lub przez innego użytkownika. Podaj inny Application ID.")
-            session.touched = time.monotonic()
+            session.touch_peer(peer)
             return session
 
     def expire(self, now=None):
@@ -201,7 +223,9 @@ class SessionRegistry:
         with self.lock:
             for key, session in list(self.sessions.items()):
                 session.expire_channels(now)
-                if now - session.touched > self.idle_seconds:
+                last_device = session.last_device_activity
+                no_device_since = session.created_at if last_device is None else last_device
+                if now - session.touched > self.idle_seconds or now - no_device_since > self.no_device_seconds:
                     expired.append(self.sessions.pop(key))
         for session in expired:
             session.close()
@@ -273,7 +297,7 @@ class OnlineHandler(BaseHTTPRequestHandler):
         # IDs and exchanged protocol bytes must never enter access logs.
         pass
 
-    def reply(self, status, payload, content_type="application/json"):
+    def reply(self, status, payload, content_type="application/json", headers=None):
         if not isinstance(payload, bytes):
             payload = json.dumps(payload).encode() if content_type == "application/json" else payload.encode()
         self.send_response(status)
@@ -282,12 +306,24 @@ class OnlineHandler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
+        for name, value in (headers or {}).items():
+            self.send_header(name, str(value))
         self.send_header(
             "Content-Security-Policy",
             "default-src 'self'; frame-ancestors https://kigoconcept.pl https://www.kigoconcept.pl; base-uri 'none'",
         )
         self.end_headers()
         self.wfile.write(payload)
+
+    def client_peer(self):
+        peer = ipaddress.ip_address(self.client_address[0])
+        forwarded = self.headers.get("X-Real-IP")
+        if peer.is_loopback and forwarded:
+            try:
+                peer = ipaddress.ip_address(forwarded)
+            except ValueError:
+                raise ApiError(400, "Invalid client address.")
+        return str(peer)
 
     def do_GET(self):
         path = urlsplit(self.path).path
@@ -335,18 +371,20 @@ class OnlineHandler(BaseHTTPRequestHandler):
             if path.endswith("/session"):
                 session = self.server.registry.get_panel(
                     payload.get("application_id"), payload.get("panel_client"),
-                    create=True, peer=self.client_address[0])
+                    create=True, peer=self.client_peer())
                 self.reply(200, {"session_id": session.runtime.runtime_config.session_id})
             elif path.endswith("/control"):
                 session = self.server.registry.get_panel(
-                    payload.get("application_id"), payload.get("panel_client"))
+                    payload.get("application_id"), payload.get("panel_client"),
+                    peer=self.client_peer())
                 self.control(session, payload)
             else:
-                session = self.server.registry.get(payload.get("application_id"))
+                session = self.server.registry.get(payload.get("application_id"), self.client_peer())
                 self.exchange(session, payload)
         except ApiError as error:
             self.close_connection = True
-            self.reply(error.status, {"error": error.message})
+            headers = {"Retry-After": error.retry_after} if error.retry_after is not None else None
+            self.reply(error.status, {"error": error.message}, headers=headers)
         except (ValueError, TypeError, KeyError, RecursionError):
             self.close_connection = True
             self.reply(400, {"error": "Invalid request."})
@@ -411,7 +449,10 @@ class OnlineHandler(BaseHTTPRequestHandler):
             raise ApiError(400, "Invalid device data.")
         outgoing = bytes.fromhex(data)
         channel = session.channel(kind, client, sequence)
-        self.reply(200, channel.exchange(sequence, outgoing), "text/plain")
+        response = channel.exchange(sequence, outgoing)
+        with session.lock:
+            session.last_device_activity = session.touched = time.monotonic()
+        self.reply(200, response, "text/plain")
 
 
 def main():
