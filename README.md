@@ -17,6 +17,10 @@ select **SIM Vario** and **SIM FLARM** in two device slots under
 `Setup > Hardware & related > Hardware > Devices > Edit > Port`.
 These new ports require an app version containing TASK-nav-000482.
 There are no addresses or TCP port numbers to enter in Kigo.
+When changing from circling left or right to straight flight, the online panel
+automatically keeps the altitude reached in the thermal. The preserved altitude
+continues in the GPS/barometric telemetry sent to Kigo instead of reverting to
+the previous value in the altitude field.
 
 Each different ID has its own flight. One active browser panel reserves an ID;
 a second browser or tab using that ID is rejected and must enter another ID.

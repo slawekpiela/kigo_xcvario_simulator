@@ -224,6 +224,10 @@ class OnlineTests(unittest.TestCase):
         self.assertIn('event.origin !== "https://kigoconcept.pl"', frontend)
         self.assertIn('event.origin !== "https://www.kigoconcept.pl"', frontend)
         self.assertIn('idInput.addEventListener("input", () => {\n  closeSession();', frontend)
+        self.assertIn('const current = await control("state");', frontend)
+        self.assertIn('ownship.phase === "circling_left" || ownship.phase === "circling_right"', frontend)
+        self.assertIn('parameters.baro_altitude_m = ownship.gps_altitude_m;', frontend)
+        self.assertIn('form.elements.baro_altitude_m.value = Math.round(ownship.gps_altitude_m);', frontend)
 
     def test_failed_connection_retry_does_not_duplicate_arbitrary_binary_writes(self):
         peer, client = socket.socketpair()

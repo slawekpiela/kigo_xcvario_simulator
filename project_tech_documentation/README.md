@@ -106,6 +106,12 @@ _To be filled as durable knowledge is discovered._
   minimum at `45 s`, and the midpoint again at `60 s`. A small deterministic jitter is added and
   clamped inside the configured range. The panel posts climb fields for `straight`, `circling_left`,
   `circling_right`, and `glider_launch` when they contain operator-entered values.
+- Before the online panel changes an active `circling_left` or `circling_right` flight to `straight`,
+  it fetches a fresh session state and replaces the submitted `baro_altitude_m` with the current
+  `OwnshipState.gps_altitude_m`. It also updates the visible altitude input to that value. This
+  preserves the height reached in the thermal in subsequent GGA/PXCV telemetry and prevents a stale
+  form value (the initial default is `1500 m`) from creating an artificial altitude jump in Kigo's
+  IGC log. Explicit altitude changes in other transitions retain the existing behavior.
 - FLARM traffic identity is loaded once on the simulator side when `ScenarioOrchestrator` creates
   `TrafficGenerator`: `traffic_database.load_default_traffic_aircraft()` checks
   `KIGO_FLARM_DDB_PATH`, then nearby `KigoData`/`Kigodata` directories for `ddb.jason`, `ddb.json`
@@ -393,3 +399,6 @@ _To be filled as durable knowledge is discovered._
   `ddb.jason`/`ddb.json` DDB data with fallback to packaged records.
 - 2026-06-21: Documented the persistent VM-runtime-to-Pi reverse-tunnel setup, disabled Pi-local
   runtime, refreshed `admin@192.168.0.111` Pi identity, and persistent-unit-aware bridge restart.
+- 2026-10-10: The online panel now preserves the achieved altitude when switching from circling to
+  straight flight, so Kigo receives a continuous GPS/barometric altitude trace and can finalize the
+  thermal without a synthetic descent caused by the stale form value.

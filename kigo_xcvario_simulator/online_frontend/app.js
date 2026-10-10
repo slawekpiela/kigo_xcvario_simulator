@@ -194,9 +194,18 @@ async function run(action) {
 document.getElementById("connect").addEventListener("click", () => run(async () => {}));
 document.getElementById("flight").addEventListener("submit", event => {
   event.preventDefault();
+  const form = event.target;
   run(async () => {
-    const parameters = values(event.target);
+    const parameters = values(form);
     if (parameters.climb_min_ms > parameters.climb_max_ms) throw new Error(t("minMax"));
+    if (parameters.phase === "straight") {
+      const current = await control("state");
+      const ownship = current.snapshot.ownship;
+      if (ownship.phase === "circling_left" || ownship.phase === "circling_right") {
+        parameters.baro_altitude_m = ownship.gps_altitude_m;
+        form.elements.baro_altitude_m.value = Math.round(ownship.gps_altitude_m);
+      }
+    }
     await control("manual-mode", parameters);
     await control("start");
   });
