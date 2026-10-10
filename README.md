@@ -124,7 +124,9 @@ gets a deterministic random maximum ellipse radius from that range. It can also
 toggle default contacts between `orbit` and `straight` motion. `Apply Traffic`
 restarts generated traffic and uses the current `Start airport or place` field
 as the placement anchor when it is filled. The optional `collision course` mode
-still makes the first contact converge on the ownship.
+still makes the first contact converge on the ownship. `PFLAU` summarizes the
+contact with the highest alarm level and reports aircraft `AlarmType=2` for
+levels `1`-`3`, enabling collision audio and overlays in compatible clients.
 `$PFLAA`/`$PFLAU` emit the six-hex-digit device ID, while the control API and
 panel also expose competition ID, registration, model labels and speed.
 

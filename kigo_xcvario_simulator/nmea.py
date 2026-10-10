@@ -274,18 +274,23 @@ def build_pflau(traffic: Sequence[TrafficContact]) -> str:
     if traffic:
         primary = min(
             traffic,
-            key=lambda contact: math.hypot(contact.relative_north_m, contact.relative_east_m),
+            key=lambda contact: (
+                -contact.alarm_level,
+                math.hypot(contact.relative_north_m, contact.relative_east_m),
+            ),
         )
         relative_distance_m = int(round(math.hypot(primary.relative_north_m, primary.relative_east_m)))
         relative_vertical_m = int(round(primary.relative_altitude_m))
         relative_bearing_deg = int(round(math.degrees(math.atan2(primary.relative_east_m, primary.relative_north_m))))
-        alarm_level = max(contact.alarm_level for contact in traffic)
+        alarm_level = primary.alarm_level
+        alarm_type = 2 if alarm_level > 0 else 0
         identifier = primary.aircraft_id or primary.contact_id
     else:
         relative_distance_m = 0
         relative_vertical_m = 0
         relative_bearing_deg = 0
         alarm_level = 0
+        alarm_type = 0
         identifier = ""
 
     body = ",".join(
@@ -297,7 +302,7 @@ def build_pflau(traffic: Sequence[TrafficContact]) -> str:
             "1",
             str(alarm_level),
             str(relative_bearing_deg),
-            "0",
+            str(alarm_type),
             str(relative_vertical_m),
             str(relative_distance_m),
             identifier,

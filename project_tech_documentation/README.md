@@ -165,6 +165,10 @@ _To be filled as durable knowledge is discovered._
 
 ## Build, Run, And Test Notes
 
+- `build_pflau()` must select the highest-alarm traffic contact, using distance
+  only to break equal-level ties. For alarm levels `1`-`3`, it must emit
+  aircraft `AlarmType=2`; `AlarmType=0` suppresses Kigo collision audio and the
+  full-screen overlay even when the separate alarm-level field is non-zero.
 - The simulator panel is operator UI only; bridge actions are posted to the selected runtime API
   (`/api/v1/bridges/*`) and execute from that runtime host. With the default panel URL
   `http://172.16.119.137:8181`, bridge SSH and `systemd-run --user` happen on the VM, not on the

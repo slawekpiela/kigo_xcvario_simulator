@@ -208,11 +208,39 @@ class NmeaBuilderTests(unittest.TestCase):
         pflau = build_pflau(traffic)
         pflaa = build_pflaa(traffic[0])
 
-        self.assertTrue(pflau.startswith("$PFLAU,1,1,2,1,1,"))
+        self.assertTrue(pflau.startswith("$PFLAU,1,1,2,1,1,-20,2,67,131,A1B2C3*"))
         self.assertIn("A1B2C3", pflau)
         self.assertTrue(pflaa.startswith("$PFLAA,1,123,-45,67,2,A1B2C3,90,0,31.4,1.5,1*"))
         self.assertTrue(pflau.endswith("\r\n"))
         self.assertTrue(pflaa.endswith("\r\n"))
+
+    def test_pflau_reports_the_highest_alarm_contact_as_aircraft_alarm(self):
+        traffic = (
+            TrafficContact(
+                contact_id="NEAREST",
+                relative_north_m=50.0,
+                relative_east_m=0.0,
+                relative_altitude_m=0.0,
+                track_deg=0.0,
+                climb_ms=0.0,
+                alarm_level=0,
+                aircraft_id="111111",
+            ),
+            TrafficContact(
+                contact_id="THREAT",
+                relative_north_m=0.0,
+                relative_east_m=500.0,
+                relative_altitude_m=20.0,
+                track_deg=180.0,
+                climb_ms=0.0,
+                alarm_level=3,
+                aircraft_id="222222",
+            ),
+        )
+
+        pflau = build_pflau(traffic)
+
+        self.assertTrue(pflau.startswith("$PFLAU,2,1,2,1,3,90,2,20,500,222222*"))
 
 
 if __name__ == "__main__":
