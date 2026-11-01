@@ -15,6 +15,16 @@ _To be filled as durable knowledge is discovered._
 
 ## Online Sessions On Anton
 
+- The public FLARM card uses `generate-collision-traffic` instead of a persistent
+  collision-course checkbox. The browser sends a zero-contact reset, waits long
+  enough for a clear FLARM frame, sends a reset collision contact for ten
+  seconds, then restores normal traffic with another reset. This gives clients
+  an alarm-clear interval and makes every button press a distinct event.
+  The collision-only bearing (clockwise from north), initial horizontal distance,
+  and relative altitude pass through `online.py`'s control allowlist, the runtime
+  traffic config, and `TrafficGenerator` contact 0. Normal traffic requests omit
+  these fields; omitted API values retain the legacy randomized collision path.
+
 - Public entrypoint: `https://api.koioslabs.pl/simulator/`; service owner
   `online.py`, UI `online_frontend/`, operations `deploy/README.md`.
 - One managed process holds up to 50 independent `OnlineSession` objects. Each

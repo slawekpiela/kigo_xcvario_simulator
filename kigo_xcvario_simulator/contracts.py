@@ -65,6 +65,9 @@ class TrafficConfig:
     enabled: bool = True
     contact_count: int = 0
     collision_course: bool = False
+    collision_bearing_deg: float | None = None
+    collision_distance_m: float | None = None
+    collision_relative_altitude_m: float | None = None
     motion_mode: str = TRAFFIC_MOTION_ORBIT
     circling_radius_min_m: float = TRAFFIC_CIRCLING_RADIUS_MIN_M
     circling_radius_max_m: float = TRAFFIC_CIRCLING_RADIUS_MAX_M

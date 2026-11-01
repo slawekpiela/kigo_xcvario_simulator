@@ -2,6 +2,7 @@ import concurrent.futures
 from dataclasses import replace
 import http.client
 import json
+import math
 from pathlib import Path
 import socket
 import threading
@@ -164,6 +165,32 @@ class OnlineTests(unittest.TestCase):
         self.create("charlie")
         self.assertEqual(self.post("session", {"application_id": "delta", "panel_client": PANEL_A})[0], 503)
 
+    def test_collision_parameters_reach_runtime_and_reject_out_of_range_values(self):
+        self.create("alpha")
+        self.control("alpha", "traffic", {
+            "enabled": True, "contact_count": 1, "collision_course": True,
+            "collision_bearing_deg": 315, "collision_distance_m": 800,
+            "collision_relative_altitude_m": -120, "reset": True,
+        })
+        config = self.registry.sessions["alpha"].runtime.get_runtime_metadata()["traffic_config"]
+        self.assertEqual(config["collision_bearing_deg"], 315)
+        self.assertEqual(config["collision_distance_m"], 800)
+        self.assertEqual(config["collision_relative_altitude_m"], -120)
+        self.control("alpha", "manual-mode", {"phase": "straight", "speed_kmh": 90})
+        self.control("alpha", "start")
+        contact = self.registry.sessions["alpha"].runtime.orchestrator.tick(0.1).traffic[0]
+        self.assertAlmostEqual(math.degrees(math.atan2(contact.relative_east_m,
+                                                        contact.relative_north_m)) % 360, 315)
+        self.assertAlmostEqual(math.hypot(contact.relative_north_m, contact.relative_east_m), 800, delta=80)
+        self.assertEqual(contact.relative_altitude_m, -120)
+        for key, value in (("collision_bearing_deg", 361), ("collision_distance_m", 0),
+                           ("collision_relative_altitude_m", 3001)):
+            status, _ = self.post("control", {
+                "application_id": "alpha", "panel_client": PANEL_A,
+                "action": "traffic", "parameters": {"collision_course": True, key: value},
+            })
+            self.assertEqual(status, 400)
+
     def test_exchange_retry_sequence_validation_and_expiry(self):
         session = self.create("alpha")
         self.control("alpha", "manual-mode", {"phase": "straight", "speed_kmh": 100})
@@ -207,6 +234,7 @@ class OnlineTests(unittest.TestCase):
 
     def test_frontend_closes_session_when_its_page_is_closed(self):
         frontend = Path("kigo_xcvario_simulator/online_frontend/app.js").read_text()
+        index = Path("kigo_xcvario_simulator/online_frontend/index.html").read_text()
         style = Path("kigo_xcvario_simulator/online_frontend/style.css").read_text()
         self.assertIn('navigator.sendBeacon("/simulator/api/close"', frontend)
         self.assertIn('sessionStorage.getItem(storageKey)', frontend)
@@ -228,6 +256,23 @@ class OnlineTests(unittest.TestCase):
         self.assertIn('ownship.phase === "circling_left" || ownship.phase === "circling_right"', frontend)
         self.assertIn('parameters.baro_altitude_m = ownship.gps_altitude_m;', frontend)
         self.assertIn('form.elements.baro_altitude_m.value = Math.round(ownship.gps_altitude_m);', frontend)
+        self.assertNotIn('name="collision_course"', index)
+        self.assertIn('id="generate-collision-traffic"', index)
+        for field in ("collision-bearing", "collision-distance", "collision-relative-altitude"):
+            self.assertIn(f'id="{field}"', index)
+        self.assertIn("collision_bearing_deg: Number(", frontend)
+        self.assertIn("collision_distance_m: Number(", frontend)
+        self.assertIn("collision_relative_altitude_m: Number(", frontend)
+        self.assertIn('data-i18n="generateCollisionTraffic"', index)
+        self.assertIn('generateCollisionTraffic:"Generate collision traffic"', frontend)
+        self.assertIn("async function generateCollisionTraffic(form)", frontend)
+        self.assertIn('await control("traffic", {...normalTraffic, enabled: false, contact_count: 0});', frontend)
+        self.assertIn("await delay(COLLISION_CLEAR_MS);", frontend)
+        self.assertIn("collision_course: true", frontend)
+        self.assertIn("const COLLISION_EVENT_MS = 10000;", frontend)
+        self.assertIn("await delay(COLLISION_EVENT_MS);", frontend)
+        self.assertIn('await control("traffic", normalTraffic);', frontend)
+        self.assertIn("if (form.reportValidity()) run(() => generateCollisionTraffic(form));", frontend)
 
     def test_failed_connection_retry_does_not_duplicate_arbitrary_binary_writes(self):
         peer, client = socket.socketpair()

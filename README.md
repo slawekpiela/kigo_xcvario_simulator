@@ -32,6 +32,16 @@ page ends its session immediately, including when the page is shown in the
 SIM FLARM expires after 5 minutes. After either event, open/start it again in the panel.
 If all 50 session slots are occupied, the panel asks you to try later.
 
+The FLARM card uses **Generate collision traffic** as a one-shot test action.
+Each press clears the previous FLARM contact state, emits collision traffic for
+ten seconds, then restores the configured normal traffic. The clear interval
+re-arms collision handling so the next press produces a separate event.
+Set the collision contact's **bearing** clockwise from north (0–360°), initial
+**horizontal distance** (100–30000 m), and **altitude relative to the glider**
+(-3000 to 3000 m; positive is above) before pressing the button. These fields
+affect only the generated collision contact; **Set FLARM traffic** keeps the
+normal traffic settings.
+
 The panel creates a session only when it is opened or after the backend reports
 that the previous session expired. One source IP can own at most two active
 sessions, and one Application ID can be active from at most two source IPs seen

@@ -233,12 +233,21 @@ class ScenarioOrchestrator:
         motion_mode: str = "orbit",
         circling_radius_min_m: float | None = None,
         circling_radius_max_m: float | None = None,
+        collision_bearing_deg: float | None = None,
+        collision_distance_m: float | None = None,
+        collision_relative_altitude_m: float | None = None,
         reset_traffic: bool = False,
         traffic_anchor_position: HomePosition | None = None,
         clear_traffic_anchor: bool = False,
     ) -> SimulationSnapshot:
         if contact_count < 0:
             raise ValueError("contact_count must be >= 0.")
+        if collision_bearing_deg is not None and (not math.isfinite(collision_bearing_deg) or not 0 <= collision_bearing_deg <= 360):
+            raise ValueError("collision_bearing_deg must be between 0 and 360.")
+        if collision_distance_m is not None and (not math.isfinite(collision_distance_m) or not 100 <= collision_distance_m <= 30000):
+            raise ValueError("collision_distance_m must be between 100 and 30000.")
+        if collision_relative_altitude_m is not None and (not math.isfinite(collision_relative_altitude_m) or not -3000 <= collision_relative_altitude_m <= 3000):
+            raise ValueError("collision_relative_altitude_m must be between -3000 and 3000.")
         circling_radius_min_m, circling_radius_max_m = normalize_traffic_circling_radius_range(
             circling_radius_min_m,
             circling_radius_max_m,
@@ -248,6 +257,9 @@ class ScenarioOrchestrator:
                 enabled=bool(enabled),
                 contact_count=int(contact_count),
                 collision_course=bool(collision_course),
+                collision_bearing_deg=collision_bearing_deg,
+                collision_distance_m=collision_distance_m,
+                collision_relative_altitude_m=collision_relative_altitude_m,
                 motion_mode=normalize_traffic_motion_mode(motion_mode),
                 circling_radius_min_m=circling_radius_min_m,
                 circling_radius_max_m=circling_radius_max_m,
@@ -348,6 +360,9 @@ class ScenarioOrchestrator:
                 anchor=self._traffic_anchor_ownship(),
                 contact_count=self._traffic_config.contact_count,
                 collision_course=self._traffic_config.collision_course,
+                collision_bearing_deg=self._traffic_config.collision_bearing_deg,
+                collision_distance_m=self._traffic_config.collision_distance_m,
+                collision_relative_altitude_m=self._traffic_config.collision_relative_altitude_m,
                 motion_mode=self._traffic_config.motion_mode,
                 circling_radius_min_m=self._traffic_config.circling_radius_min_m,
                 circling_radius_max_m=self._traffic_config.circling_radius_max_m,

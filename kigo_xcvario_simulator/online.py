@@ -42,7 +42,8 @@ PARAMETERS = {
     "preset": ("preset_id", "seed", "autostart"),
     "manual-mode": ("phase", "speed_kmh", "heading_deg", "baro_altitude_m", "turn_radius_m",
                     "climb_min_ms", "climb_max_ms", "on_ground"),
-    "traffic": ("enabled", "contact_count", "collision_course", "motion_mode", "reset"),
+    "traffic": ("enabled", "contact_count", "collision_course", "collision_bearing_deg",
+                "collision_distance_m", "collision_relative_altitude_m", "motion_mode", "reset"),
     "wind": ("direction_deg", "speed_kmh"), "oat": ("oat_c",),
     "altimeter": ("qnh_hpa",), "start-airport": ("icao",),
 }
@@ -412,6 +413,8 @@ class OnlineHandler(BaseHTTPRequestHandler):
                 raise ApiError(400, "Parameter too long.")
         bounds = {"contact_count": (0, 100), "speed_kmh": (0, 400), "heading_deg": (0, 360),
                   "direction_deg": (0, 360), "baro_altitude_m": (-500, 15000),
+                  "collision_bearing_deg": (0, 360), "collision_distance_m": (100, 30000),
+                  "collision_relative_altitude_m": (-3000, 3000),
                   "qnh_hpa": (800, 1100), "oat_c": (-80, 60), "turn_radius_m": (30, 5000),
                   "climb_min_ms": (-30, 30), "climb_max_ms": (-30, 30), "seed": (0, 2**32 - 1)}
         for key, (low, high) in bounds.items():

@@ -105,6 +105,9 @@ class TrafficGenerator:
         anchor: OwnshipState | None = None,
         contact_count: int,
         collision_course: bool = False,
+        collision_bearing_deg: float | None = None,
+        collision_distance_m: float | None = None,
+        collision_relative_altitude_m: float | None = None,
         motion_mode: str = TRAFFIC_MOTION_ORBIT,
         circling_radius_min_m: float | None = TRAFFIC_CIRCLING_RADIUS_MIN_M,
         circling_radius_max_m: float | None = TRAFFIC_CIRCLING_RADIUS_MAX_M,
@@ -134,6 +137,9 @@ class TrafficGenerator:
                 index,
                 dt_s=dt_s,
                 collision_course=collision_course,
+                collision_bearing_deg=collision_bearing_deg,
+                collision_distance_m=collision_distance_m,
+                collision_relative_altitude_m=collision_relative_altitude_m,
                 motion_mode=resolved_motion_mode,
                 circling_radius_min_m=circling_radius_min_m,
                 circling_radius_max_m=circling_radius_max_m,
@@ -150,12 +156,18 @@ class TrafficGenerator:
         *,
         dt_s: float,
         collision_course: bool,
+        collision_bearing_deg: float | None,
+        collision_distance_m: float | None,
+        collision_relative_altitude_m: float | None,
         motion_mode: str,
         circling_radius_min_m: float,
         circling_radius_max_m: float,
     ) -> TrafficContact:
         if collision_course and index == 0:
-            return self._build_collision_contact(ownship, index)
+            return self._build_collision_contact(
+                ownship, index, collision_bearing_deg, collision_distance_m,
+                collision_relative_altitude_m,
+            )
 
         if motion_mode == TRAFFIC_MOTION_STRAIGHT:
             return self._build_straight_contact(ownship, index)
@@ -252,17 +264,26 @@ class TrafficGenerator:
             alarm_level=self._alarm_level(relative_north_m, relative_east_m, relative_altitude_m),
         )
 
-    def _build_collision_contact(self, ownship: OwnshipState, index: int) -> TrafficContact:
-        ownship_heading_deg = normalize_heading_deg(ownship.track_deg)
+    def _build_collision_contact(
+        self, ownship: OwnshipState, index: int,
+        collision_bearing_deg: float | None,
+        collision_distance_m: float | None,
+        collision_relative_altitude_m: float | None,
+    ) -> TrafficContact:
+        ownship_heading_deg = normalize_heading_deg(
+            ownship.track_deg if collision_bearing_deg is None else collision_bearing_deg
+        )
         ownship_heading_rad = math.radians(ownship_heading_deg)
         right_heading_rad = math.radians(normalize_heading_deg(ownship_heading_deg + 90.0))
 
         cycle_elapsed_s = self._collision_cycle_elapsed_s()
-        initial_distance_m = COLLISION_INITIAL_DISTANCE_M + self._fraction(index, "collision_distance") * 650.0
+        initial_distance_m = (COLLISION_INITIAL_DISTANCE_M + self._fraction(index, "collision_distance") * 650.0
+                              if collision_distance_m is None else collision_distance_m)
         traffic_speed_kmh = 85.0 + self._fraction(index, "collision_speed") * 35.0
         closure_speed_ms = max(15.0, ownship.speed_kmh / 3.6) + traffic_speed_kmh / 3.6
         along_track_m = initial_distance_m - cycle_elapsed_s * closure_speed_ms
-        lateral_offset_m = -20.0 + self._fraction(index, "collision_lateral") * 40.0
+        lateral_offset_m = (-20.0 + self._fraction(index, "collision_lateral") * 40.0
+                            if collision_bearing_deg is None else 0.0)
 
         relative_north_m = math.cos(ownship_heading_rad) * along_track_m + math.cos(right_heading_rad) * lateral_offset_m
         relative_east_m = math.sin(ownship_heading_rad) * along_track_m + math.sin(right_heading_rad) * lateral_offset_m
@@ -275,7 +296,10 @@ class TrafficGenerator:
             interpolation_ticks=3,
         ).value_at(self._tick_index)
 
-        relative_altitude_m = (-35.0 + self._fraction(index, "collision_altitude") * 70.0) + climb_ms * 3.0
+        relative_altitude_m = ((-35.0 + self._fraction(index, "collision_altitude") * 70.0) + climb_ms * 3.0
+                               if collision_relative_altitude_m is None else collision_relative_altitude_m)
+        if collision_relative_altitude_m is not None:
+            climb_ms = 0.0
         separation_m = math.hypot(along_track_m, lateral_offset_m)
         if separation_m < 250.0 and abs(relative_altitude_m) < 60.0:
             alarm_level = 3

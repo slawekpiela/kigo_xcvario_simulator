@@ -90,6 +90,26 @@ class TrafficGeneratorTests(unittest.TestCase):
         self.assertEqual(first[0].track_deg, 270.0)
         self.assertTrue(first[0].aircraft_id)
 
+    def test_collision_contact_uses_requested_bearing_distance_and_relative_altitude(self):
+        generator = TrafficGenerator(seed=33)
+
+        first = generator.step(
+            _ownship(track_deg=90), 0.0, contact_count=1, collision_course=True,
+            collision_bearing_deg=0, collision_distance_m=1000,
+            collision_relative_altitude_m=-75,
+        )[0]
+        second = generator.step(
+            _ownship(track_deg=90), 1.0, contact_count=1, collision_course=True,
+            collision_bearing_deg=0, collision_distance_m=1000,
+            collision_relative_altitude_m=-75,
+        )[0]
+
+        self.assertAlmostEqual(first.relative_north_m, 1000)
+        self.assertAlmostEqual(first.relative_east_m, 0)
+        self.assertEqual(first.relative_altitude_m, -75)
+        self.assertEqual(first.track_deg, 180)
+        self.assertLess(second.relative_north_m, first.relative_north_m)
+
     def test_contacts_use_configured_flarm_aircraft_metadata(self):
         generator = TrafficGenerator(seed=33)
 
