@@ -34,7 +34,7 @@ If all 50 session slots are occupied, the panel asks you to try later.
 
 The FLARM card uses **Generate collision traffic** as a one-shot test action.
 Each press clears the previous FLARM contact state, emits collision traffic for
-ten seconds, then restores the configured normal traffic. The clear interval
+three seconds, then restores the configured normal traffic. The clear interval
 re-arms collision handling so the next press produces a separate event.
 Set the collision contact's **bearing** clockwise from north (0–360°), initial
 **horizontal distance** (100–30000 m), and **altitude relative to the glider**

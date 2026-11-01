@@ -70,7 +70,7 @@ const idInput = document.getElementById("application-id");
 const statusLine = document.getElementById("status");
 let activeID = "", activeSessionID = "", busy = false, timer = null;
 const COLLISION_CLEAR_MS = 1100;
-const COLLISION_EVENT_MS = 10000;
+const COLLISION_EVENT_MS = 3000;
 idInput.value = localStorage.getItem("kigo.sim.applicationId") || "";
 
 function createPanelClient() {

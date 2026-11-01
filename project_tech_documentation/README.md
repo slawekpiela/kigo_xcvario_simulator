@@ -17,7 +17,7 @@ _To be filled as durable knowledge is discovered._
 
 - The public FLARM card uses `generate-collision-traffic` instead of a persistent
   collision-course checkbox. The browser sends a zero-contact reset, waits long
-  enough for a clear FLARM frame, sends a reset collision contact for ten
+  enough for a clear FLARM frame, sends a reset collision contact for three
   seconds, then restores normal traffic with another reset. This gives clients
   an alarm-clear interval and makes every button press a distinct event.
   The collision-only bearing (clockwise from north), initial horizontal distance,

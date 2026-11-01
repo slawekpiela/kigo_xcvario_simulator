@@ -269,7 +269,7 @@ class OnlineTests(unittest.TestCase):
         self.assertIn('await control("traffic", {...normalTraffic, enabled: false, contact_count: 0});', frontend)
         self.assertIn("await delay(COLLISION_CLEAR_MS);", frontend)
         self.assertIn("collision_course: true", frontend)
-        self.assertIn("const COLLISION_EVENT_MS = 10000;", frontend)
+        self.assertIn("const COLLISION_EVENT_MS = 3000;", frontend)
         self.assertIn("await delay(COLLISION_EVENT_MS);", frontend)
         self.assertIn('await control("traffic", normalTraffic);', frontend)
         self.assertIn("if (form.reportValidity()) run(() => generateCollisionTraffic(form));", frontend)
