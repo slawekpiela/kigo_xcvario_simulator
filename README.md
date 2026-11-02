@@ -23,12 +23,14 @@ continues in the GPS/barometric telemetry sent to Kigo instead of reverting to
 the previous value in the altitude field.
 
 To replay a recorded route, choose an `.igc` file in **Odtwórz lot** and press
-**Odtwórz lot**. The ownship follows the IGC fixes at the recorded timing;
+**Odtwórz lot**. Set playback speed from 1× to 100× before starting, or change
+it while the route plays with **Ustaw prędkość**. The ownship follows the IGC fixes at the selected timing;
 position, GPS altitude, ground speed, course and vario are interpolated between
 fixes. **Pauza** and **Wznów** control playback. The final position remains
 visible when the route ends. Loading another IGC starts it from the beginning;
-**Zastosuj i Start** returns to manual flight. Files are limited to 2 MB and
-20,000 valid fixes. FLARM traffic keeps its current configuration and continues
+**Zastosuj i Start** returns to manual flight. Files are limited to 3 MB and
+40,000 valid fixes. File or upload errors appear directly under the replay
+button. FLARM traffic keeps its current configuration and continues
 to be generated independently of the replayed route.
 
 Each different ID has its own flight. One active browser panel reserves an ID;

@@ -17,7 +17,11 @@ _To be filled as durable knowledge is discovered._
 
 - `online_frontend/` uploads an IGC file through panel-owned `/simulator/api/replay`.
   `replay.parse_igc()` accepts valid `B` fixes, handles UTC midnight, bounds the
-  file to 2 MB / 20,000 fixes and retains the track only in session memory.
+  file to 3 MB / 40,000 fixes and retains the track only in session memory.
+  The previous 2 MB / 20,000-fix limits rejected a 2,005,452-byte,
+  28,257-fix IGC without showing the client-side error beside the replay
+  button; the panel now shows errors there and accepts that flight. Replay
+  speed is adjustable from 1× to 100× through the panel-owned control action.
   `ScenarioOrchestrator` interpolates ownship position and altitude at recorded
   1× time while `TelemetryScheduler` keeps publishing the existing device
   streams. Pause/resume/reset operate on the track; manual mode, a preset or

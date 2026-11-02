@@ -34,14 +34,15 @@ from .flarm_passthrough import FlarmPassthroughSimulator
 
 PREFIX = "/simulator"
 MAX_BODY = 40000
-MAX_REPLAY_BODY = 2_750_000
+MAX_REPLAY_BODY = 4_050_000
 MAX_BYTES = 16384
 ID_PATTERN = re.compile(r"[A-Za-z0-9_.-]{1,64}\Z")
 TOKEN_PATTERN = re.compile(r"[a-f0-9]{32}\Z")
 CONTROL_PATHS = frozenset(("start", "pause", "reset", "preset", "manual-mode", "traffic",
-                           "wind", "oat", "altimeter", "start-airport"))
+                           "wind", "oat", "altimeter", "start-airport", "replay-speed"))
 PARAMETERS = {
     "state": (), "start": (), "pause": (), "reset": (),
+    "replay-speed": ("speed",),
     "preset": ("preset_id", "seed", "autostart"),
     "manual-mode": ("phase", "speed_kmh", "heading_deg", "baro_altitude_m", "turn_radius_m",
                     "climb_min_ms", "climb_max_ms", "on_ground"),
@@ -389,9 +390,12 @@ class OnlineHandler(BaseHTTPRequestHandler):
                 encoded = payload.get("igc")
                 if not isinstance(encoded, str):
                     raise ApiError(400, "IGC file required.")
+                speed = payload.get("speed", 1)
+                if type(speed) is not int or not 1 <= speed <= 100:
+                    raise ApiError(400, "Replay speed must be between 1 and 100.")
                 try:
                     data = base64.b64decode(encoded, validate=True)
-                    session.runtime.load_replay_igc(data)
+                    session.runtime.load_replay_igc(data, speed=speed)
                 except (binascii.Error, ValueError) as exc:
                     raise ApiError(400, str(exc)) from exc
                 self.reply(200, {"replay": session.runtime.get_replay_status()})
@@ -438,6 +442,16 @@ class OnlineHandler(BaseHTTPRequestHandler):
                 raise ApiError(400, "Parameter outside supported range: " + key)
         if params.get("climb_min_ms", -30) > params.get("climb_max_ms", 30):
             raise ApiError(400, "Minimum climb exceeds maximum.")
+        if action == "replay-speed":
+            speed = params.get("speed")
+            if type(speed) is not int or not 1 <= speed <= 100:
+                raise ApiError(400, "Replay speed must be between 1 and 100.")
+            try:
+                session.runtime.set_replay_speed(speed)
+            except ValueError as exc:
+                raise ApiError(409, str(exc)) from exc
+            self.reply(200, {"replay": session.runtime.get_replay_status()})
+            return
         connection = http.client.HTTPConnection("127.0.0.1", session.api.bound_port, timeout=10)
         try:
             connection.request("GET" if action == "state" else "POST", "/api/v1/simulation/" + action,

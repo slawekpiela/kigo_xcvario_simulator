@@ -15,6 +15,19 @@ def igc(*records):
 
 
 class ReplayTests(unittest.TestCase):
+    def test_accepts_flight_above_old_file_and_fix_limits(self):
+        fixes = []
+        for second in range(28_257):
+            hour, remainder = divmod(second, 3600)
+            minute, second_of_minute = divmod(remainder, 60)
+            fixes.append(f"B{hour:02d}{minute:02d}{second_of_minute:02d}5100000N01900000EA0100001000")
+        data = igc(*fixes)
+        data += b"L" + b"x" * (2_005_452 - len(data) - 1)
+        track = parse_igc(data)
+        self.assertEqual(len(track.fixes), 28_257)
+        with self.assertRaisesRegex(ValueError, "maximum 3 MB"):
+            parse_igc(b"x" * 3_000_001)
+
     def test_igc_interpolation_and_midnight(self):
         track = parse_igc(igc(
             "B2359585100000N01900000EA0100001000",

@@ -107,6 +107,31 @@ class OnlineTests(unittest.TestCase):
         self.assertEqual(self.post("replay", payload)[0], 400)
         self.assertEqual(self.control("alpha", "state")["replay"]["fix_count"], 2)
 
+    def test_replay_emits_moving_gps_to_connected_vario(self):
+        self.create("alpha")
+        client = "c" * 32
+        self.assertEqual(self.exchange("alpha", "vario", client=client, sequence=1)[0], 200)
+        encoded = base64.b64encode(b"B1200005100000N01900000EA0100001000\n"
+                                   b"B1200205100120N01900000EA0102001020\n").decode()
+        payload = {"application_id": "alpha", "panel_client": PANEL_A, "igc": encoded, "speed": 2}
+        status, data = self.post("replay", payload)
+        self.assertEqual(status, 200, data)
+        self.assertEqual(self.control("alpha", "state")["snapshot"]["runtime_state"], "running")
+        rmc = []
+        for sequence in range(2, 14):
+            status, data = self.exchange("alpha", "vario", client=client, sequence=sequence)
+            self.assertEqual(status, 200, data)
+            wire = bytes.fromhex(data.split(b"\n", 1)[1].decode()).decode(errors="replace")
+            rmc.extend(line.split(",") for line in wire.splitlines() if line.startswith("$GPRMC"))
+            time.sleep(0.1)
+        self.assertGreater(len(rmc), 1)
+        self.assertGreater(float(rmc[-1][7]), 1)
+        self.assertNotEqual(rmc[0][3], rmc[-1][3])
+        self.assertEqual(self.control("alpha", "state")["replay"]["speed"], 2)
+        self.control("alpha", "replay-speed", {"speed": 10})
+        self.assertEqual(self.control("alpha", "state")["replay"]["speed"], 10)
+        self.assertEqual(self.post("replay", {**payload, "speed": 101})[0], 400)
+
     def test_active_application_id_rejects_a_different_panel(self):
         status, data = self.post("session", {"application_id": "alpha", "panel_client": PANEL_A})
         self.assertEqual(status, 200, data)

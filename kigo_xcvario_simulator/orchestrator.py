@@ -91,6 +91,7 @@ class ScenarioOrchestrator:
         self._manual_segment_elapsed_s = 0.0
         self._manual_directive = None
         self._replay: ReplayTrack | None = None
+        self._replay_speed = 1
         self._sim_time_s = 0.0
         self._ownship = self._flight_model.reset()
 
@@ -316,7 +317,7 @@ class ScenarioOrchestrator:
                 return self._snapshot()
 
             if self._replay is not None:
-                self._sim_time_s = min(self._sim_time_s + dt_s, self._replay.duration_s)
+                self._sim_time_s = min(self._sim_time_s + dt_s * self._replay_speed, self._replay.duration_s)
                 self._ownship = self._flight_model.replay_state(self._replay.sample(self._sim_time_s), self._sim_time_s)
                 self._update_traffic(dt_s)
                 if self._sim_time_s >= self._replay.duration_s:
@@ -366,9 +367,12 @@ class ScenarioOrchestrator:
         with self._lock:
             return self._manual_directive is not None or self._manual_plan is not None
 
-    def load_replay(self, track: ReplayTrack) -> SimulationSnapshot:
+    def load_replay(self, track: ReplayTrack, *, speed: int = 1) -> SimulationSnapshot:
+        if type(speed) is not int or not 1 <= speed <= 100:
+            raise ValueError("Replay speed must be between 1 and 100.")
         with self._lock:
             self._replay = track
+            self._replay_speed = speed
             self._preset_plan = None
             self._manual_plan = None
             self._manual_directive = None
@@ -377,12 +381,21 @@ class ScenarioOrchestrator:
             self._runtime_state = RuntimeState.RUNNING
             return self._snapshot()
 
+    def set_replay_speed(self, speed: int) -> SimulationSnapshot:
+        if type(speed) is not int or not 1 <= speed <= 100:
+            raise ValueError("Replay speed must be between 1 and 100.")
+        with self._lock:
+            if self._replay is None:
+                raise ValueError("Load an IGC flight first.")
+            self._replay_speed = speed
+            return self._snapshot()
+
     def get_replay_status(self) -> dict[str, float | int] | None:
         with self._lock:
             if self._replay is None:
                 return None
             return {"elapsed_s": self._sim_time_s, "duration_s": self._replay.duration_s,
-                    "fix_count": len(self._replay.fixes)}
+                    "fix_count": len(self._replay.fixes), "speed": self._replay_speed}
 
     def _update_traffic(self, dt_s: float) -> None:
         if not self._traffic_config.enabled or self._traffic_config.contact_count == 0:

@@ -221,8 +221,11 @@ class SimulatorRuntimeSession:
     def load_preset(self, request: PresetRequest, *, overrides: dict[str, object] | None = None) -> SimulationSnapshot:
         return self.orchestrator.load_preset(request, overrides=overrides)
 
-    def load_replay_igc(self, data: bytes) -> SimulationSnapshot:
-        return self.orchestrator.load_replay(parse_igc(data))
+    def load_replay_igc(self, data: bytes, *, speed: int = 1) -> SimulationSnapshot:
+        return self.orchestrator.load_replay(parse_igc(data), speed=speed)
+
+    def set_replay_speed(self, speed: int) -> SimulationSnapshot:
+        return self.orchestrator.set_replay_speed(speed)
 
     def get_replay_status(self) -> dict[str, float | int] | None:
         return self.orchestrator.get_replay_status()

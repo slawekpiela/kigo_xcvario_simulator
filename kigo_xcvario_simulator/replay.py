@@ -9,8 +9,8 @@ import re
 
 from .flight_math import EARTH_RADIUS_M, normalize_heading_deg
 
-MAX_IGC_BYTES = 2_000_000
-MAX_FIXES = 20_000
+MAX_IGC_BYTES = 3_000_000
+MAX_FIXES = 40_000
 FIX = re.compile(r"^B(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{3})([NS])(\d{3})(\d{2})(\d{3})([EW])([AV])(\d{5})(\d{5})")
 
 
@@ -63,7 +63,7 @@ class ReplayTrack:
 
 def parse_igc(data: bytes) -> ReplayTrack:
     if len(data) > MAX_IGC_BYTES:
-        raise ValueError("IGC file is too large (maximum 2 MB).")
+        raise ValueError("IGC file is too large (maximum 3 MB).")
     try:
         lines = data.decode("ascii").splitlines()
     except UnicodeDecodeError as exc:
@@ -101,7 +101,7 @@ def parse_igc(data: bytes) -> ReplayTrack:
             longitude = -longitude
         fixes.append(Fix(elapsed, latitude, longitude, float(int(match[14]))))
         if len(fixes) > MAX_FIXES:
-            raise ValueError("IGC has too many fixes (maximum 20,000).")
+            raise ValueError("IGC has too many fixes (maximum 40,000).")
     if len(fixes) < 2:
         raise ValueError("IGC needs at least two valid fixes at different times.")
     return ReplayTrack(tuple(fixes))
