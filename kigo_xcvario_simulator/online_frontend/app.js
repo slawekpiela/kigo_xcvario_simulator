@@ -33,6 +33,13 @@ Object.assign(copy.fr, {rateLimited:"La limite de connexions du simulateur pour 
 Object.assign(copy.es, {rateLimited:"Se alcanzó el límite de conexiones del simulador para esta red o Application ID. Espera un momento o usa otra ID."});
 Object.assign(copy.cs, {rateLimited:"Byl dosažen limit připojení simulátoru pro tuto síť nebo Application ID. Chvíli počkejte nebo použijte jiné ID."});
 Object.assign(copy.sk, {rateLimited:"Bol dosiahnutý limit pripojení simulátora pre túto sieť alebo Application ID. Chvíľu počkajte alebo použite iné ID."});
+Object.assign(copy.en, {replayTitle:"Replay a flight",igcFile:"IGC flight file (up to 2 MB, 20,000 fixes)",replayHint:"The recorded route drives your glider at its original speed. Pause and Resume work during replay.",replayFlight:"Replay flight",replayProgress:"Replaying flight",replayDone:"Flight replay finished",invalidIgc:"Choose an IGC file up to 2 MB."});
+Object.assign(copy.pl, {replayTitle:"Odtwórz lot",igcFile:"Plik lotu IGC (do 2 MB, 20 000 punktów)",replayHint:"Trasa steruje szybowcem w czasie rzeczywistym. Pauza i Wznów działają podczas odtwarzania.",replayFlight:"Odtwórz lot",replayProgress:"Odtwarzanie lotu",replayDone:"Odtwarzanie zakończone",invalidIgc:"Wybierz plik IGC o rozmiarze do 2 MB."});
+Object.assign(copy.de, {replayTitle:"Flug abspielen",igcFile:"IGC-Flugdatei (bis 2 MB, 20.000 Punkte)",replayHint:"Die aufgezeichnete Route steuert das Segelflugzeug in Echtzeit. Pause und Fortsetzen funktionieren auch hier.",replayFlight:"Flug abspielen",replayProgress:"Flug wird abgespielt",replayDone:"Flug beendet",invalidIgc:"Wähle eine IGC-Datei bis 2 MB."});
+Object.assign(copy.fr, {replayTitle:"Rejouer un vol",igcFile:"Fichier IGC (2 Mo, 20 000 points maximum)",replayHint:"La trace pilote le planeur en temps réel. Pause et Reprendre fonctionnent pendant la lecture.",replayFlight:"Rejouer le vol",replayProgress:"Lecture du vol",replayDone:"Lecture terminée",invalidIgc:"Choisissez un fichier IGC de 2 Mo maximum."});
+Object.assign(copy.es, {replayTitle:"Reproducir vuelo",igcFile:"Archivo IGC (máximo 2 MB y 20.000 puntos)",replayHint:"La ruta grabada mueve el planeador en tiempo real. Pausa y Reanudar funcionan durante la reproducción.",replayFlight:"Reproducir vuelo",replayProgress:"Reproduciendo vuelo",replayDone:"Vuelo terminado",invalidIgc:"Elige un archivo IGC de hasta 2 MB."});
+Object.assign(copy.cs, {replayTitle:"Přehrát let",igcFile:"Soubor IGC (max. 2 MB, 20 000 bodů)",replayHint:"Zaznamenaná trasa řídí kluzák v reálném čase. Pozastavení a pokračování funguje i při přehrávání.",replayFlight:"Přehrát let",replayProgress:"Přehrávání letu",replayDone:"Přehrávání dokončeno",invalidIgc:"Vyberte soubor IGC do 2 MB."});
+Object.assign(copy.sk, {replayTitle:"Prehrať let",igcFile:"Súbor IGC (max. 2 MB, 20 000 bodov)",replayHint:"Zaznamenaná trasa riadi vetroň v reálnom čase. Pauza a pokračovanie fungujú aj pri prehrávaní.",replayFlight:"Prehrať let",replayProgress:"Prehrávanie letu",replayDone:"Prehrávanie dokončené",invalidIgc:"Vyberte súbor IGC do 2 MB."});
 const applicationIdHints = {
   en: "To set/retrieve your Application ID go to: CONFIGURATION -> GENERAL -> SERVICE -> APPLICATION ID",
   pl: "Aby ustawić/odczytać swój Application ID, przejdź do: CONFIGURATION -> GENERAL -> SERVICE -> APPLICATION ID",
@@ -94,7 +101,7 @@ function status(text, error = false) {
 
 async function request(path, body, id = activeID) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12000);
+  const timeout = setTimeout(() => controller.abort(), path === "replay" ? 60000 : 12000);
   try {
     const response = await fetch(`/simulator/api/${path}`, {
       method: "POST", headers: {"Content-Type": "application/json"},
@@ -185,7 +192,7 @@ async function generateCollisionTraffic(form) {
 async function refresh() {
   if (!activeID) return;
   const refreshedID = activeID;
-  const {snapshot, devices} = await control("state");
+  const {snapshot, devices, replay} = await control("state");
   if (activeID !== refreshedID) return;
   const own = snapshot.ownship;
   document.getElementById("altitude").textContent = Math.round(own.gps_altitude_m);
@@ -195,7 +202,10 @@ async function refresh() {
   deviceState = devices;
   renderDevices();
   const states = {running: t("running"), paused: t("paused"), stopped: t("stopped")};
-  status(states[snapshot.runtime_state] || t("sessionReady"));
+  if (replay) {
+    const minutes = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
+    status(`${replay.elapsed_s >= replay.duration_s ? t("replayDone") : t("replayProgress")} · ${minutes(replay.elapsed_s)} / ${minutes(replay.duration_s)}${snapshot.runtime_state === "paused" && replay.elapsed_s < replay.duration_s ? ` · ${t("paused")}` : ""}`);
+  } else status(states[snapshot.runtime_state] || t("sessionReady"));
 }
 
 function schedule() {
@@ -254,6 +264,23 @@ document.getElementById("flight").addEventListener("submit", event => {
     }
     await control("manual-mode", parameters);
     await control("start");
+  });
+});
+document.getElementById("replay").addEventListener("submit", event => {
+  event.preventDefault();
+  const file = document.getElementById("replay-file").files[0];
+  if (!file || !/\.igc$/i.test(file.name) || file.size > 2000000) {
+    status(t("invalidIgc"), true);
+    return;
+  }
+  run(async () => {
+    const encoded = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(",", 2)[1]);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+    await request("replay", {igc: encoded});
   });
 });
 for (const [formID, action] of [["wind", "wind"], ["traffic", "traffic"], ["airport", "start-airport"], ["altimeter", "altimeter"]]) {

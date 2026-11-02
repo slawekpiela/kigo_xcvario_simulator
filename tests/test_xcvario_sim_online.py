@@ -1,4 +1,5 @@
 import concurrent.futures
+import base64
 from dataclasses import replace
 import http.client
 import json
@@ -87,6 +88,24 @@ class OnlineTests(unittest.TestCase):
         status, data = self.post("session", {"application_id": "alpha", "panel_client": PANEL_A})
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(data)["session_id"], a.runtime.runtime_config.session_id)
+
+    def test_replay_upload_is_panel_owned_and_leaves_flarm_traffic_config(self):
+        self.create("alpha")
+        self.control("alpha", "traffic", {"enabled": True, "contact_count": 4})
+        encoded = base64.b64encode(b"B1200005100000N01900000EA0100001000\n"
+                                   b"B1200025100120N01900000EA0102001020\n").decode()
+        payload = {"application_id": "alpha", "panel_client": PANEL_B, "igc": encoded}
+        self.assertEqual(self.post("replay", payload)[0], 409)
+        payload["panel_client"] = PANEL_A
+        status, data = self.post("replay", payload)
+        self.assertEqual(status, 200, data)
+        self.assertEqual(json.loads(data)["replay"]["fix_count"], 2)
+        state = self.control("alpha", "state")
+        self.assertEqual(state["replay"]["duration_s"], 2)
+        self.assertEqual(self.registry.sessions["alpha"].runtime.orchestrator.get_traffic_config().contact_count, 4)
+        payload["igc"] = base64.b64encode(b"invalid").decode()
+        self.assertEqual(self.post("replay", payload)[0], 400)
+        self.assertEqual(self.control("alpha", "state")["replay"]["fix_count"], 2)
 
     def test_active_application_id_rejects_a_different_panel(self):
         status, data = self.post("session", {"application_id": "alpha", "panel_client": PANEL_A})

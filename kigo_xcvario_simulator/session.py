@@ -10,6 +10,7 @@ from .config import HomePosition, SimulatorRuntimeConfig, normalize_primary_devi
 from .contracts import ManualModeInput, PresetRequest, SimulationSnapshot
 from .flarm_adapter import FlarmTcpAdapter
 from .orchestrator import ScenarioOrchestrator
+from .replay import parse_igc
 from .scheduler import TelemetryScheduler
 from .state import FlightPhase, RuntimeState
 from .sxhawk_adapter import SxHawkTcpAdapter
@@ -219,6 +220,12 @@ class SimulatorRuntimeSession:
 
     def load_preset(self, request: PresetRequest, *, overrides: dict[str, object] | None = None) -> SimulationSnapshot:
         return self.orchestrator.load_preset(request, overrides=overrides)
+
+    def load_replay_igc(self, data: bytes) -> SimulationSnapshot:
+        return self.orchestrator.load_replay(parse_igc(data))
+
+    def get_replay_status(self) -> dict[str, float | int] | None:
+        return self.orchestrator.get_replay_status()
 
     def activate_on_ground_default(self) -> SimulationSnapshot:
         snapshot = self.orchestrator.get_snapshot()

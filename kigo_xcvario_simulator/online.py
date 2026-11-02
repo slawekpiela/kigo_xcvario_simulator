@@ -8,6 +8,8 @@ Device transport uses bounded HTTPS exchanges, preserving arbitrary wire bytes.
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 from collections import OrderedDict
 from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -32,6 +34,7 @@ from .flarm_passthrough import FlarmPassthroughSimulator
 
 PREFIX = "/simulator"
 MAX_BODY = 40000
+MAX_REPLAY_BODY = 2_750_000
 MAX_BYTES = 16384
 ID_PATTERN = re.compile(r"[A-Za-z0-9_.-]{1,64}\Z")
 TOKEN_PATTERN = re.compile(r"[a-f0-9]{32}\Z")
@@ -348,8 +351,9 @@ class OnlineHandler(BaseHTTPRequestHandler):
                 raise ApiError(403, "Cross-origin request rejected.")
             if self.headers.get("Transfer-Encoding"):
                 raise ApiError(400, "Content-Length required.")
+            path = urlsplit(self.path).path
             length = int(self.headers.get("Content-Length", "0"))
-            if not 0 < length <= MAX_BODY:
+            if not 0 < length <= (MAX_REPLAY_BODY if path == PREFIX + "/api/replay" else MAX_BODY):
                 raise ApiError(413, "Request too large or empty.")
             if self.headers.get_content_type() != "application/json":
                 raise ApiError(415, "JSON required.")
@@ -359,9 +363,8 @@ class OnlineHandler(BaseHTTPRequestHandler):
             payload = json.loads(raw)
             if not isinstance(payload, dict):
                 raise ApiError(400, "JSON object required.")
-            path = urlsplit(self.path).path
             if path not in (PREFIX + "/api/session", PREFIX + "/api/close",
-                            PREFIX + "/api/control", PREFIX + "/api/exchange"):
+                            PREFIX + "/api/control", PREFIX + "/api/exchange", PREFIX + "/api/replay"):
                 raise ApiError(404, "Not found")
             if path.endswith("/close"):
                 closed = self.server.registry.close_session(
@@ -379,6 +382,19 @@ class OnlineHandler(BaseHTTPRequestHandler):
                     payload.get("application_id"), payload.get("panel_client"),
                     peer=self.client_peer())
                 self.control(session, payload)
+            elif path.endswith("/replay"):
+                session = self.server.registry.get_panel(
+                    payload.get("application_id"), payload.get("panel_client"),
+                    peer=self.client_peer())
+                encoded = payload.get("igc")
+                if not isinstance(encoded, str):
+                    raise ApiError(400, "IGC file required.")
+                try:
+                    data = base64.b64decode(encoded, validate=True)
+                    session.runtime.load_replay_igc(data)
+                except (binascii.Error, ValueError) as exc:
+                    raise ApiError(400, str(exc)) from exc
+                self.reply(200, {"replay": session.runtime.get_replay_status()})
             else:
                 session = self.server.registry.get(payload.get("application_id"), self.client_peer())
                 self.exchange(session, payload)
@@ -436,7 +452,8 @@ class OnlineHandler(BaseHTTPRequestHandler):
                     devices = {kind: any(k == kind and now - c.touched < 10
                                         for (k, _), c in session.channels.items())
                                for kind in ("vario", "flarm")}
-                data = json.dumps({"snapshot": snapshot, "devices": devices}).encode()
+                data = json.dumps({"snapshot": snapshot, "devices": devices,
+                                   "replay": session.runtime.get_replay_status()}).encode()
             self.reply(200 if response.status == 204 else response.status, data or b"{}")
         finally:
             connection.close()

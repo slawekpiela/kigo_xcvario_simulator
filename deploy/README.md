@@ -3,6 +3,13 @@
 The service listens only on `127.0.0.1:8010`. Public URL:
 `https://api.koioslabs.pl/simulator/`.
 
+The panel's **Replay flight** action uploads a bounded IGC file to
+`/simulator/api/replay` for the current panel-owned Application ID. The route
+accepts at most 2 MB / 20,000 valid fixes, keeps the track in that session's
+memory, and does not write the file to disk. An active replay follows recorded
+time at 1× speed; pause/resume and the existing FLARM traffic configuration
+continue to work. Restarting the service discards loaded tracks.
+
 Install source (including package data) into `/home/slawek/kigo-simulator-online`.
 No additional Python dependencies are required. Install the supplied user unit
 as `~/.config/systemd/user/kigo-simulator-online.service`, reload the user manager

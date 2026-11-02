@@ -15,6 +15,16 @@ _To be filled as durable knowledge is discovered._
 
 ## Online Sessions On Anton
 
+- `online_frontend/` uploads an IGC file through panel-owned `/simulator/api/replay`.
+  `replay.parse_igc()` accepts valid `B` fixes, handles UTC midnight, bounds the
+  file to 2 MB / 20,000 fixes and retains the track only in session memory.
+  `ScenarioOrchestrator` interpolates ownship position and altitude at recorded
+  1× time while `TelemetryScheduler` keeps publishing the existing device
+  streams. Pause/resume/reset operate on the track; manual mode, a preset or
+  start-airport change cancels it. The existing traffic generator and contact
+  configuration are unchanged. Replay snapshots use zero wind so the NMEA
+  ground-speed/course from the recorded fixes are not shifted a second time.
+
 - The public FLARM card uses `generate-collision-traffic` instead of a persistent
   collision-course checkbox. The browser sends a zero-contact reset, waits long
   enough for a clear FLARM frame, sends a reset collision contact for three

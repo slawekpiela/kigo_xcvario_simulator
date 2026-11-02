@@ -17,6 +17,7 @@ from .contracts import FlightDirective, OwnshipState, WindState
 from .flight_math import advance_heading_deg, advance_position, ground_velocity_from_true_wind, normalize_heading_deg
 from .state import FlightPhase
 from .variation import SeededRangeGenerator
+from .replay import ReplaySample
 
 
 DEFAULT_HOME_TRACK_DEG = 90.0
@@ -110,6 +111,19 @@ class FlightModel:
             track_deg=self._default_track_deg,
             on_ground=True,
             phase=FlightPhase.GLIDER_LAUNCH,
+        )
+
+    def replay_state(self, sample: ReplaySample, elapsed_s: float) -> OwnshipState:
+        self._elapsed_s = elapsed_s
+        return self._build_state(
+            latitude_deg=sample.latitude_deg,
+            longitude_deg=sample.longitude_deg,
+            gps_altitude_m=sample.altitude_m,
+            vertical_speed_ms=sample.climb_ms,
+            speed_kmh=sample.speed_kmh,
+            track_deg=sample.track_deg,
+            on_ground=False,
+            phase=FlightPhase.STRAIGHT,
         )
 
     def step(

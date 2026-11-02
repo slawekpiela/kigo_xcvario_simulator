@@ -19,6 +19,7 @@ from .contracts import (
 )
 from .flight_model import FlightModel
 from .flight_math import normalize_heading_deg
+from .replay import ReplayTrack
 from .presets import (
     DEFAULT_CIRCLING_RADIUS_M,
     DEFAULT_CIRCLING_SPEED_KMH,
@@ -89,6 +90,7 @@ class ScenarioOrchestrator:
         self._manual_segment_index = 0
         self._manual_segment_elapsed_s = 0.0
         self._manual_directive = None
+        self._replay: ReplayTrack | None = None
         self._sim_time_s = 0.0
         self._ownship = self._flight_model.reset()
 
@@ -106,6 +108,11 @@ class ScenarioOrchestrator:
     def reset(self) -> SimulationSnapshot:
         with self._lock:
             current_state = self._runtime_state
+            if self._replay is not None:
+                self._sim_time_s = 0.0
+                self._ownship = self._flight_model.replay_state(self._replay.sample(0.0), 0.0)
+                self._runtime_state = current_state
+                return self._snapshot()
             self._sim_time_s = 0.0
             self._preset_segment_index = 0
             self._preset_segment_elapsed_s = 0.0
@@ -127,6 +134,7 @@ class ScenarioOrchestrator:
         overrides: dict[str, object] | None = None,
     ) -> SimulationSnapshot:
         with self._lock:
+            self._replay = None
             self._seed = request.seed
             self._flight_model.reseed(request.seed)
             self._traffic_generator.reseed(request.seed)
@@ -147,6 +155,7 @@ class ScenarioOrchestrator:
 
     def set_manual_mode(self, manual_input: ManualModeInput) -> SimulationSnapshot:
         with self._lock:
+            self._replay = None
             self._manual_generation += 1
             self._manual_plan = None
             self._manual_segment_index = 0
@@ -176,6 +185,7 @@ class ScenarioOrchestrator:
         heading_deg: float | None = None,
     ) -> SimulationSnapshot:
         with self._lock:
+            self._replay = None
             self._home_position = home_position
             self._traffic_anchor_position = home_position
             self._flight_model.set_home_position(
@@ -305,6 +315,14 @@ class ScenarioOrchestrator:
             if self._runtime_state != RuntimeState.RUNNING or dt_s == 0.0:
                 return self._snapshot()
 
+            if self._replay is not None:
+                self._sim_time_s = min(self._sim_time_s + dt_s, self._replay.duration_s)
+                self._ownship = self._flight_model.replay_state(self._replay.sample(self._sim_time_s), self._sim_time_s)
+                self._update_traffic(dt_s)
+                if self._sim_time_s >= self._replay.duration_s:
+                    self._runtime_state = RuntimeState.PAUSED
+                return self._snapshot()
+
             directive = self._resolve_active_directive()
             if directive is None:
                 return self._snapshot()
@@ -347,6 +365,24 @@ class ScenarioOrchestrator:
     def has_manual_mode(self) -> bool:
         with self._lock:
             return self._manual_directive is not None or self._manual_plan is not None
+
+    def load_replay(self, track: ReplayTrack) -> SimulationSnapshot:
+        with self._lock:
+            self._replay = track
+            self._preset_plan = None
+            self._manual_plan = None
+            self._manual_directive = None
+            self._sim_time_s = 0.0
+            self._ownship = self._flight_model.replay_state(track.sample(0.0), 0.0)
+            self._runtime_state = RuntimeState.RUNNING
+            return self._snapshot()
+
+    def get_replay_status(self) -> dict[str, float | int] | None:
+        with self._lock:
+            if self._replay is None:
+                return None
+            return {"elapsed_s": self._sim_time_s, "duration_s": self._replay.duration_s,
+                    "fix_count": len(self._replay.fixes)}
 
     def _update_traffic(self, dt_s: float) -> None:
         if not self._traffic_config.enabled or self._traffic_config.contact_count == 0:
@@ -583,7 +619,7 @@ class ScenarioOrchestrator:
             runtime_state=self._runtime_state,
             ownship=self._ownship,
             traffic=tuple(self._traffic),
-            wind=self._wind,
+            wind=WindState() if self._replay is not None else self._wind,
             preset_id=self._preset_plan.preset_id if self._preset_plan is not None else None,
             seed=self._seed,
             sim_time_s=self._sim_time_s,
