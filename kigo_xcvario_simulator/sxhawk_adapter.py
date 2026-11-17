@@ -11,7 +11,6 @@ from .xcvario_adapter import (
     DEFAULT_GPS_EVERY_BARO_FRAMES,
     XcvarioTcpAdapter,
     _command_value_text,
-    _ownship_with_wind_adjusted_ground_velocity,
 )
 from .xcvario_polar import XcvarioPolar
 
@@ -71,8 +70,7 @@ class SxHawkTcpAdapter(XcvarioTcpAdapter):
         payload_parts = []
         if include_position:
             position_ownship = self._ownship_for_position_output(snapshot)
-            gps_ownship = _ownship_with_wind_adjusted_ground_velocity(position_ownship, snapshot.wind)
-            payload_parts.append(build_gprmc(gps_ownship))
+            payload_parts.append(build_gprmc(position_ownship, wind=snapshot.wind))
             payload_parts.append(build_gpgga(position_ownship))
 
         payload_parts.append(build_lxwp0(snapshot.ownship, snapshot.wind))

@@ -154,6 +154,9 @@ contact with the highest alarm level and reports aircraft `AlarmType=2` for
 levels `1`-`3`, enabling collision audio and overlays in compatible clients.
 `$PFLAA`/`$PFLAU` emit the six-hex-digit device ID, while the control API and
 panel also expose competition ID, registration, model labels and speed.
+The FLARM channel sends the simulated ownship position with date and time in UTC
+in the RMC sentence and time in UTC in the GGA sentence. Traffic positions in
+PFLAA carry relative offsets without timestamps.
 
 The `SxHAWK` telemetry stream follows the LXNAV/LX protocol parsed by the
 `LX`/LXNAV driver in `kigo_nav`: `GPRMC`, `GPGGA`, `LXWP0`, `LXWP1`, `LXWP2`

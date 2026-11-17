@@ -9,6 +9,7 @@ from typing import Sequence
 
 from .baro import STANDARD_QNH_HPA, static_pressure_to_qnh_altitude_m
 from .contracts import OwnshipState, TrafficContact, WindState
+from .flight_math import ground_velocity_from_true_wind
 from .state import FlightPhase
 
 DRY_AIR_GAS_CONSTANT_J_PER_KG_K = 287.05
@@ -28,11 +29,19 @@ def build_nmea_sentence(sentence_body: str) -> str:
     return f"${sentence_body}*{checksum:02X}\r\n"
 
 
-def build_gprmc(ownship: OwnshipState) -> str:
+def build_gprmc(ownship: OwnshipState, *, wind: WindState | None = None) -> str:
     timestamp = _parse_timestamp(ownship.timestamp_utc)
     latitude_text, latitude_hemisphere = format_latitude(ownship.latitude_deg)
     longitude_text, longitude_hemisphere = format_longitude(ownship.longitude_deg)
-    speed_knots = ownship.speed_kmh / 1.852
+    speed_kmh, track_deg = ownship.speed_kmh, ownship.track_deg
+    if wind is not None and not ownship.on_ground:
+        speed_kmh, track_deg = ground_velocity_from_true_wind(
+            airspeed_kmh=speed_kmh,
+            track_deg=track_deg,
+            wind_from_direction_deg=wind.direction_deg,
+            wind_speed_kmh=wind.speed_kmh,
+        )
+    speed_knots = speed_kmh / 1.852
     body = ",".join(
         [
             "GPRMC",
@@ -43,7 +52,7 @@ def build_gprmc(ownship: OwnshipState) -> str:
             longitude_text,
             longitude_hemisphere,
             f"{speed_knots:.1f}",
-            f"{ownship.track_deg:.1f}",
+            f"{track_deg:.1f}",
             timestamp.strftime("%d%m%y"),
             "",
             "",

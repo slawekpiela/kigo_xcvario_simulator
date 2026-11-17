@@ -1,4 +1,4 @@
-"""TCP listener that exposes traffic data as FLARM-compatible NMEA."""
+"""TCP listener that exposes ownship GPS and traffic as FLARM-compatible NMEA."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from threading import Event, Lock, Thread, current_thread
 
 from .contracts import SimulationSnapshot
 from .flarm_passthrough import FlarmPassthroughSimulator
-from .nmea import build_pflaa, build_pflau
+from .nmea import build_gpgga, build_gprmc, build_pflaa, build_pflau
 
 
 class FlarmTcpAdapter:
@@ -98,7 +98,11 @@ class FlarmTcpAdapter:
 
     def publish_snapshot(self, snapshot: SimulationSnapshot) -> None:
         traffic = snapshot.traffic
-        payload = [build_pflau(traffic)]
+        payload = [
+            build_gprmc(snapshot.ownship, wind=snapshot.wind),
+            build_gpgga(snapshot.ownship),
+            build_pflau(traffic),
+        ]
         payload.extend(build_pflaa(contact) for contact in traffic)
         self._send("".join(payload).encode("ascii"))
 

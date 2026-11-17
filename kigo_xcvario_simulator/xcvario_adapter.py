@@ -8,10 +8,9 @@ import math
 import socket
 from threading import Event, Lock, Thread, current_thread
 
-from .contracts import OwnshipState, SimulationSnapshot, WindState
+from .contracts import SimulationSnapshot
 from .baro import qnh_hpa_for_static_pressure, static_pressure_hpa_for_altitude
 from .flarm_passthrough import FlarmPassthroughSimulator
-from .flight_math import ground_velocity_from_true_wind
 from .nmea import (
     build_gpgga,
     build_gprmc,
@@ -171,8 +170,7 @@ class XcvarioTcpAdapter:
         payload_parts = []
         if include_position:
             position_ownship = self._ownship_for_position_output(snapshot)
-            gps_ownship = _ownship_with_wind_adjusted_ground_velocity(position_ownship, snapshot.wind)
-            payload_parts.append(build_gprmc(gps_ownship))
+            payload_parts.append(build_gprmc(position_ownship, wind=snapshot.wind))
             payload_parts.append(build_gpgga(position_ownship))
         payload_parts.append(build_hchdm(snapshot.ownship))
         payload_parts.append(
@@ -463,22 +461,6 @@ def _socket_endpoint(client_socket: socket.socket, *, local: bool) -> tuple[str,
 
 def _format_endpoint(host: str, port: int | None) -> str:
     return f"{host}:{port}" if port is not None else host
-
-
-def _ownship_with_wind_adjusted_ground_velocity(ownship: OwnshipState, wind: WindState) -> OwnshipState:
-    if ownship.on_ground:
-        return ownship
-    ground_speed_kmh, ground_track_deg = ground_velocity_from_true_wind(
-        airspeed_kmh=ownship.speed_kmh,
-        track_deg=ownship.track_deg,
-        wind_from_direction_deg=wind.direction_deg,
-        wind_speed_kmh=wind.speed_kmh,
-    )
-    return replace(
-        ownship,
-        speed_kmh=ground_speed_kmh,
-        track_deg=ground_track_deg,
-    )
 
 
 def _circling_ahrs_roll_angle_deg(snapshot: SimulationSnapshot) -> float | None:

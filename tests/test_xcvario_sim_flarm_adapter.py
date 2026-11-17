@@ -1,8 +1,9 @@
+from dataclasses import replace
 import socket
 import time
 import unittest
 
-from kigo_xcvario_simulator.contracts import OwnshipState, SimulationSnapshot, TrafficContact
+from kigo_xcvario_simulator.contracts import OwnshipState, SimulationSnapshot, TrafficContact, WindState
 from kigo_xcvario_simulator.flarm_adapter import FlarmTcpAdapter
 from kigo_xcvario_simulator.nmea import build_nmea_sentence
 from kigo_xcvario_simulator.state import FlightPhase, HealthState, RuntimeState
@@ -36,7 +37,7 @@ def _snapshot() -> SimulationSnapshot:
 
 
 class FlarmAdapterTests(unittest.TestCase):
-    def test_client_receives_pflaa_and_pflau_sentences(self):
+    def test_client_receives_ownship_gps_and_traffic_sentences(self):
         adapter = FlarmTcpAdapter(bind_host="127.0.0.1", port=0)
         adapter.start()
         self.addCleanup(adapter.stop)
@@ -45,12 +46,26 @@ class FlarmAdapterTests(unittest.TestCase):
         self.addCleanup(client.close)
         time.sleep(0.05)
 
-        adapter.publish_snapshot(_snapshot())
-        payload = client.recv(4096).decode("ascii")
+        snapshot = _snapshot()
+        ownship = replace(snapshot.ownship, timestamp_utc="2026-05-08T23:59:59.000Z", track_deg=90.0)
+        snapshot = replace(snapshot, ownship=ownship, wind=WindState(direction_deg=90.0, speed_kmh=15.0))
+        adapter.publish_snapshot(snapshot)
+        with client.makefile("r", encoding="ascii") as stream:
+            rmc, gga, heartbeat, contact, _ = (stream.readline() for _ in range(5))
+            rmc_fields = rmc.split(",")
+            self.assertEqual(rmc_fields[0:3], ["$GPRMC", "235959.00", "A"])
+            self.assertEqual(rmc_fields[7:10], ["40.5", "90.0", "080526"])
+            self.assertEqual(gga.split(",")[:6], ["$GPGGA", "235959.00", *rmc_fields[3:7]])
+            self.assertTrue(heartbeat.startswith("$PFLAU,2,"))
+            self.assertIn("TFC-01", contact)
 
-        self.assertIn("$PFLAU,", payload)
-        self.assertIn("$PFLAA,", payload)
-        self.assertIn("TFC-01", payload)
+            ownship = replace(ownship, timestamp_utc="2026-05-09T00:00:00.000Z")
+            adapter.publish_snapshot(replace(snapshot, ownship=ownship, traffic=()))
+            rmc, gga, heartbeat = (stream.readline() for _ in range(3))
+            self.assertTrue(rmc.startswith("$GPRMC,000000.00,"))
+            self.assertEqual(rmc.split(",")[9], "090526")
+            self.assertTrue(gga.startswith("$GPGGA,000000.00,"))
+            self.assertTrue(heartbeat.startswith("$PFLAU,0,"))
 
     def test_new_client_can_reconnect_and_receive_future_payload(self):
         adapter = FlarmTcpAdapter(bind_host="127.0.0.1", port=0)

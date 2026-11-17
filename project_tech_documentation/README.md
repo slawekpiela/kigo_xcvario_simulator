@@ -91,6 +91,10 @@ _To be filled as durable knowledge is discovered._
 - XCVario/SxHAWK GPS output then derives `$GPRMC` speed/course over ground by applying the same
   true-wind vector to the ownship air vector, while `$GPGGA` carries the already wind-drifted
   position and `$HCHDM`/`$LXWP0` keep the air heading/airspeed-style values.
+- TCP and online FLARM share the same adapter. Each FLARM frame includes RMC
+  and GGA from the ownship snapshot timestamp at the traffic cadence
+  (1 Hz by default). RMC uses the same wind-adjusted speed and course as the
+  primary GPS stream. PFLAA carries relative traffic positions without timestamps.
 - The XCVario adapter exposes airspeed to `kigo_nav` indirectly through dynamic pressure, not as an
   explicit `$POV,S,<tas>` field. `xcvario_adapter.publish_snapshot()` computes dynamic pressure from
   `OwnshipState.speed_kmh`; `nmea.build_pxcv()` and `nmea.build_pov()` emit it as `Q`. During the
