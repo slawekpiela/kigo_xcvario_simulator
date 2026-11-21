@@ -44,8 +44,11 @@ Keep bridge administration private. Limits: 50 sessions, eight byte connections
 per session, 16 KiB per exchange and 256 concurrent HTTP connections. The
 trusted gateway source address is read from `X-Real-IP` only when the direct
 peer is loopback. One source IP can own at most two active sessions. One
-Application ID accepts at most two source IPs active within the last two minutes;
-a third receives HTTP 429 with `Retry-After`. The gateway separately limits
+Application ID allows its owning panel from at most two source IPs within the
+last two minutes; a third panel network receives HTTP 429 with `Retry-After`.
+Device exchanges do not consume this panel-IP allowance: receivers on different
+networks share the flight concurrently, within the existing eight byte-connection
+limit. A device connection does not displace another receiver. The gateway separately limits
 `/simulator/api/session` to 2 requests/minute/IP with burst 1, one concurrent
 request/IP, and 10 requests/minute globally with burst 2.
 

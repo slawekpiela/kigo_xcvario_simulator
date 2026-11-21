@@ -17,6 +17,10 @@ select **SIM Vario** and **SIM FLARM** in two device slots under
 `Setup > Hardware & related > Hardware > Devices > Edit > Port`.
 These new ports require an app version containing TASK-nav-000482.
 There are no addresses or TCP port numbers to enter in Kigo.
+Every device with the same Application ID receives the same flight and FLARM
+traffic concurrently, including devices on different networks. Keep the owning
+browser panel open. Up to eight byte connections (normally four devices with
+both ports) can be active per session.
 When changing from circling left or right to straight flight, the online panel
 automatically keeps the altitude reached in the thermal. The preserved altitude
 continues in the GPS/barometric telemetry sent to Kigo instead of reverting to

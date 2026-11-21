@@ -200,7 +200,9 @@ class SessionRegistry:
             session = self.sessions.get(key)
             if session is None:
                 raise ApiError(404, "Waiting: open the simulator page and enter this Application ID.")
-            session.touch_peer(peer)
+            # Receivers sharing an Application ID may use different networks.
+            # Bound their sockets in OnlineSession.channel(), not by source IP;
+            # otherwise a panel and one phone exclude the next phone.
             return session
 
     def get_panel(self, key, panel_client_id, create=False, peer=""):

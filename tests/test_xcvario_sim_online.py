@@ -161,16 +161,52 @@ class OnlineTests(unittest.TestCase):
         self.assertEqual(status, 429, data)
         self.assertEqual(response_headers["Retry-After"], "60")
 
-    def test_application_id_allows_two_active_ips_then_recovers(self):
+    def test_panel_allows_two_active_ips_then_recovers(self):
         session = self.registry.get_panel("alpha", PANEL_A, create=True, peer="198.51.100.1")
         self.registry.get_panel("alpha", PANEL_A, peer="198.51.100.2")
         with self.assertRaises(ApiError) as rejected:
-            self.registry.get("alpha", "198.51.100.3")
+            self.registry.get_panel("alpha", PANEL_A, peer="198.51.100.3")
         self.assertEqual(rejected.exception.status, 429)
         self.assertEqual(rejected.exception.retry_after, 120)
         session.active_peers["198.51.100.1"] -= 121
-        self.assertIs(self.registry.get("alpha", "198.51.100.3"), session)
+        self.assertIs(self.registry.get_panel("alpha", PANEL_A, peer="198.51.100.3"), session)
         self.assertEqual(set(session.active_peers), {"198.51.100.2", "198.51.100.3"})
+
+    def test_same_id_broadcasts_both_channels_to_receivers_on_three_networks(self):
+        panel_headers = {"X-Real-IP": "198.51.100.1"}
+        status, data = self.post("session", {"application_id": "shared", "panel_client": PANEL_A},
+                                 panel_headers)
+        self.assertEqual(status, 200, data)
+        receivers = [(kind, str(index) * 32, {"X-Real-IP": f"198.51.100.{index + 1}"})
+                     for index in range(1, 4) for kind in ("vario", "flarm")]
+
+        def receive(receiver, sequence):
+            kind, client, headers = receiver
+            status, data = self.post("exchange", {"application_id": "shared", "channel": kind,
+                "client": client, "sequence": sequence, "data": ""}, headers)
+            self.assertEqual(status, 200, data)
+            self.assertTrue(data.startswith(b"OK\n"), data)
+            return bytes.fromhex(data[3:].decode())
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+            list(pool.map(lambda receiver: receive(receiver, 1), receivers))
+            session = self.registry.sessions["shared"]
+            self.control("shared", "manual-mode", {"phase": "straight", "speed_kmh": 100,
+                         "baro_altitude_m": 1500, "climb_min_ms": 0, "climb_max_ms": 0})
+            self.control("shared", "traffic", {"enabled": True, "contact_count": 2})
+            self.control("shared", "start")
+            received = [b"" for _ in receivers]
+            for sequence in range(2, 9):
+                for i, wire in enumerate(pool.map(lambda receiver: receive(receiver, sequence), receivers)):
+                    received[i] += wire
+                if all((b"$GPRMC" in wire and (b"$PXCV" if receiver[0] == "vario" else b"$PFLAA") in wire)
+                       for receiver, wire in zip(receivers, received)):
+                    break
+            for receiver, wire in zip(receivers, received):
+                self.assertIn(b"$GPRMC", wire, receiver)
+                self.assertIn(b"$PXCV" if receiver[0] == "vario" else b"$PFLAA", wire, receiver)
+            self.assertEqual(len(session.channels), 6)
+            self.assertEqual(session.runtime.get_snapshot().runtime_state, RuntimeState.RUNNING)
 
     def test_session_without_device_expires_after_five_minutes(self):
         session = self.create("alpha")

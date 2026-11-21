@@ -63,8 +63,14 @@ _To be filled as durable knowledge is discovered._
   the deploy document for resource bounds.
 - The frontend reuses its active session and calls `/api/session` only when the
   user first opens it or once after HTTP 404 reports expiry. The registry allows
-  at most two sessions created by one trusted source IP and at most two source
-  IPs active on one Application ID during a rolling two-minute window. The
+  at most two sessions created by one trusted source IP and at most two panel
+  source IPs active on one Application ID during a rolling two-minute window.
+  Device exchanges bypass this panel-peer check: every distinct client on the
+  same Application ID receives its own broadcast stream, across networks.
+  The existing eight channel-socket limit still bounds session resources.
+  BUG-nav-000742 reproduced the old HTTP429 rejection with a panel plus
+  three receivers; a six-channel concurrent regression checks GPS, XCVario
+  and FLARM data for all three without resetting the session. The
   loopback service accepts `X-Real-IP` only from a loopback peer; the gateway
   overwrites that header from its verified Cloudflare client address.
 - Application ID selects a session, not proof of account ownership. One active
